@@ -1,5 +1,4 @@
 import logging
-import re
 from collections.abc import AsyncIterator, Callable
 from functools import partial
 from typing import Any, Literal, NamedTuple
@@ -9,8 +8,6 @@ from claude_agent_sdk import (
     ClaudeSDKClient,
     ClaudeSDKError,
     ResultMessage,
-    TextBlock,
-    UserMessage,
 )
 from app.constants import SANDBOX_GIT_ASKPASS_PATH, SANDBOX_HOME_DIR
 from app.core.config import get_settings
@@ -105,6 +102,7 @@ class ClaudeAgentService:
         self.tool_registry = ToolHandlerRegistry()
         self.session_factory = session_factory or SessionLocal
         self._total_cost_usd = 0.0
+        self._usage: dict[str, Any] | None = None
         self._provider_service = ProviderService()
 
     def _create_sandbox_transport(
@@ -223,6 +221,7 @@ class ClaudeAgentService:
         attachments: list[dict[str, Any]] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         self._total_cost_usd = 0.0
+        self._usage = None
         user_prompt = self.prepare_user_prompt(prompt, custom_instructions, attachments)
 
         prompt_message = {
@@ -241,19 +240,26 @@ class ClaudeAgentService:
         try:
             await client.query(prompt_iterable)
             async for message in client.receive_response():
+                prev_usage = processor.usage
                 for event in processor.emit_events_for_message(message):
                     if event:
                         yield event
                         if event.get("tool", {}).get("name") == "ExitPlanMode":
                             await client.set_permission_mode("auto")
+                if processor.usage is not prev_usage:
+                    self._usage = processor.usage
 
             self._total_cost_usd = processor.total_cost_usd
+            self._usage = processor.usage
 
         except ClaudeSDKError as e:
             raise ClaudeAgentException(f"Claude SDK error: {str(e)}") from e
 
     def get_total_cost_usd(self) -> float:
         return self._total_cost_usd
+
+    def get_usage(self) -> dict[str, Any] | None:
+        return self._usage
 
     def _create_session_handler(
         self, session_callback: Callable[[str], None] | None
@@ -558,81 +564,3 @@ class ClaudeAgentService:
         prompt_message: dict[str, Any],
     ) -> AsyncIterator[dict[str, Any]]:
         yield prompt_message
-
-    async def get_context_token_usage(
-        self,
-        session_id: str,
-        sandbox_id: str,
-        model_id: str,
-        user_settings: UserSettings,
-    ) -> int | None:
-        try:
-            env, _ = self._build_auth_env(model_id, user_settings)
-            _, actual_model_id = self._provider_service.get_provider_for_model(
-                user_settings, model_id
-            )
-
-            options = ClaudeAgentOptions(
-                system_prompt="",
-                permission_mode="bypassPermissions",
-                model=actual_model_id,
-                cwd=SANDBOX_HOME_DIR,
-                user="user",
-                resume=session_id,
-                env=env,
-            )
-
-            prompt_message = {
-                "type": "user",
-                "message": {"role": MessageRole.USER.value, "content": "/context"},
-                "parent_tool_use_id": None,
-                "session_id": session_id,
-            }
-
-            prompt_iterable = self._create_prompt_iterable(prompt_message)
-
-            transport = self._create_sandbox_transport(
-                sandbox_provider=user_settings.sandbox_provider,
-                sandbox_id=sandbox_id,
-                options=options,
-                user_settings=user_settings,
-            )
-
-            async with transport:
-                response_content = ""
-                async with ClaudeSDKClient(
-                    options=options, transport=transport
-                ) as client:
-                    await client.query(prompt_iterable)
-                    async for message in client.receive_response():
-                        if isinstance(message, UserMessage):
-                            if isinstance(message.content, str):
-                                response_content += message.content
-                            elif isinstance(message.content, list):
-                                for item in message.content:
-                                    if isinstance(item, TextBlock) and item.text:
-                                        response_content += item.text
-
-            if not response_content:
-                return None
-
-            # The Claude CLI outputs context info in a specific format:
-            #   <local-command-stdout>...**Tokens:** 12.5k...</local-command-stdout>
-            # Parse with regex to extract token count in thousands (e.g., "12.5k" -> 12500)
-            stdout_match = re.search(
-                r"<local-command-stdout>(.*?)</local-command-stdout>",
-                response_content,
-                re.DOTALL,
-            )
-            if stdout_match:
-                token_match = re.search(
-                    r"\*\*Tokens:\*\*\s*(\d+(?:\.\d+)?)k", stdout_match.group(1)
-                )
-                if token_match:
-                    return int(float(token_match.group(1)) * 1000)
-
-            return None
-
-        except Exception as e:
-            logger.error("Failed to get context token usage: %s", e)
-            return None

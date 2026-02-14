@@ -35,6 +35,7 @@ class StreamProcessor:
         self._tool_registry = tool_registry
         self._session_handler = session_handler
         self.total_cost_usd = 0.0
+        self.usage: dict[str, Any] | None = None
 
     def _process_session_init(self, message: SystemMessage) -> None:
         if message.subtype != "init" or not self._session_handler:
@@ -52,6 +53,8 @@ class StreamProcessor:
             return
 
         if isinstance(message, AssistantMessage):
+            if message.usage is not None:
+                self.usage = message.usage
             yield from self._emit_assistant_events(message)
             return
 

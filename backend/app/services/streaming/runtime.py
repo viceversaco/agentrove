@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from collections.abc import AsyncIterator
@@ -11,7 +12,7 @@ from uuid import UUID, uuid4
 from redis.asyncio import Redis
 from sqlalchemy import select
 
-from app.constants import REDIS_KEY_CHAT_STREAM_LIVE
+from app.constants import REDIS_KEY_CHAT_CONTEXT_USAGE, REDIS_KEY_CHAT_STREAM_LIVE
 from app.core.config import get_settings
 from app.db.session import SessionLocal
 from app.models.db_models import (
@@ -30,7 +31,6 @@ from app.services.message import MessageService
 from app.services.queue import QueueService
 from app.services.sandbox import SandboxService
 from app.services.streaming.cancellation import CancellationHandler
-from app.services.streaming.context_usage import ContextUsagePoller
 from app.services.streaming.types import (
     ChatStreamRequest,
     StreamEnvelope,
@@ -192,7 +192,7 @@ class ChatStreamRuntime:
                     last_seq=start_seq,
                     active_stream_id=self.stream_id,
                 )
-            await self._consume_stream(stream)
+            await self._consume_stream(ai_service, stream)
 
             if self._cancelled:
                 return await self._complete_stream(
@@ -218,9 +218,11 @@ class ChatStreamRuntime:
 
     async def _consume_stream(
         self,
+        ai_service: ClaudeAgentService,
         stream: AsyncIterator[StreamEvent],
     ) -> None:
         stream_iter = aiter(stream)
+        last_usage: dict[str, Any] | None = None
         try:
             while True:
                 event = await self._next_or_cancel(stream_iter)
@@ -232,6 +234,11 @@ class ChatStreamRuntime:
                 payload = {k: v for k, v in event.items() if k != "type"}
                 await self.emit_event(kind, payload)
                 await self._flush_snapshot(force=False)
+
+                current_usage = ai_service.get_usage()
+                if current_usage is not None and current_usage is not last_usage:
+                    last_usage = current_usage
+                    await self._emit_context_usage(ai_service)
         except asyncio.CancelledError:
             if not (self._cancel_event and self._cancel_event.is_set()):
                 raise
@@ -389,14 +396,14 @@ class ChatStreamRuntime:
             await self._create_checkpoint()
             queue_processed = await self._process_next_queued()
             if not queue_processed:
-                await self._emit_final_context_usage(ai_service)
+                await self._emit_context_usage(ai_service)
                 await self.emit_event(
                     "complete",
                     {"status": "completed"},
                     apply_snapshot=False,
                 )
         else:
-            await self._emit_final_context_usage(ai_service)
+            await self._emit_context_usage(ai_service)
             terminal_kind = (
                 "cancelled" if status == MessageStreamStatus.INTERRUPTED else "complete"
             )
@@ -515,25 +522,56 @@ class ChatStreamRuntime:
             logger.error("Failed to process queued message: %s", exc)
             return False
 
-    async def _emit_final_context_usage(self, ai_service: ClaudeAgentService) -> None:
-        session_id = (
-            self.session_container.get("session_id")
-            if self.session_container
-            else self.chat.session_id
-        )
-        if (
-            not session_id
-            or not self.sandbox_id
-            or not self.user_id
-            or not self.model_id
-            or not self.redis
-        ):
+    async def _emit_context_usage(self, ai_service: ClaudeAgentService) -> None:
+        usage = ai_service.get_usage()
+        if not usage or not self.redis:
             return
 
-        await ContextUsagePoller(runtime=self).refresh(
-            ai_service=ai_service,
-            session_id=str(session_id),
+        token_usage = (
+            usage.get("input_tokens", 0)
+            + usage.get("cache_creation_input_tokens", 0)
+            + usage.get("cache_read_input_tokens", 0)
         )
+        if token_usage <= 0:
+            return
+
+        context_window = settings.CONTEXT_WINDOW_TOKENS
+        percentage = (
+            min((token_usage / context_window) * 100, 100.0)
+            if context_window > 0
+            else 0.0
+        )
+        context_data: dict[str, Any] = {
+            "tokens_used": token_usage,
+            "context_window": context_window,
+            "percentage": percentage,
+        }
+
+        try:
+            async with self.session_factory() as db:
+                result = await db.execute(select(Chat).filter(Chat.id == self.chat.id))
+                chat = result.scalar_one_or_none()
+                if chat:
+                    chat.context_token_usage = token_usage
+                    db.add(chat)
+                    await db.commit()
+
+            await self.redis.setex(
+                REDIS_KEY_CHAT_CONTEXT_USAGE.format(chat_id=self.chat_id),
+                settings.CONTEXT_USAGE_CACHE_TTL_SECONDS,
+                json.dumps(context_data),
+            )
+
+            if self.assistant_message_id:
+                await self.emit_event(
+                    "system",
+                    {"context_usage": context_data, "chat_id": self.chat_id},
+                    apply_snapshot=False,
+                )
+        except Exception as exc:
+            logger.debug(
+                "Context usage update failed for chat %s: %s", self.chat_id, exc
+            )
 
     @classmethod
     async def stop_background_chats(cls) -> None:
@@ -736,12 +774,7 @@ class ChatStreamRuntime:
                         session_callback=session_callback,
                         attachments=request.attachments,
                     )
-                    context_poller = ContextUsagePoller(runtime=runtime)
-                    poll_task, stop_event = context_poller.start(ai_service)
-                    try:
-                        return await runtime.run(ai_service, stream)
-                    finally:
-                        await ContextUsagePoller.stop(poll_task, stop_event)
+                    return await runtime.run(ai_service, stream)
                 except (
                     ClaudeAgentException,
                     asyncio.CancelledError,
