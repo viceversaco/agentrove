@@ -9,6 +9,7 @@ from claude_agent_sdk import (
     ClaudeSDKError,
     ResultMessage,
 )
+
 from app.constants import SANDBOX_GIT_ASKPASS_PATH, SANDBOX_HOME_DIR
 from app.core.config import get_settings
 from app.core.security import create_chat_scoped_token
@@ -16,9 +17,12 @@ from app.db.session import SessionLocal
 from app.models.db_models import Chat, MessageRole, User, UserSettings
 from app.models.schemas.settings import ProviderType
 from app.prompts.enhance_prompt import get_enhance_prompt
-from app.services.provider import ProviderService
 from app.services.exceptions import ClaudeAgentException
+from app.services.provider import ProviderService
 from app.services.sandbox_providers import SandboxProviderType, create_docker_config
+from app.services.streaming.processor import StreamProcessor
+from app.services.streaming.types import StreamEvent
+from app.services.tool_handler import ToolHandlerRegistry
 from app.services.transports import (
     DockerSandboxTransport,
     E2BSandboxTransport,
@@ -26,9 +30,6 @@ from app.services.transports import (
     ModalSandboxTransport,
     SandboxTransport,
 )
-from app.services.streaming.types import StreamEvent
-from app.services.streaming.processor import StreamProcessor
-from app.services.tool_handler import ToolHandlerRegistry
 from app.services.user import UserService
 
 SDKPermissionMode = Literal["default", "acceptEdits", "plan", "bypassPermissions"]
@@ -60,7 +61,7 @@ ALLOWED_SLASH_COMMANDS = [
 SDK_PERMISSION_MODE_MAP: dict[str, SDKPermissionMode] = {
     "plan": "plan",
     "ask": "default",
-    "auto": "default",
+    "auto": "bypassPermissions",
 }
 
 
