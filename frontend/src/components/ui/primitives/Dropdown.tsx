@@ -168,7 +168,7 @@ function DropdownInner<T>({
                   onKeyDown={handleSearchKeyDown}
                   placeholder={searchPlaceholder}
                   autoFocus={!isMobile}
-                  className="h-7 w-full rounded-lg border border-border bg-surface-tertiary py-1 pl-7 pr-7 text-xs text-text-primary transition-all duration-200 placeholder:text-text-quaternary focus:border-border-hover focus:outline-none dark:border-border-dark dark:bg-surface-dark-tertiary dark:text-text-dark-primary dark:placeholder:text-text-dark-quaternary dark:focus:border-border-dark-hover"
+                  className="h-7 w-full rounded-lg border border-border bg-surface-tertiary py-1 pl-7 pr-7 text-xs text-text-primary transition-colors duration-200 placeholder:text-text-quaternary focus:border-border-hover focus:outline-none dark:border-border-dark dark:bg-surface-dark-tertiary dark:text-text-dark-primary dark:placeholder:text-text-dark-quaternary dark:focus:border-border-dark-hover"
                 />
                 {searchQuery && (
                   <Button
