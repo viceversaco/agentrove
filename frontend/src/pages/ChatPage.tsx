@@ -10,22 +10,14 @@ import { SplitViewContainer } from '@/components/ui/SplitViewContainer';
 import { Spinner } from '@/components/ui/primitives/Spinner';
 import type { ViewType } from '@/types/ui.types';
 import { Chat as ChatComponent } from '@/components/chat/chat-window/Chat';
-import { useQueryClient } from '@tanstack/react-query';
-import { useChatStreaming } from '@/hooks/useChatStreaming';
-import { usePermissionRequest } from '@/hooks/usePermissionRequest';
-import { useInitialPrompt } from '@/hooks/useInitialPrompt';
+import { ChatSessionOrchestrator } from '@/components/chat/ChatSessionOrchestrator';
 import { useEditorState } from '@/hooks/useEditorState';
-import { useMessageInitialization } from '@/hooks/useMessageInitialization';
 import { useChatData } from '@/hooks/useChatData';
 import { useSandboxFiles } from '@/hooks/useSandboxFiles';
-import { useContextUsageState } from '@/hooks/useContextUsageState';
 import { useModelSelection } from '@/hooks/queries/useModelQueries';
 import { useSettingsQuery } from '@/hooks/queries/useSettingsQueries';
 import { mergeAgents } from '@/utils/settings';
 import { ChatProvider } from '@/contexts/ChatContext';
-import { ChatSessionProvider } from '@/contexts/ChatSessionContext';
-import { ChatInputMessageProvider } from '@/contexts/ChatInputMessageContext';
-import type { ChatSessionState, ChatSessionActions } from '@/contexts/ChatSessionContextDefinition';
 
 const Editor = lazy(() =>
   import('@/components/editor/editor-core/Editor').then((m) => ({ default: m.Editor })),
@@ -58,35 +50,18 @@ const viewLoadingFallback = (
 export function ChatPage() {
   const { chatId } = useParams();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
 
-  const { attachedFiles, setAttachedFiles, setCurrentChat } = useChatStore(
+  const setCurrentChat = useChatStore((state) => state.setCurrentChat);
+
+  const { selectedModelId } = useModelSelection();
+
+  const { currentView, secondaryView, setCurrentView } = useUIStore(
     useShallow((state) => ({
-      attachedFiles: state.attachedFiles,
-      setAttachedFiles: state.setAttachedFiles,
-      setCurrentChat: state.setCurrentChat,
-    })),
-  );
-
-  const { selectedModelId, selectModel } = useModelSelection();
-
-  const { permissionMode, thinkingMode, currentView, secondaryView, setCurrentView } = useUIStore(
-    useShallow((state) => ({
-      permissionMode: state.permissionMode,
-      thinkingMode: state.thinkingMode,
       currentView: state.currentView,
       secondaryView: state.secondaryView,
       setCurrentView: state.setCurrentView,
     })),
   );
-
-  const {
-    initialPrompt,
-    setInitialPrompt,
-    initialPromptSent,
-    setInitialPromptSent,
-    initialPromptFromRoute,
-  } = useInitialPrompt();
 
   const { chats, currentChat, fetchedMessages, hasFetchedMessages, chatsQueryMeta, messagesQuery } =
     useChatData(chatId);
@@ -130,8 +105,6 @@ export function ChatPage() {
     };
   }, [currentView, secondaryView, currentChat?.sandbox_id, refetchFilesMetadata]);
 
-  const { contextUsage, updateContextUsage } = useContextUsageState(chatId, currentChat);
-
   const { data: settings } = useSettingsQuery();
 
   const allAgents = useMemo(() => mergeAgents(settings?.custom_agents), [settings?.custom_agents]);
@@ -147,98 +120,14 @@ export function ChatPage() {
   const { selectedFile, setSelectedFile, isRefreshing, handleRefresh, handleFileSelect } =
     useEditorState(refetchFilesMetadata);
 
-  const {
-    pendingRequest,
-    isLoading: isPermissionLoading,
-    error: permissionError,
-    handlePermissionRequest,
-    handleApprove,
-    handleReject,
-  } = usePermissionRequest(chatId);
-
-  const streamingState = useChatStreaming({
-    chatId,
-    currentChat,
-    fetchedMessages,
-    hasFetchedMessages,
-    isInitialLoading: messagesQuery.isLoading,
-    queryClient,
-    refetchFilesMetadata,
-    onContextUsageUpdate: updateContextUsage,
-    selectedModelId,
-    permissionMode,
-    thinkingMode,
-    onPermissionRequest: handlePermissionRequest,
-  });
-
-  const {
-    messages,
-    sendMessage,
-    isLoading,
-    isStreaming,
-    error,
-    wasAborted,
-    setWasAborted,
-    setMessages,
-  } = streamingState;
-
-  useMessageInitialization({
-    fetchedMessages,
-    chatId,
-    selectedModelId,
-    hasMessages: messages.length > 0,
-    initialPromptFromRoute,
-    initialPromptSent,
-    wasAborted,
-    attachedFiles,
-    isLoading,
-    isStreaming,
-    setMessages,
-    setInitialPrompt,
-  });
-
-  useEffect(() => {
-    if (
-      initialPrompt &&
-      messages.length === 1 &&
-      !isLoading &&
-      !isStreaming &&
-      !initialPromptSent &&
-      !error &&
-      !messagesQuery.isLoading &&
-      !hasFetchedMessages
-    ) {
-      const userMessage = messages[0];
-      sendMessage(initialPrompt, chatId, userMessage, attachedFiles);
-      setInitialPromptSent(true);
-      setAttachedFiles([]);
-    }
-  }, [
-    initialPrompt,
-    messages,
-    messages.length,
-    isLoading,
-    isStreaming,
-    sendMessage,
-    chatId,
-    initialPromptSent,
-    error,
-    setAttachedFiles,
-    messagesQuery.isLoading,
-    hasFetchedMessages,
-    attachedFiles,
-    setInitialPromptSent,
-  ]);
-
   useEffect(() => {
     setCurrentChat(currentChat || null);
   }, [currentChat, setCurrentChat]);
 
   useEffect(() => {
-    setInitialPromptSent(false);
     setSelectedFile(null);
     setCurrentView('agent');
-  }, [chatId, setInitialPromptSent, setSelectedFile, setCurrentView]);
+  }, [chatId, setSelectedFile, setCurrentView]);
 
   const handleChatSelect = useCallback(
     (selectedChatId: string) => {
@@ -246,14 +135,6 @@ export function ChatPage() {
     },
     [navigate],
   );
-
-  const handleRestoreSuccess = useCallback(() => {
-    setWasAborted(false);
-    messagesQuery.refetch();
-    if (currentChat?.sandbox_id) {
-      refetchFilesMetadata();
-    }
-  }, [setWasAborted, messagesQuery, currentChat?.sandbox_id, refetchFilesMetadata]);
 
   const sidebarContent = useMemo(() => {
     if (currentView !== 'agent') return null;
@@ -280,84 +161,11 @@ export function ChatPage() {
 
   useLayoutSidebar(sidebarContent);
 
-  const chatSessionState = useMemo<ChatSessionState>(
-    () => ({
-      messages,
-      isLoading,
-      isStreaming,
-      isInitialLoading: messagesQuery.isLoading,
-      error,
-      copiedMessageId: streamingState.copiedMessageId,
-      pendingUserMessageId: streamingState.pendingUserMessageId ?? null,
-      attachedFiles: streamingState.inputFiles ?? null,
-      selectedModelId,
-      contextUsage,
-      hasNextPage: messagesQuery.hasNextPage ?? false,
-      isFetchingNextPage: messagesQuery.isFetchingNextPage ?? false,
-      pendingPermissionRequest: pendingRequest ?? null,
-      isPermissionLoading,
-      permissionError: permissionError ?? null,
-    }),
-    [
-      messages,
-      streamingState.copiedMessageId,
-      streamingState.pendingUserMessageId,
-      streamingState.inputFiles,
-      isLoading,
-      isStreaming,
-      messagesQuery.isLoading,
-      messagesQuery.hasNextPage,
-      messagesQuery.isFetchingNextPage,
-      error,
-      selectedModelId,
-      contextUsage,
-      pendingRequest,
-      isPermissionLoading,
-      permissionError,
-    ],
-  );
-
-  const chatSessionActions = useMemo<ChatSessionActions>(
-    () => ({
-      onSubmit: streamingState.handleMessageSend,
-      onStopStream: streamingState.handleStop,
-      onCopy: streamingState.handleCopy,
-      onAttach: streamingState.setInputFiles,
-      onModelChange: selectModel,
-      onDismissError: streamingState.handleDismissError,
-      fetchNextPage: messagesQuery.fetchNextPage,
-      onRestoreSuccess: handleRestoreSuccess,
-      onPermissionApprove: handleApprove,
-      onPermissionReject: handleReject,
-    }),
-    [
-      streamingState.handleMessageSend,
-      streamingState.handleStop,
-      streamingState.handleCopy,
-      streamingState.setInputFiles,
-      streamingState.handleDismissError,
-      selectModel,
-      messagesQuery.fetchNextPage,
-      handleRestoreSuccess,
-      handleApprove,
-      handleReject,
-    ],
-  );
-
   const renderNonTerminalView = useCallback(
     (view: ViewType): ReactNode => {
       switch (view) {
         case 'agent':
-          return (
-            <ChatSessionProvider state={chatSessionState} actions={chatSessionActions}>
-              <ChatInputMessageProvider
-                inputMessage={streamingState.inputMessage}
-                setInputMessage={streamingState.setInputMessage}
-              >
-                <ChatComponent />
-              </ChatInputMessageProvider>
-            </ChatSessionProvider>
-          );
+          return <ChatComponent />;
         case 'editor':
           return (
             <Suspense fallback={viewLoadingFallback}>
@@ -409,12 +217,8 @@ export function ChatPage() {
       }
     },
     [
-      chatSessionState,
-      chatSessionActions,
-      streamingState.inputMessage,
-      streamingState.setInputMessage,
-      currentChat,
       chatId,
+      currentChat,
       fileStructure,
       selectedFile,
       handleFileSelect,
@@ -454,12 +258,22 @@ export function ChatPage() {
       customSlashCommands={enabledSlashCommands}
       customPrompts={customPrompts}
     >
-      <div className="relative flex h-full">
-        <ViewSwitcher />
-        <div className="flex h-full flex-1 overflow-hidden bg-surface pl-12 text-text-primary dark:bg-surface-dark dark:text-text-dark-primary">
-          <SplitViewContainer renderView={renderView} />
+      <ChatSessionOrchestrator
+        chatId={chatId}
+        currentChat={currentChat}
+        fetchedMessages={fetchedMessages}
+        hasFetchedMessages={hasFetchedMessages}
+        messagesQuery={messagesQuery}
+        refetchFilesMetadata={refetchFilesMetadata}
+        selectedModelId={selectedModelId}
+      >
+        <div className="relative flex h-full">
+          <ViewSwitcher />
+          <div className="flex h-full flex-1 overflow-hidden bg-surface pl-12 text-text-primary dark:bg-surface-dark dark:text-text-dark-primary">
+            <SplitViewContainer renderView={renderView} />
+          </div>
         </div>
-      </div>
+      </ChatSessionOrchestrator>
     </ChatProvider>
   );
 }

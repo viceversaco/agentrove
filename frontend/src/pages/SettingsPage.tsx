@@ -1,8 +1,6 @@
-import { useState, useEffect, useMemo, useCallback, useRef, Suspense, lazy } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, Suspense, lazy } from 'react';
 import {
   AlertCircle,
-  FileText,
-  FileArchive,
   Settings2,
   Layers,
   Link2,
@@ -19,76 +17,29 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import type {
-  UserSettings,
-  UserSettingsUpdate,
-  CustomPrompt,
-  CustomProvider,
-  SandboxProviderType,
-} from '@/types/user.types';
+import type { UserSettings, UserSettingsUpdate, SandboxProviderType } from '@/types/user.types';
 import type { ApiFieldKey } from '@/types/settings.types';
-import { queryKeys } from '@/hooks/queries/queryKeys';
 import { useDeleteAllChatsMutation } from '@/hooks/queries/useChatQueries';
-import { useModelsQuery } from '@/hooks/queries/useModelQueries';
 import { useSettingsQuery, useUpdateSettingsMutation } from '@/hooks/queries/useSettingsQueries';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Button } from '@/components/ui/primitives/Button';
 import { Spinner } from '@/components/ui/primitives/Spinner';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
-import { SettingsUploadModal } from '@/components/ui/SettingsUploadModal';
 import toast from 'react-hot-toast';
 import { GeneralSettingsTab } from '@/components/settings/tabs/GeneralSettingsTab';
-const AgentEditDialog = lazy(() =>
-  import('@/components/settings/dialogs/AgentEditDialog').then((m) => ({
-    default: m.AgentEditDialog,
-  })),
-);
-const McpDialog = lazy(() =>
-  import('@/components/settings/dialogs/McpDialog').then((m) => ({ default: m.McpDialog })),
-);
-const EnvVarDialog = lazy(() =>
-  import('@/components/settings/dialogs/EnvVarDialog').then((m) => ({ default: m.EnvVarDialog })),
-);
-const TaskDialog = lazy(() =>
-  import('@/components/settings/dialogs/TaskDialog').then((m) => ({ default: m.TaskDialog })),
-);
-const ProviderDialog = lazy(() =>
-  import('@/components/settings/dialogs/ProviderDialog').then((m) => ({
-    default: m.ProviderDialog,
-  })),
-);
-const CommandEditDialog = lazy(() =>
-  import('@/components/settings/dialogs/CommandEditDialog').then((m) => ({
-    default: m.CommandEditDialog,
-  })),
-);
-const PromptEditDialog = lazy(() =>
-  import('@/components/settings/dialogs/PromptEditDialog').then((m) => ({
-    default: m.PromptEditDialog,
-  })),
-);
-import { useCrudForm } from '@/hooks/useCrudForm';
-import { useTaskManagement } from '@/hooks/useTaskManagement';
-import { useFileResourceManagement } from '@/hooks/useFileResourceManagement';
-import { agentService } from '@/services/agentService';
-import { skillService } from '@/services/skillService';
-import { commandService } from '@/services/commandService';
-import { mcpService } from '@/services/mcpService';
-import {
-  getGeneralSecretFields,
-  createDefaultEnvVarForm,
-  validateEnvVarForm,
-  createDefaultMcpForm,
-  validateMcpForm,
-} from '@/utils/settings';
+import { SettingsProvider } from '@/contexts/SettingsContext';
+import { getGeneralSecretFields } from '@/utils/settings';
 
-const ProvidersSettingsTab = lazy(() =>
-  import('@/components/settings/tabs/ProvidersSettingsTab').then((m) => ({
-    default: m.ProvidersSettingsTab,
-  })),
-);
+import { ProvidersSection } from '@/components/settings/sections/ProvidersSection';
+import { McpSection } from '@/components/settings/sections/McpSection';
+import { AgentsSection } from '@/components/settings/sections/AgentsSection';
+import { SkillsSection } from '@/components/settings/sections/SkillsSection';
+import { CommandsSection } from '@/components/settings/sections/CommandsSection';
+import { PromptsSection } from '@/components/settings/sections/PromptsSection';
+import { EnvVarsSection } from '@/components/settings/sections/EnvVarsSection';
+import { TasksSection } from '@/components/settings/sections/TasksSection';
+
 const IntegrationsSettingsTab = lazy(() =>
   import('@/components/settings/tabs/IntegrationsSettingsTab').then((m) => ({
     default: m.IntegrationsSettingsTab,
@@ -99,44 +50,9 @@ const MarketplaceSettingsTab = lazy(() =>
     default: m.MarketplaceSettingsTab,
   })),
 );
-const McpSettingsTab = lazy(() =>
-  import('@/components/settings/tabs/McpSettingsTab').then((m) => ({
-    default: m.McpSettingsTab,
-  })),
-);
-const AgentsSettingsTab = lazy(() =>
-  import('@/components/settings/tabs/AgentsSettingsTab').then((m) => ({
-    default: m.AgentsSettingsTab,
-  })),
-);
-const SkillsSettingsTab = lazy(() =>
-  import('@/components/settings/tabs/SkillsSettingsTab').then((m) => ({
-    default: m.SkillsSettingsTab,
-  })),
-);
-const CommandsSettingsTab = lazy(() =>
-  import('@/components/settings/tabs/CommandsSettingsTab').then((m) => ({
-    default: m.CommandsSettingsTab,
-  })),
-);
-const PromptsSettingsTab = lazy(() =>
-  import('@/components/settings/tabs/PromptsSettingsTab').then((m) => ({
-    default: m.PromptsSettingsTab,
-  })),
-);
-const EnvVarsSettingsTab = lazy(() =>
-  import('@/components/settings/tabs/EnvVarsSettingsTab').then((m) => ({
-    default: m.EnvVarsSettingsTab,
-  })),
-);
 const InstructionsSettingsTab = lazy(() =>
   import('@/components/settings/tabs/InstructionsSettingsTab').then((m) => ({
     default: m.InstructionsSettingsTab,
-  })),
-);
-const TasksSettingsTab = lazy(() =>
-  import('@/components/settings/tabs/TasksSettingsTab').then((m) => ({
-    default: m.TasksSettingsTab,
   })),
 );
 
@@ -181,16 +97,7 @@ const createFallbackSettings = (): UserSettings => ({
 });
 
 const TAB_FIELDS: Record<TabKey, (keyof UserSettings)[]> = {
-  // Only include fields that require manual save (not auto-saved via persistSettings)
-  general: [
-    'github_personal_access_token',
-    'e2b_api_key',
-    'modal_api_key',
-    'timezone',
-    // Note: sandbox_provider, auto_compact_disabled, and attribution_disabled are
-    // excluded because they are auto-saved immediately and shouldn't trigger the
-    // "unsaved changes" banner.
-  ],
+  general: ['github_personal_access_token', 'e2b_api_key', 'modal_api_key', 'timezone'],
   providers: ['custom_providers'],
   integrations: [],
   marketplace: [],
@@ -257,9 +164,7 @@ const tabLoadingFallback = (
 
 const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabKey>('general');
-  const { data: models = [] } = useModelsQuery({ enabled: activeTab === 'tasks' });
   const [isDeleteAllDialogOpen, setIsDeleteAllDialogOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -272,8 +177,6 @@ const SettingsPage: React.FC = () => {
     () => settings ?? createFallbackSettings(),
   );
   const localSettingsRef = useRef<UserSettings>(localSettings);
-
-  const defaultModelId = models.length > 0 ? models[0].model_id : '';
 
   const manualUpdateMutation = useUpdateSettingsMutation({
     onSuccess: (data) => {
@@ -353,146 +256,6 @@ const SettingsPage: React.FC = () => {
     },
     [instantUpdateMutation, buildChangedPayload],
   );
-
-  const agentManagement = useFileResourceManagement(
-    localSettings,
-    persistSettings,
-    setLocalSettings,
-    {
-      settingsKey: 'custom_agents',
-      itemName: 'Agent',
-      maxItems: 10,
-      uploadFn: agentService.uploadAgent,
-      deleteFn: agentService.deleteAgent,
-      updateFn: agentService.updateAgent,
-    },
-  );
-
-  const mcpCrud = useCrudForm(localSettings, persistSettings, setLocalSettings, {
-    createDefault: createDefaultMcpForm,
-    validateForm: (form, editingIndex) =>
-      validateMcpForm(form, editingIndex, localSettings.custom_mcps || []),
-    getArrayKey: 'custom_mcps',
-    itemName: 'MCP',
-    createFn: mcpService.createMcp,
-    updateFn: mcpService.updateMcp,
-    deleteFn: mcpService.deleteMcp,
-    toggleFn: (name, enabled) => mcpService.updateMcp(name, { enabled }),
-  });
-
-  const envVarCrud = useCrudForm(localSettings, persistSettings, setLocalSettings, {
-    createDefault: createDefaultEnvVarForm,
-    validateForm: (form, editingIndex) =>
-      validateEnvVarForm(form, editingIndex, localSettings.custom_env_vars || []),
-    getArrayKey: 'custom_env_vars',
-    itemName: 'environment variable',
-  });
-
-  const promptCrud = useCrudForm<CustomPrompt>(localSettings, persistSettings, setLocalSettings, {
-    createDefault: (): CustomPrompt => ({ name: '', content: '' }),
-    validateForm: (form, editingIndex) => {
-      if (!form.name.trim()) return 'Name is required';
-      if (!form.content.trim()) return 'Content is required';
-      const prompts = localSettings.custom_prompts || [];
-      const duplicate = prompts.some((p, i) => p.name === form.name.trim() && i !== editingIndex);
-      if (duplicate) return 'A prompt with this name already exists';
-      return null;
-    },
-    getArrayKey: 'custom_prompts',
-    itemName: 'prompt',
-  });
-
-  const skillManagement = useFileResourceManagement(
-    localSettings,
-    persistSettings,
-    setLocalSettings,
-    {
-      settingsKey: 'custom_skills',
-      itemName: 'Skill',
-      maxItems: 10,
-      uploadFn: skillService.uploadSkill,
-      deleteFn: skillService.deleteSkill,
-    },
-  );
-
-  const commandManagement = useFileResourceManagement(
-    localSettings,
-    persistSettings,
-    setLocalSettings,
-    {
-      settingsKey: 'custom_slash_commands',
-      itemName: 'Command',
-      maxItems: 10,
-      uploadFn: commandService.uploadCommand,
-      deleteFn: commandService.deleteCommand,
-      updateFn: commandService.updateCommand,
-    },
-  );
-  const taskManagement = useTaskManagement(defaultModelId);
-
-  const [isProviderDialogOpen, setIsProviderDialogOpen] = useState(false);
-  const [editingProvider, setEditingProvider] = useState<CustomProvider | null>(null);
-
-  const handleAddProvider = () => {
-    setEditingProvider(null);
-    setIsProviderDialogOpen(true);
-  };
-
-  const handleEditProvider = (provider: CustomProvider) => {
-    setEditingProvider(provider);
-    setIsProviderDialogOpen(true);
-  };
-
-  const handleDeleteProvider = (providerId: string) => {
-    void persistSettings(
-      (prev) => ({
-        ...prev,
-        custom_providers: (prev.custom_providers || []).filter((p) => p.id !== providerId),
-      }),
-      { successMessage: 'Provider deleted' },
-    ).then(() => queryClient.invalidateQueries({ queryKey: [queryKeys.models] }));
-  };
-
-  const handleToggleProvider = (providerId: string, enabled: boolean) => {
-    void persistSettings((prev) => ({
-      ...prev,
-      custom_providers: (prev.custom_providers || []).map((p) =>
-        p.id === providerId ? { ...p, enabled } : p,
-      ),
-    })).then(() => queryClient.invalidateQueries({ queryKey: [queryKeys.models] }));
-  };
-
-  const handleSaveProvider = (provider: CustomProvider) => {
-    const providers = localSettings.custom_providers || [];
-    const existingIndex = providers.findIndex((p) => p.id === provider.id);
-
-    if (existingIndex >= 0) {
-      void persistSettings(
-        (prev) => ({
-          ...prev,
-          custom_providers: (prev.custom_providers || []).map((p) =>
-            p.id === provider.id ? provider : p,
-          ),
-        }),
-        { successMessage: 'Provider updated' },
-      ).then(() => queryClient.invalidateQueries({ queryKey: [queryKeys.models] }));
-    } else {
-      void persistSettings(
-        (prev) => ({
-          ...prev,
-          custom_providers: [...(prev.custom_providers || []), provider],
-        }),
-        { successMessage: 'Provider added' },
-      ).then(() => queryClient.invalidateQueries({ queryKey: [queryKeys.models] }));
-    }
-    setIsProviderDialogOpen(false);
-    setEditingProvider(null);
-  };
-
-  const handleProviderDialogClose = () => {
-    setIsProviderDialogOpen(false);
-    setEditingProvider(null);
-  };
 
   const [revealedFields, setRevealedFields] = useState<Record<ApiFieldKey, boolean>>({
     github_personal_access_token: false,
@@ -791,163 +554,128 @@ const SettingsPage: React.FC = () => {
               </div>
             )}
 
-            <ErrorBoundary>
-              <div className="min-w-0 space-y-6">
-                {activeTab === 'general' && (
-                  <div role="tabpanel" id="general-panel" aria-labelledby="general-tab">
-                    <GeneralSettingsTab
-                      fields={generalSecretFields}
-                      settings={localSettings}
-                      savedSettings={settings}
-                      revealedFields={revealedFields}
-                      onSecretChange={handleSecretFieldChange}
-                      onToggleVisibility={toggleFieldVisibility}
-                      onDeleteAllChats={handleDeleteAllChats}
-                      onNotificationSoundChange={handleNotificationSoundChange}
-                      onAutoCompactDisabledChange={handleAutoCompactDisabledChange}
-                      onAttributionDisabledChange={handleAttributionDisabledChange}
-                      onSandboxProviderChange={handleSandboxProviderChange}
-                      onTimezoneChange={handleTimezoneChange}
-                    />
-                  </div>
-                )}
-
-                {activeTab === 'providers' && (
-                  <div role="tabpanel" id="providers-panel" aria-labelledby="providers-tab">
-                    <Suspense fallback={tabLoadingFallback}>
-                      <ProvidersSettingsTab
-                        providers={localSettings.custom_providers ?? null}
-                        onAddProvider={handleAddProvider}
-                        onEditProvider={handleEditProvider}
-                        onDeleteProvider={handleDeleteProvider}
-                        onToggleProvider={handleToggleProvider}
+            <SettingsProvider
+              localSettings={localSettings}
+              setLocalSettings={setLocalSettings}
+              persistSettings={persistSettings}
+              settings={settings}
+            >
+              <ErrorBoundary>
+                <div className="min-w-0 space-y-6">
+                  {activeTab === 'general' && (
+                    <div role="tabpanel" id="general-panel" aria-labelledby="general-tab">
+                      <GeneralSettingsTab
+                        fields={generalSecretFields}
+                        settings={localSettings}
+                        savedSettings={settings}
+                        revealedFields={revealedFields}
+                        onSecretChange={handleSecretFieldChange}
+                        onToggleVisibility={toggleFieldVisibility}
+                        onDeleteAllChats={handleDeleteAllChats}
+                        onNotificationSoundChange={handleNotificationSoundChange}
+                        onAutoCompactDisabledChange={handleAutoCompactDisabledChange}
+                        onAttributionDisabledChange={handleAttributionDisabledChange}
+                        onSandboxProviderChange={handleSandboxProviderChange}
+                        onTimezoneChange={handleTimezoneChange}
                       />
-                    </Suspense>
-                  </div>
-                )}
+                    </div>
+                  )}
 
-                {activeTab === 'integrations' && (
-                  <div role="tabpanel" id="integrations-panel" aria-labelledby="integrations-tab">
-                    <Suspense fallback={tabLoadingFallback}>
-                      <IntegrationsSettingsTab />
-                    </Suspense>
-                  </div>
-                )}
+                  {activeTab === 'providers' && (
+                    <div role="tabpanel" id="providers-panel" aria-labelledby="providers-tab">
+                      <Suspense fallback={tabLoadingFallback}>
+                        <ProvidersSection />
+                      </Suspense>
+                    </div>
+                  )}
 
-                {activeTab === 'marketplace' && (
-                  <div role="tabpanel" id="marketplace-panel" aria-labelledby="marketplace-tab">
-                    <Suspense fallback={tabLoadingFallback}>
-                      <MarketplaceSettingsTab />
-                    </Suspense>
-                  </div>
-                )}
+                  {activeTab === 'integrations' && (
+                    <div role="tabpanel" id="integrations-panel" aria-labelledby="integrations-tab">
+                      <Suspense fallback={tabLoadingFallback}>
+                        <IntegrationsSettingsTab />
+                      </Suspense>
+                    </div>
+                  )}
 
-                {activeTab === 'mcp' && (
-                  <div role="tabpanel" id="mcp-panel" aria-labelledby="mcp-tab">
-                    <Suspense fallback={tabLoadingFallback}>
-                      <McpSettingsTab
-                        mcps={localSettings.custom_mcps ?? null}
-                        onAddMcp={mcpCrud.handleAdd}
-                        onEditMcp={mcpCrud.handleEdit}
-                        onDeleteMcp={mcpCrud.handleDelete}
-                        onToggleMcp={mcpCrud.handleToggleEnabled}
-                      />
-                    </Suspense>
-                  </div>
-                )}
+                  {activeTab === 'marketplace' && (
+                    <div role="tabpanel" id="marketplace-panel" aria-labelledby="marketplace-tab">
+                      <Suspense fallback={tabLoadingFallback}>
+                        <MarketplaceSettingsTab />
+                      </Suspense>
+                    </div>
+                  )}
 
-                {activeTab === 'agents' && (
-                  <div role="tabpanel" id="agents-panel" aria-labelledby="agents-tab">
-                    <Suspense fallback={tabLoadingFallback}>
-                      <AgentsSettingsTab
-                        agents={localSettings.custom_agents ?? null}
-                        onAddAgent={agentManagement.handleAdd}
-                        onEditAgent={agentManagement.handleEdit}
-                        onDeleteAgent={agentManagement.handleDelete}
-                        onToggleAgent={agentManagement.handleToggle}
-                      />
-                    </Suspense>
-                  </div>
-                )}
+                  {activeTab === 'mcp' && (
+                    <div role="tabpanel" id="mcp-panel" aria-labelledby="mcp-tab">
+                      <Suspense fallback={tabLoadingFallback}>
+                        <McpSection />
+                      </Suspense>
+                    </div>
+                  )}
 
-                {activeTab === 'skills' && (
-                  <div role="tabpanel" id="skills-panel" aria-labelledby="skills-tab">
-                    <Suspense fallback={tabLoadingFallback}>
-                      <SkillsSettingsTab
-                        skills={localSettings.custom_skills ?? null}
-                        onAddSkill={skillManagement.handleAdd}
-                        onDeleteSkill={skillManagement.handleDelete}
-                        onToggleSkill={skillManagement.handleToggle}
-                      />
-                    </Suspense>
-                  </div>
-                )}
+                  {activeTab === 'agents' && (
+                    <div role="tabpanel" id="agents-panel" aria-labelledby="agents-tab">
+                      <Suspense fallback={tabLoadingFallback}>
+                        <AgentsSection />
+                      </Suspense>
+                    </div>
+                  )}
 
-                {activeTab === 'commands' && (
-                  <div role="tabpanel" id="commands-panel" aria-labelledby="commands-tab">
-                    <Suspense fallback={tabLoadingFallback}>
-                      <CommandsSettingsTab
-                        commands={localSettings.custom_slash_commands ?? null}
-                        onAddCommand={commandManagement.handleAdd}
-                        onEditCommand={commandManagement.handleEdit}
-                        onDeleteCommand={commandManagement.handleDelete}
-                        onToggleCommand={commandManagement.handleToggle}
-                      />
-                    </Suspense>
-                  </div>
-                )}
+                  {activeTab === 'skills' && (
+                    <div role="tabpanel" id="skills-panel" aria-labelledby="skills-tab">
+                      <Suspense fallback={tabLoadingFallback}>
+                        <SkillsSection />
+                      </Suspense>
+                    </div>
+                  )}
 
-                {activeTab === 'prompts' && (
-                  <div role="tabpanel" id="prompts-panel" aria-labelledby="prompts-tab">
-                    <Suspense fallback={tabLoadingFallback}>
-                      <PromptsSettingsTab
-                        prompts={localSettings.custom_prompts ?? null}
-                        onAddPrompt={promptCrud.handleAdd}
-                        onEditPrompt={promptCrud.handleEdit}
-                        onDeletePrompt={promptCrud.handleDelete}
-                      />
-                    </Suspense>
-                  </div>
-                )}
+                  {activeTab === 'commands' && (
+                    <div role="tabpanel" id="commands-panel" aria-labelledby="commands-tab">
+                      <Suspense fallback={tabLoadingFallback}>
+                        <CommandsSection />
+                      </Suspense>
+                    </div>
+                  )}
 
-                {activeTab === 'env_vars' && (
-                  <div role="tabpanel" id="env_vars-panel" aria-labelledby="env_vars-tab">
-                    <Suspense fallback={tabLoadingFallback}>
-                      <EnvVarsSettingsTab
-                        envVars={localSettings.custom_env_vars ?? null}
-                        onAddEnvVar={envVarCrud.handleAdd}
-                        onEditEnvVar={envVarCrud.handleEdit}
-                        onDeleteEnvVar={envVarCrud.handleDelete}
-                      />
-                    </Suspense>
-                  </div>
-                )}
+                  {activeTab === 'prompts' && (
+                    <div role="tabpanel" id="prompts-panel" aria-labelledby="prompts-tab">
+                      <Suspense fallback={tabLoadingFallback}>
+                        <PromptsSection />
+                      </Suspense>
+                    </div>
+                  )}
 
-                {activeTab === 'instructions' && (
-                  <div role="tabpanel" id="instructions-panel" aria-labelledby="instructions-tab">
-                    <Suspense fallback={tabLoadingFallback}>
-                      <InstructionsSettingsTab
-                        instructions={localSettings.custom_instructions || ''}
-                        onInstructionsChange={(value) =>
-                          handleInputChange('custom_instructions', value)
-                        }
-                      />
-                    </Suspense>
-                  </div>
-                )}
+                  {activeTab === 'env_vars' && (
+                    <div role="tabpanel" id="env_vars-panel" aria-labelledby="env_vars-tab">
+                      <Suspense fallback={tabLoadingFallback}>
+                        <EnvVarsSection />
+                      </Suspense>
+                    </div>
+                  )}
 
-                {activeTab === 'tasks' && (
-                  <div role="tabpanel" id="tasks-panel" aria-labelledby="tasks-tab">
-                    <Suspense fallback={tabLoadingFallback}>
-                      <TasksSettingsTab
-                        onAddTask={taskManagement.handleAddTask}
-                        onEditTask={taskManagement.handleEditTask}
-                      />
-                    </Suspense>
-                  </div>
-                )}
-              </div>
-            </ErrorBoundary>
+                  {activeTab === 'instructions' && (
+                    <div role="tabpanel" id="instructions-panel" aria-labelledby="instructions-tab">
+                      <Suspense fallback={tabLoadingFallback}>
+                        <InstructionsSettingsTab
+                          instructions={localSettings.custom_instructions || ''}
+                          onInstructionsChange={(value) =>
+                            handleInputChange('custom_instructions', value)
+                          }
+                        />
+                      </Suspense>
+                    </div>
+                  )}
+
+                  {activeTab === 'tasks' && (
+                    <div role="tabpanel" id="tasks-panel" aria-labelledby="tasks-tab">
+                      <Suspense fallback={tabLoadingFallback}>
+                        <TasksSection isActive={activeTab === 'tasks'} />
+                      </Suspense>
+                    </div>
+                  )}
+                </div>
+              </ErrorBoundary>
+            </SettingsProvider>
           </div>
         </div>
       </div>
@@ -961,135 +689,6 @@ const SettingsPage: React.FC = () => {
         confirmLabel="Delete All"
         cancelLabel="Cancel"
       />
-
-      <SettingsUploadModal
-        isOpen={agentManagement.isDialogOpen}
-        error={agentManagement.uploadError}
-        uploading={agentManagement.isUploading}
-        onClose={agentManagement.handleDialogClose}
-        onUpload={agentManagement.handleUpload}
-        title="Upload Agent"
-        acceptedExtension=".md"
-        icon={FileText}
-        hintText="The .md file must include YAML frontmatter with name and description fields. Optional fields: model, allowed_tools."
-      />
-
-      {agentManagement.isEditDialogOpen && (
-        <Suspense fallback={null}>
-          <AgentEditDialog
-            isOpen={agentManagement.isEditDialogOpen}
-            agent={agentManagement.editingItem}
-            error={agentManagement.editError}
-            saving={agentManagement.isSavingEdit}
-            onClose={agentManagement.handleEditDialogClose}
-            onSave={agentManagement.handleSaveEdit}
-          />
-        </Suspense>
-      )}
-
-      {mcpCrud.isDialogOpen && (
-        <Suspense fallback={null}>
-          <McpDialog
-            isOpen={mcpCrud.isDialogOpen}
-            isEditing={mcpCrud.editingIndex !== null}
-            mcp={mcpCrud.form}
-            error={mcpCrud.formError}
-            onClose={mcpCrud.handleDialogClose}
-            onSubmit={mcpCrud.handleSave}
-            onMcpChange={mcpCrud.handleFormChange}
-          />
-        </Suspense>
-      )}
-
-      {envVarCrud.isDialogOpen && (
-        <Suspense fallback={null}>
-          <EnvVarDialog
-            isOpen={envVarCrud.isDialogOpen}
-            isEditing={envVarCrud.editingIndex !== null}
-            envVar={envVarCrud.form}
-            error={envVarCrud.formError}
-            onClose={envVarCrud.handleDialogClose}
-            onSubmit={envVarCrud.handleSave}
-            onEnvVarChange={envVarCrud.handleFormChange}
-          />
-        </Suspense>
-      )}
-
-      {promptCrud.isDialogOpen && (
-        <Suspense fallback={null}>
-          <PromptEditDialog
-            isOpen={promptCrud.isDialogOpen}
-            isEditing={promptCrud.editingIndex !== null}
-            prompt={promptCrud.form}
-            error={promptCrud.formError}
-            onClose={promptCrud.handleDialogClose}
-            onSubmit={promptCrud.handleSave}
-            onPromptChange={promptCrud.handleFormChange}
-          />
-        </Suspense>
-      )}
-
-      {taskManagement.isTaskDialogOpen && (
-        <Suspense fallback={null}>
-          <TaskDialog
-            isOpen={taskManagement.isTaskDialogOpen}
-            isEditing={taskManagement.editingTaskId !== null}
-            task={taskManagement.taskForm}
-            error={taskManagement.taskFormError}
-            onClose={taskManagement.handleTaskDialogClose}
-            onSubmit={taskManagement.handleSaveTask}
-            onTaskChange={taskManagement.handleTaskFormChange}
-          />
-        </Suspense>
-      )}
-
-      <SettingsUploadModal
-        isOpen={skillManagement.isDialogOpen}
-        error={skillManagement.uploadError}
-        uploading={skillManagement.isUploading}
-        onClose={skillManagement.handleDialogClose}
-        onUpload={skillManagement.handleUpload}
-        title="Upload Skill"
-        acceptedExtension=".zip"
-        icon={FileArchive}
-        hintText="The ZIP must contain a SKILL.md file with YAML frontmatter including name and description fields."
-      />
-
-      <SettingsUploadModal
-        isOpen={commandManagement.isDialogOpen}
-        error={commandManagement.uploadError}
-        uploading={commandManagement.isUploading}
-        onClose={commandManagement.handleDialogClose}
-        onUpload={commandManagement.handleUpload}
-        title="Upload Slash Command"
-        acceptedExtension=".md"
-        icon={FileText}
-        hintText="The .md file must include YAML frontmatter with name and description fields. Optional fields: argument-hint, allowed-tools, model."
-      />
-
-      {commandManagement.isEditDialogOpen && (
-        <Suspense fallback={null}>
-          <CommandEditDialog
-            isOpen={commandManagement.isEditDialogOpen}
-            command={commandManagement.editingItem}
-            error={commandManagement.editError}
-            saving={commandManagement.isSavingEdit}
-            onClose={commandManagement.handleEditDialogClose}
-            onSave={commandManagement.handleSaveEdit}
-          />
-        </Suspense>
-      )}
-
-      {isProviderDialogOpen && (
-        <Suspense fallback={null}>
-          <ProviderDialog
-            isOpen={isProviderDialogOpen}
-            provider={editingProvider}
-            onClose={handleProviderDialogClose}
-            onSave={handleSaveProvider}
-          />
-        </Suspense>
-      )}
     </div>
   );
 };

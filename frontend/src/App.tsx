@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { useEffect, useState, Suspense, lazy } from 'react';
+import { useEffect, useMemo, useState, Suspense, lazy } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from '@/store/authStore';
@@ -53,7 +53,10 @@ function AppContent() {
     enabled: isAuthenticated,
   });
 
-  const allChats = chatsData?.pages.flatMap((page) => page.items) ?? [];
+  const allChats = useMemo(
+    () => chatsData?.pages.flatMap((page) => page.items) ?? [],
+    [chatsData?.pages],
+  );
 
   useStreamRestoration({
     chats: allChats,
