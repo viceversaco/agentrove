@@ -1,5 +1,5 @@
 import { StreamProcessingError } from '@/types';
-import { Button } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
 
 interface ErrorMessageProps {
   error: Error;

@@ -1,5 +1,6 @@
 import { ReactNode, useState } from 'react';
-import { Button, ConfirmDialog } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Plus, Loader2, LucideIcon, Edit2, Trash2 } from 'lucide-react';
 import { logger } from '@/utils/logger';
 

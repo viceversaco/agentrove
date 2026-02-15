@@ -2,8 +2,11 @@ import { memo, type ReactNode, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, ArrowLeft, Mail, ArrowRight, CheckCircle } from 'lucide-react';
 import { Layout } from '@/components/layout';
-import { Button, FieldMessage, Input, Label } from '@/components/ui';
-import { useForgotPasswordMutation } from '@/hooks/queries';
+import { Button } from '@/components/ui/primitives/Button';
+import { FieldMessage } from '@/components/ui/primitives/FieldMessage';
+import { Input } from '@/components/ui/primitives/Input';
+import { Label } from '@/components/ui/primitives/Label';
+import { useForgotPasswordMutation } from '@/hooks/queries/useAuthQueries';
 import { isValidEmail } from '@/utils/validation';
 
 interface ForgotPasswordFormData {

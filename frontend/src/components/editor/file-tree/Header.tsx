@@ -1,5 +1,5 @@
 import { Download, Loader2, RefreshCw, X } from 'lucide-react';
-import { Button } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
 import { SearchInput } from './SearchInput';
 
 export interface HeaderProps {

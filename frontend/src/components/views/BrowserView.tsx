@@ -7,7 +7,7 @@ import {
   useBrowserStatusQuery,
   useStartBrowserMutation,
   useStopBrowserMutation,
-} from '@/hooks/queries';
+} from '@/hooks/queries/useSandboxQueries';
 import { cn } from '@/utils/cn';
 
 const VNCClient = lazy(() =>

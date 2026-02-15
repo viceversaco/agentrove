@@ -1,5 +1,9 @@
 import type { CustomMcp } from '@/types';
-import { Button, Input, Label, Textarea, Switch } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
+import { Input } from '@/components/ui/primitives/Input';
+import { Label } from '@/components/ui/primitives/Label';
+import { Switch } from '@/components/ui/primitives/Switch';
+import { Textarea } from '@/components/ui/primitives/Textarea';
 import { Plus, X } from 'lucide-react';
 import { BaseModal } from '@/components/ui/shared/BaseModal';
 import { useState, useEffect, useRef } from 'react';

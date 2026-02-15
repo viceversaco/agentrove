@@ -6,8 +6,10 @@ import {
   useAddSecretMutation,
   useUpdateSecretMutation,
   useDeleteSecretMutation,
-} from '@/hooks/queries';
-import { Button, Input, Spinner } from '@/components/ui';
+} from '@/hooks/queries/useSandboxQueries';
+import { Button } from '@/components/ui/primitives/Button';
+import { Input } from '@/components/ui/primitives/Input';
+import { Spinner } from '@/components/ui/primitives/Spinner';
 import type { Secret } from '@/types';
 import toast from 'react-hot-toast';
 import { cn } from '@/utils/cn';

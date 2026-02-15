@@ -1,5 +1,5 @@
 import { ArrowUp, LoaderCircle, Pause } from 'lucide-react';
-import { Button } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
 
 export interface SendButtonProps {
   isLoading: boolean;

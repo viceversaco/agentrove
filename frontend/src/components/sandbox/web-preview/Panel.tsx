@@ -2,7 +2,9 @@ import { memo, useState, useCallback, useMemo, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { Smartphone, Monitor, ExternalLink, RotateCcw } from 'lucide-react';
 import type { PortInfo } from '@/types';
-import { Button, Select, Spinner } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
+import { Select } from '@/components/ui/primitives/Select';
+import { Spinner } from '@/components/ui/primitives/Spinner';
 import { cn } from '@/utils/cn';
 
 interface DeviceButtonProps {

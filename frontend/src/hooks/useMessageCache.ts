@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
-import { queryKeys } from '@/hooks/queries';
+import { queryKeys } from '@/hooks/queries/queryKeys';
 import type { Message, PaginatedMessages } from '@/types';
 
 interface UseMessageCacheParams {

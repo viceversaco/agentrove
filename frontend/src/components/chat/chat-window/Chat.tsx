@@ -18,11 +18,12 @@ import { ChatSkeleton } from './ChatSkeleton';
 import { LoadingIndicator } from './LoadingIndicator';
 import { ScrollButton } from './ScrollButton';
 import { ErrorMessage } from './ErrorMessage';
-import { Spinner } from '@/components/ui';
+import { Spinner } from '@/components/ui/primitives/Spinner';
 import { useStreamStore, useMessageQueueStore, EMPTY_QUEUE } from '@/store';
 import { ToolPermissionInline } from '@/components/chat/tools/ToolPermissionInline';
 import { useChatContext } from '@/hooks/useChatContext';
 import { useChatSessionContext } from '@/hooks/useChatSessionContext';
+import { useChatInputMessageContext } from '@/hooks/useChatInputMessageContext';
 
 const SCROLL_THRESHOLD_PERCENT = 20;
 
@@ -33,7 +34,6 @@ export const Chat = memo(function Chat() {
   const {
     messages,
     pendingUserMessageId,
-    copiedMessageId,
     isLoading,
     isStreaming,
     isInitialLoading,
@@ -49,18 +49,17 @@ export const Chat = memo(function Chat() {
   } = state;
 
   const {
-    setInputMessage,
     onSubmit,
     onStopStream,
-    onCopy,
     onAttach,
     onModelChange,
     onDismissError,
     fetchNextPage,
-    onRestoreSuccess,
     onPermissionApprove,
     onPermissionReject,
   } = actions;
+
+  const { inputMessage, setInputMessage } = useChatInputMessageContext();
 
   const streamingMessageIds = useStreamStore(
     useShallow((s) => {
@@ -287,13 +286,6 @@ export const Chat = memo(function Chat() {
   const showPermissionAtEnd =
     canShowPermissionInline && (lastBotMessageIndex < 0 || lastBotIsStreaming);
 
-  const handleSuggestionSelect = useCallback(
-    (suggestion: string) => {
-      setInputMessage(suggestion);
-    },
-    [setInputMessage],
-  );
-
   return (
     <div className="relative flex min-w-0 flex-1 flex-col">
       <div
@@ -342,20 +334,14 @@ export const Chat = memo(function Chat() {
                         contentText={msg.content_text}
                         contentRender={msg.content_render}
                         attachments={msg.attachments}
-                        copiedMessageId={copiedMessageId}
-                        onCopy={onCopy}
                         isStreaming={messageIsStreaming}
-                        isGloballyStreaming={isStreaming}
                         createdAt={msg.created_at}
                         modelId={msg.model_id}
                         isLastBotMessageWithCommit={isLastBotMessage}
-                        onRestoreSuccess={onRestoreSuccess}
                         isLastBotMessage={isLastBotMessage && !messageIsStreaming}
-                        onSuggestionSelect={isLastBotMessage ? handleSuggestionSelect : undefined}
                       />
                     ) : (
                       <UserMessage
-                        contentText={msg.content_text}
                         contentRender={msg.content_render}
                         attachments={msg.attachments}
                         uploadingAttachmentIds={uploadingAttachmentIds}
@@ -422,7 +408,7 @@ export const Chat = memo(function Chat() {
         <div className="relative bg-surface pb-safe dark:bg-surface-dark">
           <div className="w-full py-2 lg:mx-auto lg:max-w-3xl">
             <Input
-              message={state.inputMessage}
+              message={inputMessage}
               setMessage={setInputMessage}
               onSubmit={onSubmit}
               onAttach={onAttach}

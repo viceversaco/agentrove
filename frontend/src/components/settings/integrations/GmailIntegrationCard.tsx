@@ -1,6 +1,9 @@
 import { useRef, useCallback, useState } from 'react';
 import { Mail, Upload, Link2, Unlink, Trash2, ExternalLink, CheckCircle2 } from 'lucide-react';
-import { Button, Badge, Spinner, ConfirmDialog } from '@/components/ui';
+import { Badge } from '@/components/ui/primitives/Badge';
+import { Button } from '@/components/ui/primitives/Button';
+import { Spinner } from '@/components/ui/primitives/Spinner';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import type { GmailStatus } from '@/services/integrationsService';
 
 interface GmailIntegrationCardProps {

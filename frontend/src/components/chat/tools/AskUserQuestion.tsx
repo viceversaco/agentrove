@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { HelpCircle, ChevronUp, ChevronDown, AlertCircle } from 'lucide-react';
-import { Button } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
 import type { ToolAggregate, UserQuestion } from '@/types';
 import { ToolCard } from './common';
 import { useUserQuestion } from '@/hooks/useUserQuestion';

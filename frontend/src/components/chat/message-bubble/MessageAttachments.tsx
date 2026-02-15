@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { AttachmentViewer } from '@/components/ui';
+import { AttachmentViewer } from '@/components/ui/AttachmentViewer';
 import type { MessageAttachment } from '@/types';
 
 interface MessageAttachmentsProps {

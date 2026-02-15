@@ -8,7 +8,7 @@ import { useEditorTheme } from '@/hooks/useEditorTheme';
 import { useUIStore } from '@/store';
 import type { FileStructure } from '@/types';
 import { detectLanguage, findFileInStructure } from '@/utils/file';
-import { useUpdateFileMutation, useFileContentQuery } from '@/hooks/queries';
+import { useUpdateFileMutation, useFileContentQuery } from '@/hooks/queries/useSandboxQueries';
 import { isPreviewableFile, isHtmlFile } from '@/utils/fileTypes';
 
 export interface ViewProps {

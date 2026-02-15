@@ -43,91 +43,76 @@ export const Input = memo(function Input(props: InputProps) {
 });
 
 function InputLayout() {
-  const ctx = useInputContext();
+  const { state, actions, meta } = useInputContext();
 
   const shouldShowAttachedPreview =
-    ctx.hasAttachments && ctx.showPreview && ctx.attachedFiles && ctx.attachedFiles.length > 0;
+    state.hasAttachments &&
+    state.showPreview &&
+    state.attachedFiles &&
+    state.attachedFiles.length > 0;
 
   return (
-    <form ref={ctx.formRef} onSubmit={ctx.handleSubmit} className="relative px-4 sm:px-6">
+    <form ref={meta.formRef} onSubmit={actions.handleSubmit} className="relative px-4 sm:px-6">
       <div
-        {...ctx.dragHandlers}
+        {...meta.dragHandlers}
         className={`relative rounded-2xl border bg-surface-secondary shadow-soft transition-all duration-300 dark:bg-surface-dark-secondary ${
-          ctx.isDragging
+          state.isDragging
             ? 'scale-[1.01] border-border-hover dark:border-border-dark-hover'
             : 'border-border dark:border-border-dark'
         }`}
       >
-        <DropIndicator visible={ctx.isDragging} fileType="any" message="Drop your files here" />
+        <DropIndicator visible={state.isDragging} fileType="any" message="Drop your files here" />
 
         {shouldShowAttachedPreview && (
           <InputAttachments
-            files={ctx.attachedFiles!}
-            previewUrls={ctx.previewUrls}
-            onRemoveFile={ctx.handleRemoveFile}
-            onEditImage={ctx.handleDrawClick}
+            files={state.attachedFiles!}
+            previewUrls={state.previewUrls}
+            onRemoveFile={actions.handleRemoveFile}
+            onEditImage={actions.handleDrawClick}
           />
         )}
 
-        {ctx.contextUsage && (
+        {state.contextUsage && (
           <div className="absolute right-3 top-3 z-10">
-            <ContextUsageIndicator usage={ctx.contextUsage} />
+            <ContextUsageIndicator usage={state.contextUsage} />
           </div>
         )}
 
         <div className="relative px-3 pb-12 pt-1.5 sm:pb-9">
           <Textarea
-            ref={ctx.textareaRef}
-            message={ctx.message}
-            setMessage={ctx.setMessage}
-            placeholder={ctx.placeholder}
-            isLoading={ctx.isLoading}
-            onKeyDown={ctx.handleKeyDown}
-            onCursorPositionChange={ctx.setCursorPosition}
-            compact={ctx.compact}
+            ref={meta.textareaRef}
+            message={state.message}
+            setMessage={actions.setMessage}
+            placeholder={state.placeholder}
+            isLoading={state.isLoading}
+            onKeyDown={actions.handleKeyDown}
+            onCursorPositionChange={actions.setCursorPosition}
+            compact={state.compact}
           />
-          <InputSuggestionsPanel
-            isMentionActive={ctx.isMentionActive}
-            slashCommands={ctx.slashCommandSuggestions}
-            highlightedSlashIndex={ctx.highlightedSlashCommandIndex}
-            onSlashSelect={ctx.selectSlashCommand}
-            mentionFiles={ctx.filteredFiles}
-            mentionAgents={ctx.filteredAgents}
-            mentionPrompts={ctx.filteredPrompts}
-            highlightedMentionIndex={ctx.highlightedMentionIndex}
-            onMentionSelect={ctx.selectMention}
-          />
+          <InputSuggestionsPanel />
         </div>
 
         <div className="absolute bottom-0 left-0 right-0 px-3 py-2 pb-safe">
           <div className="relative flex items-center justify-between">
-            <InputControls
-              selectedModelId={ctx.selectedModelId}
-              onModelChange={ctx.onModelChange}
-              onEnhance={ctx.handleEnhancePrompt}
-              dropdownPosition={ctx.dropdownPosition}
-              isLoading={ctx.isLoading}
-              isEnhancing={ctx.isEnhancing}
-              hasMessage={ctx.hasMessage}
-            />
+            <InputControls />
 
             <div className="absolute bottom-2.5 right-3 flex items-center gap-1">
               <AttachButton
                 onAttach={() => {
-                  ctx.resetDragState();
-                  ctx.setShowFileUpload(true);
+                  actions.resetDragState();
+                  actions.setShowFileUpload(true);
                 }}
               />
               <SendButton
-                isLoading={ctx.isLoading}
-                isStreaming={ctx.isStreaming}
+                isLoading={state.isLoading}
+                isStreaming={state.isStreaming}
                 disabled={
-                  (!ctx.isLoading && !ctx.isStreaming && !ctx.hasMessage) || ctx.isEnhancing
+                  (!state.isLoading && !state.isStreaming && !state.hasMessage) || state.isEnhancing
                 }
-                onClick={ctx.handleSendClick}
+                onClick={actions.handleSendClick}
                 type="button"
-                hasMessage={ctx.hasMessage}
-                showLoadingSpinner={ctx.showLoadingSpinner}
+                hasMessage={state.hasMessage}
+                showLoadingSpinner={state.showLoadingSpinner}
               />
             </div>
           </div>
@@ -135,23 +120,23 @@ function InputLayout() {
       </div>
 
       <FileUploadDialog
-        isOpen={ctx.showFileUpload}
-        onClose={() => ctx.setShowFileUpload(false)}
-        onFileSelect={ctx.handleFileSelect}
+        isOpen={state.showFileUpload}
+        onClose={() => actions.setShowFileUpload(false)}
+        onFileSelect={actions.handleFileSelect}
       />
 
-      {ctx.editingImageIndex !== null &&
-        ctx.editingImageIndex < ctx.previewUrls.length &&
-        ctx.previewUrls[ctx.editingImageIndex] && (
+      {state.editingImageIndex !== null &&
+        state.editingImageIndex < state.previewUrls.length &&
+        state.previewUrls[state.editingImageIndex] && (
           <DrawingModal
-            imageUrl={ctx.previewUrls[ctx.editingImageIndex]}
-            isOpen={ctx.showDrawingModal}
-            onClose={ctx.closeDrawingModal}
-            onSave={ctx.handleDrawingSave}
+            imageUrl={state.previewUrls[state.editingImageIndex]}
+            isOpen={state.showDrawingModal}
+            onClose={actions.closeDrawingModal}
+            onSave={actions.handleDrawingSave}
           />
         )}
 
-      {ctx.showTip && !ctx.hasAttachments && (
+      {state.showTip && !state.hasAttachments && (
         <div className="mt-1 animate-fade-in text-center text-2xs text-text-quaternary dark:text-text-dark-tertiary">
           <span className="font-medium">Tip:</span> Drag and drop images, pdfs and xlsx files into
           the input area, type `/` for slash commands, or `@` to mention files, agents, and prompts

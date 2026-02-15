@@ -1,4 +1,4 @@
-import { Spinner } from '@/components/ui';
+import { Spinner } from '@/components/ui/primitives/Spinner';
 
 export function LoadingState() {
   return (

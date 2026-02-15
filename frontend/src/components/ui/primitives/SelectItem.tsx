@@ -1,5 +1,5 @@
 import { memo, ReactNode } from 'react';
-import { Button } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
 import { cn } from '@/utils/cn';
 
 interface SelectItemProps {

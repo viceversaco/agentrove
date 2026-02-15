@@ -1,6 +1,11 @@
 import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
-import { Button, Input, Label, Select, Textarea, TimePicker } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
+import { Input } from '@/components/ui/primitives/Input';
+import { Label } from '@/components/ui/primitives/Label';
+import { Select } from '@/components/ui/primitives/Select';
+import { Textarea } from '@/components/ui/primitives/Textarea';
+import { TimePicker } from '@/components/ui/TimePicker';
 import { RecurrenceType } from '@/types';
 import { ModelSelector } from '@/components/chat/model-selector/ModelSelector';
 import { BaseModal } from '@/components/ui/shared/BaseModal';

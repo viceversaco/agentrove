@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import QRCode from 'qrcode';
 import { Smartphone, RefreshCw } from 'lucide-react';
-import { Button, Select, Spinner } from '@/components/ui';
-import { usePreviewLinksQuery } from '@/hooks/queries';
+import { Button } from '@/components/ui/primitives/Button';
+import { Select } from '@/components/ui/primitives/Select';
+import { Spinner } from '@/components/ui/primitives/Spinner';
+import { usePreviewLinksQuery } from '@/hooks/queries/useSandboxQueries';
 import { NoOpenPortsState } from '../shared/NoOpenPortsState';
 import { cn } from '@/utils/cn';
 

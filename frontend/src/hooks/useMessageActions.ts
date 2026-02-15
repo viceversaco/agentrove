@@ -123,6 +123,7 @@ export function useMessageActions({
       }
     },
     [
+      chatId,
       addMessageToCache,
       permissionMode,
       selectedModelId,

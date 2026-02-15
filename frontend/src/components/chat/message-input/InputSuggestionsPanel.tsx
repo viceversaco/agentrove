@@ -1,48 +1,28 @@
 import { memo } from 'react';
 import { SlashCommandsPanel } from './SlashCommandsPanel';
 import { MentionSuggestionsPanel } from './MentionSuggestionsPanel';
-import type { MentionItem, SlashCommand } from '@/types';
+import { useInputContext } from '@/hooks/useInputContext';
 
-interface InputSuggestionsPanelProps {
-  isMentionActive: boolean;
-  slashCommands: SlashCommand[];
-  highlightedSlashIndex: number;
-  onSlashSelect: (command: SlashCommand) => void;
-  mentionFiles: MentionItem[];
-  mentionAgents: MentionItem[];
-  mentionPrompts: MentionItem[];
-  highlightedMentionIndex: number;
-  onMentionSelect: (item: MentionItem) => void;
-}
+export const InputSuggestionsPanel = memo(function InputSuggestionsPanel() {
+  const { state, actions } = useInputContext();
 
-export const InputSuggestionsPanel = memo(function InputSuggestionsPanel({
-  isMentionActive,
-  slashCommands,
-  highlightedSlashIndex,
-  onSlashSelect,
-  mentionFiles,
-  mentionAgents,
-  mentionPrompts,
-  highlightedMentionIndex,
-  onMentionSelect,
-}: InputSuggestionsPanelProps) {
-  if (isMentionActive) {
+  if (state.isMentionActive) {
     return (
       <MentionSuggestionsPanel
-        files={mentionFiles}
-        agents={mentionAgents}
-        prompts={mentionPrompts}
-        highlightedIndex={highlightedMentionIndex}
-        onSelect={onMentionSelect}
+        files={state.filteredFiles}
+        agents={state.filteredAgents}
+        prompts={state.filteredPrompts}
+        highlightedIndex={state.highlightedMentionIndex}
+        onSelect={actions.selectMention}
       />
     );
   }
 
   return (
     <SlashCommandsPanel
-      suggestions={slashCommands}
-      highlightedIndex={highlightedSlashIndex}
-      onSelect={onSlashSelect}
+      suggestions={state.slashCommandSuggestions}
+      highlightedIndex={state.highlightedSlashCommandIndex}
+      onSelect={actions.selectSlashCommand}
     />
   );
 });

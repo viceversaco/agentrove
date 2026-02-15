@@ -2,8 +2,11 @@ import { memo, useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Mail, RefreshCw, AlertCircle, CheckCircle } from 'lucide-react';
 import { Layout } from '@/components/layout';
-import { Button } from '@/components/ui';
-import { useVerifyEmailMutation, useResendVerificationMutation } from '@/hooks/queries';
+import { Button } from '@/components/ui/primitives/Button';
+import {
+  useVerifyEmailMutation,
+  useResendVerificationMutation,
+} from '@/hooks/queries/useAuthQueries';
 import { useAuthStore } from '@/store';
 import { cn } from '@/utils/cn';
 

@@ -22,13 +22,10 @@ import { cn } from '@/utils/cn';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import type { UserSettings, UserSettingsUpdate } from '@/types';
-import {
-  queryKeys,
-  useSettingsQuery,
-  useUpdateSettingsMutation,
-  useDeleteAllChatsMutation,
-  useModelsQuery,
-} from '@/hooks/queries';
+import { queryKeys } from '@/hooks/queries/queryKeys';
+import { useDeleteAllChatsMutation } from '@/hooks/queries/useChatQueries';
+import { useModelsQuery } from '@/hooks/queries/useModelQueries';
+import { useSettingsQuery, useUpdateSettingsMutation } from '@/hooks/queries/useSettingsQueries';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Button } from '@/components/ui/primitives/Button';
 import { Spinner } from '@/components/ui/primitives/Spinner';

@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Button, Input, Label, Switch, Select } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
+import { Input } from '@/components/ui/primitives/Input';
+import { Label } from '@/components/ui/primitives/Label';
+import { Select } from '@/components/ui/primitives/Select';
+import { Switch } from '@/components/ui/primitives/Switch';
 import { BaseModal } from '@/components/ui/shared/BaseModal';
 import { SecretInput } from '../inputs/SecretInput';
 import { OpenAIAuthButton } from '../inputs/OpenAIAuthButton';

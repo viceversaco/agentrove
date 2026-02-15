@@ -17,10 +17,12 @@ import { useMessageInitialization } from '@/hooks/useMessageInitialization';
 import { useChatData } from '@/hooks/useChatData';
 import { useSandboxFiles } from '@/hooks/useSandboxFiles';
 import { useContextUsageState } from '@/hooks/useContextUsageState';
-import { useSettingsQuery, useModelSelection } from '@/hooks/queries';
+import { useModelSelection } from '@/hooks/queries/useModelQueries';
+import { useSettingsQuery } from '@/hooks/queries/useSettingsQueries';
 import { mergeAgents } from '@/utils/settings';
 import { ChatProvider } from '@/contexts/ChatContext';
 import { ChatSessionProvider } from '@/contexts/ChatSessionContext';
+import { ChatInputMessageProvider } from '@/contexts/ChatInputMessageContext';
 import type { ChatSessionState, ChatSessionActions } from '@/contexts/ChatSessionContextDefinition';
 
 const Editor = lazy(() =>
@@ -279,7 +281,6 @@ export function ChatPage() {
   const chatSessionState = useMemo<ChatSessionState>(
     () => ({
       messages,
-      inputMessage: streamingState.inputMessage,
       isLoading,
       isStreaming,
       isInitialLoading: messagesQuery.isLoading,
@@ -297,7 +298,6 @@ export function ChatPage() {
     }),
     [
       messages,
-      streamingState.inputMessage,
       streamingState.copiedMessageId,
       streamingState.pendingUserMessageId,
       streamingState.inputFiles,
@@ -317,7 +317,6 @@ export function ChatPage() {
 
   const chatSessionActions = useMemo<ChatSessionActions>(
     () => ({
-      setInputMessage: streamingState.setInputMessage,
       onSubmit: streamingState.handleMessageSend,
       onStopStream: streamingState.handleStop,
       onCopy: streamingState.handleCopy,
@@ -330,7 +329,6 @@ export function ChatPage() {
       onPermissionReject: handleReject,
     }),
     [
-      streamingState.setInputMessage,
       streamingState.handleMessageSend,
       streamingState.handleStop,
       streamingState.handleCopy,
@@ -350,7 +348,12 @@ export function ChatPage() {
         case 'agent':
           return (
             <ChatSessionProvider state={chatSessionState} actions={chatSessionActions}>
-              <ChatComponent />
+              <ChatInputMessageProvider
+                inputMessage={streamingState.inputMessage}
+                setInputMessage={streamingState.setInputMessage}
+              >
+                <ChatComponent />
+              </ChatInputMessageProvider>
             </ChatSessionProvider>
           );
         case 'editor':
@@ -406,6 +409,8 @@ export function ChatPage() {
     [
       chatSessionState,
       chatSessionActions,
+      streamingState.inputMessage,
+      streamingState.setInputMessage,
       currentChat,
       chatId,
       fileStructure,

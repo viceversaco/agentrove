@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Dropdown } from '@/components/ui';
+import { Dropdown } from '@/components/ui/primitives/Dropdown';
 import { useUIStore } from '@/store';
 
 export interface PermissionModeOption {

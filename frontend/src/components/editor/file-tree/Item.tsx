@@ -6,7 +6,7 @@ import { useFileTreeContext } from './fileTreeContext';
 import type { FileStructure } from '@/types';
 import { getFileName } from '@/utils/file';
 import { cn } from '@/utils/cn';
-import { Button } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
 
 export interface ItemProps {
   item: FileStructure;

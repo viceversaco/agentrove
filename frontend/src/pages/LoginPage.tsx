@@ -2,9 +2,12 @@ import { memo, type ReactNode, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, ArrowRight } from 'lucide-react';
 import { Layout } from '@/components/layout';
-import { Button, FieldMessage, Input, Label } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
+import { FieldMessage } from '@/components/ui/primitives/FieldMessage';
+import { Input } from '@/components/ui/primitives/Input';
+import { Label } from '@/components/ui/primitives/Label';
 import { useAuthStore } from '@/store';
-import { useLoginMutation } from '@/hooks/queries';
+import { useLoginMutation } from '@/hooks/queries/useAuthQueries';
 import { isValidEmail } from '@/utils/validation';
 
 interface LoginFormData {

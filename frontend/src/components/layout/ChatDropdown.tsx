@@ -1,6 +1,6 @@
 import { memo, type Ref } from 'react';
 import { Edit2, Trash2, Pin, PinOff } from 'lucide-react';
-import { Button } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
 import { cn } from '@/utils/cn';
 import type { Chat } from '@/types';
 

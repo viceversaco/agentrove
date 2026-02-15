@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Button } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
 import { Check, Loader2, ExternalLink, Copy, CheckCheck, X, ArrowRight } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';

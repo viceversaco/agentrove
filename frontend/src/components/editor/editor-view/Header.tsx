@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { AlertTriangle, Code, FileText, Save, Loader2, PanelLeft } from 'lucide-react';
 import type { FileStructure } from '@/types';
-import { Button } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
 import { isPreviewableFile } from '@/utils/fileTypes';
 import { cn } from '@/utils/cn';
 

@@ -2,7 +2,8 @@ import { memo, ReactNode, useState, useEffect, KeyboardEvent } from 'react';
 import { Check, ChevronDown, LucideIcon, Search, X } from 'lucide-react';
 import { useDropdown } from '@/hooks/useDropdown';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { Button, SelectItem } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
+import { SelectItem } from '@/components/ui/primitives/SelectItem';
 import { fuzzySearch } from '@/utils/fuzzySearch';
 
 export type DropdownItemType<T> = { type: 'item'; data: T } | { type: 'header'; label: string };

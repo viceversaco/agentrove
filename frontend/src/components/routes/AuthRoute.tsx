@@ -1,7 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import type { ReactElement } from 'react';
 import { Layout } from '@/components/layout';
-import { LoadingScreen } from '@/components/ui';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
 
 interface AuthRouteProps {
   isAuthenticated: boolean;

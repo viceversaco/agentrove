@@ -1,5 +1,8 @@
 import type { CustomPrompt } from '@/types';
-import { Button, Input, Label, Textarea } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
+import { Input } from '@/components/ui/primitives/Input';
+import { Label } from '@/components/ui/primitives/Label';
+import { Textarea } from '@/components/ui/primitives/Textarea';
 import { BaseModal } from '@/components/ui/shared/BaseModal';
 
 interface PromptEditDialogProps {

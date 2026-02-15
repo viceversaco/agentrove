@@ -3,7 +3,7 @@ import { logger } from '@/utils/logger';
 import { base64ToUint8Array } from '@/utils/base64';
 import JSZip from 'jszip';
 import type { FileStructure } from '@/types';
-import { Button } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
 import { PreviewContainer } from './PreviewContainer';
 import { previewBackgroundClass } from './previewConstants';
 import { getDisplayFileName, isValidBase64 } from './previewUtils';

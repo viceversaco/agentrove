@@ -1,5 +1,5 @@
 import { Image } from 'lucide-react';
-import { Button } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
 
 export interface AttachButtonProps {
   onAttach?: () => void;

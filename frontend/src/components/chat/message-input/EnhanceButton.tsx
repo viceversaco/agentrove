@@ -1,5 +1,5 @@
 import { Sparkles } from 'lucide-react';
-import { Button } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
 
 export interface EnhanceButtonProps {
   onEnhance?: () => void;

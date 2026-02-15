@@ -1,5 +1,5 @@
 import { RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
 
 interface NoOpenPortsStateProps {
   onRefresh: () => void;

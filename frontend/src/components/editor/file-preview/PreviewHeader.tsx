@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Maximize2, Minimize2 } from 'lucide-react';
-import { Button } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
 
 export interface PreviewHeaderProps {
   fileName: string;

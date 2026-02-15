@@ -3,16 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Sidebar, useLayoutSidebar } from '@/components/layout';
 import { Input } from '@/components/chat/message-input/Input';
-import { Button } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
 import { Globe, BarChart3, Code2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useChatStore, useAuthStore } from '@/store';
-import {
-  useInfiniteChatsQuery,
-  useCreateChatMutation,
-  useSettingsQuery,
-  useModelSelection,
-} from '@/hooks/queries';
+import { useInfiniteChatsQuery, useCreateChatMutation } from '@/hooks/queries/useChatQueries';
+import { useModelSelection } from '@/hooks/queries/useModelQueries';
+import { useSettingsQuery } from '@/hooks/queries/useSettingsQueries';
 import { mergeAgents } from '@/utils/settings';
 import { ChatProvider } from '@/contexts/ChatContext';
 

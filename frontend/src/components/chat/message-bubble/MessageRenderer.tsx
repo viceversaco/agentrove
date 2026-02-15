@@ -8,7 +8,6 @@ import type { AssistantStreamEvent } from '@/types';
 import { Spinner } from '@/components/ui/primitives/Spinner';
 
 interface MessageRendererProps {
-  contentText: string;
   events?: AssistantStreamEvent[];
   className?: string;
   isStreaming?: boolean;
@@ -18,7 +17,6 @@ interface MessageRendererProps {
 }
 
 const MessageRendererInner: React.FC<MessageRendererProps> = ({
-  contentText,
   events,
   className = '',
   isStreaming = false,
@@ -47,7 +45,7 @@ const MessageRendererInner: React.FC<MessageRendererProps> = ({
       segments: builtSegments,
       activeThinkingIndex: thinkingIndex,
     };
-  }, [events, contentText, isStreaming]);
+  }, [events, isStreaming]);
 
   return (
     <div className={className}>

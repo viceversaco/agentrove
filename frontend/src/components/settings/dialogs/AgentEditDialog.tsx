@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import { BaseModal } from '@/components/ui/shared/BaseModal';
-import { Button } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
 import { useUIStore } from '@/store/uiStore';
 import type { CustomAgent } from '@/types/user.types';
 

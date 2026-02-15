@@ -1,6 +1,6 @@
 import type { ElementType } from 'react';
 import { useState, useCallback } from 'react';
-import { Button } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
 import { Upload, X } from 'lucide-react';
 import { useDragAndDrop } from '@/hooks/useDragAndDrop';
 

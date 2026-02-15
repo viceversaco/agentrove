@@ -4,7 +4,6 @@ import type { AssistantStreamEvent, MessageAttachment } from '@/types';
 import { MessageAttachments } from './MessageAttachments';
 
 interface SharedContentProps {
-  contentText: string;
   contentRender?: {
     events?: AssistantStreamEvent[];
   };
@@ -18,7 +17,6 @@ interface UserMessageContentProps extends SharedContentProps {
 }
 
 export const UserMessageContent = memo(function UserMessageContent({
-  contentText,
   contentRender,
   attachments,
   uploadingAttachmentIds,
@@ -31,12 +29,7 @@ export const UserMessageContent = memo(function UserMessageContent({
         attachments={attachments}
         uploadingAttachmentIds={uploadingAttachmentIds}
       />
-      <MessageRenderer
-        contentText={contentText}
-        events={contentRender?.events}
-        isStreaming={isStreaming}
-        chatId={chatId}
-      />
+      <MessageRenderer events={contentRender?.events} isStreaming={isStreaming} chatId={chatId} />
     </div>
   );
 });
@@ -47,7 +40,6 @@ interface AssistantMessageContentProps extends SharedContentProps {
 }
 
 export const AssistantMessageContent = memo(function AssistantMessageContent({
-  contentText,
   contentRender,
   attachments,
   isStreaming,
@@ -58,7 +50,6 @@ export const AssistantMessageContent = memo(function AssistantMessageContent({
   return (
     <div className="space-y-4">
       <MessageRenderer
-        contentText={contentText}
         events={contentRender?.events}
         isStreaming={isStreaming}
         chatId={chatId}

@@ -2,56 +2,68 @@ import { createContext, type RefObject } from 'react';
 import type { MentionItem, SlashCommand } from '@/types';
 import type { ContextUsageInfo } from './ContextUsageIndicator';
 
-export interface InputContextValue {
+export interface InputState {
   message: string;
-  setMessage: (value: string) => void;
+  cursorPosition: number;
   isLoading: boolean;
   isStreaming: boolean;
-  chatId?: string;
-  placeholder: string;
-  compact: boolean;
-  formRef: RefObject<HTMLFormElement | null>;
-  textareaRef: RefObject<HTMLTextAreaElement | null>;
+  isEnhancing: boolean;
   hasMessage: boolean;
   hasAttachments: boolean;
-  isEnhancing: boolean;
+  showPreview: boolean;
+  showFileUpload: boolean;
+  showDrawingModal: boolean;
+  showLoadingSpinner: boolean;
+  showTip: boolean;
+  isDragging: boolean;
+  compact: boolean;
+  placeholder: string;
+  selectedModelId: string;
+  dropdownPosition: 'top' | 'bottom';
+  attachedFiles: File[] | null;
+  previewUrls: string[];
+  editingImageIndex: number | null;
+  contextUsage?: ContextUsageInfo;
+  chatId?: string;
+  isMentionActive: boolean;
+  slashCommandSuggestions: SlashCommand[];
+  highlightedSlashCommandIndex: number;
+  filteredFiles: MentionItem[];
+  filteredAgents: MentionItem[];
+  filteredPrompts: MentionItem[];
+  highlightedMentionIndex: number;
+}
+
+export interface InputActions {
+  setMessage: (value: string) => void;
+  setCursorPosition: (pos: number) => void;
+  setShowFileUpload: (v: boolean) => void;
+  onModelChange: (modelId: string) => void;
   handleSubmit: (e: React.FormEvent) => void;
   submitOrStop: () => void;
   handleKeyDown: (e: React.KeyboardEvent<Element>) => void;
   handleSendClick: (e: React.MouseEvent) => void;
-  showLoadingSpinner: boolean;
-  selectedModelId: string;
-  onModelChange: (modelId: string) => void;
-  dropdownPosition: 'top' | 'bottom';
-  attachedFiles: File[] | null;
-  previewUrls: string[];
-  showPreview: boolean;
-  isDragging: boolean;
-  dragHandlers: Record<string, (e: React.DragEvent) => void>;
-  resetDragState: () => void;
-  showFileUpload: boolean;
-  setShowFileUpload: (v: boolean) => void;
-  showDrawingModal: boolean;
-  editingImageIndex: number | null;
+  handleEnhancePrompt: () => void;
   handleFileSelect: (files: File[]) => void;
   handleRemoveFile: (index: number) => void;
   handleDrawClick: (index: number) => void;
   handleDrawingSave: (dataUrl: string) => Promise<void>;
   closeDrawingModal: () => void;
-  handleEnhancePrompt: () => void;
-  contextUsage?: ContextUsageInfo;
-  showTip: boolean;
-  cursorPosition: number;
-  setCursorPosition: (pos: number) => void;
-  slashCommandSuggestions: SlashCommand[];
-  highlightedSlashCommandIndex: number;
+  resetDragState: () => void;
   selectSlashCommand: (command: SlashCommand) => void;
-  isMentionActive: boolean;
-  filteredFiles: MentionItem[];
-  filteredAgents: MentionItem[];
-  filteredPrompts: MentionItem[];
-  highlightedMentionIndex: number;
   selectMention: (item: MentionItem) => void;
+}
+
+export interface InputMeta {
+  formRef: RefObject<HTMLFormElement | null>;
+  textareaRef: RefObject<HTMLTextAreaElement | null>;
+  dragHandlers: Record<string, (e: React.DragEvent) => void>;
+}
+
+export interface InputContextValue {
+  state: InputState;
+  actions: InputActions;
+  meta: InputMeta;
 }
 
 export const InputContext = createContext<InputContextValue | null>(null);

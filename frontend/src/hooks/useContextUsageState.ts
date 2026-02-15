@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useContextUsageQuery } from '@/hooks/queries';
+import { useContextUsageQuery } from '@/hooks/queries/useChatQueries';
 import type { Chat, ContextUsage } from '@/types';
 import { CONTEXT_WINDOW_TOKENS } from '@/config/constants';
 

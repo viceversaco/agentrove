@@ -1,6 +1,7 @@
 import { memo, useState, useCallback, useRef, useEffect } from 'react';
 import { X, Pencil, Check, FileText, FileSpreadsheet } from 'lucide-react';
-import { Button, Spinner } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
+import { Spinner } from '@/components/ui/primitives/Spinner';
 import { apiClient } from '@/lib/api';
 import { detectFileType } from '@/utils/fileTypes';
 import { fetchAttachmentBlob } from '@/utils/file';

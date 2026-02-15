@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Button } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
 import type { SlashCommand } from '@/types';
 
 interface SlashCommandsPanelProps {

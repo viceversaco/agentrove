@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ChangeEvent, type KeyboardEvent } from 'react';
 import { Search, X } from 'lucide-react';
-import { Button } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
 import { cn } from '@/utils/cn';
 
 export interface SearchInputProps {

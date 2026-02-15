@@ -2,8 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, LogOut, Moon, Settings, Sun } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore, useUIStore } from '@/store';
-import { useCurrentUserQuery, useLogoutMutation, useUserUsageQuery } from '@/hooks/queries';
-import { Button, ToggleButton } from '@/components/ui';
+import {
+  useCurrentUserQuery,
+  useLogoutMutation,
+  useUserUsageQuery,
+} from '@/hooks/queries/useAuthQueries';
+import { Button } from '@/components/ui/primitives/Button';
+import { ToggleButton } from '@/components/ui/ToggleButton';
 import { cn } from '@/utils/cn';
 import { UserAvatarCircle } from '@/components/chat/message-bubble/MessageAvatars';
 import type { UserUsage } from '@/types';

@@ -1,8 +1,8 @@
 import { memo, useMemo, useEffect } from 'react';
-import { Dropdown } from '@/components/ui';
-import type { DropdownItemType } from '@/components/ui';
+import { Dropdown } from '@/components/ui/primitives/Dropdown';
+import type { DropdownItemType } from '@/components/ui/primitives/Dropdown';
 import { useAuthStore, useUIStore } from '@/store';
-import { useModelSelection } from '@/hooks/queries';
+import { useModelSelection } from '@/hooks/queries/useModelQueries';
 import type { Model } from '@/types/chat.types';
 
 const groupModelsByProvider = (models: Model[]) => {

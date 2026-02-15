@@ -1,7 +1,7 @@
 import { memo, useState, useCallback } from 'react';
 import { Panel } from './Panel';
 import type { PortInfo } from '@/types';
-import { usePreviewLinksQuery } from '@/hooks/queries';
+import { usePreviewLinksQuery } from '@/hooks/queries/useSandboxQueries';
 import { NoOpenPortsState } from '../shared/NoOpenPortsState';
 
 export interface WebPreviewProps {

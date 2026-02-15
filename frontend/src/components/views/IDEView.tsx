@@ -2,7 +2,7 @@ import { memo, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Download, ExternalLink, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/primitives/Button';
 import { Spinner } from '@/components/ui/primitives/Spinner';
-import { useIDEUrlQuery } from '@/hooks/queries';
+import { useIDEUrlQuery } from '@/hooks/queries/useSandboxQueries';
 import { useUIStore } from '@/store';
 import { sandboxService } from '@/services/sandboxService';
 

@@ -4,7 +4,6 @@ import type { ContextUsageInfo } from '@/components/chat/message-input/ContextUs
 
 export interface ChatSessionState {
   messages: Message[];
-  inputMessage: string;
   isLoading: boolean;
   isStreaming: boolean;
   isInitialLoading: boolean;
@@ -22,7 +21,6 @@ export interface ChatSessionState {
 }
 
 export interface ChatSessionActions {
-  setInputMessage: (msg: string) => void;
   onSubmit: (e: React.FormEvent) => void;
   onStopStream: () => void;
   onCopy: (content: string, id: string) => void;

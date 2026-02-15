@@ -2,48 +2,34 @@ import { EnhanceButton } from './EnhanceButton';
 import { PermissionModeSelector } from '@/components/chat/permission-mode-selector/PermissionModeSelector';
 import { ModelSelector } from '@/components/chat/model-selector/ModelSelector';
 import { ThinkingModeSelector } from '@/components/chat/thinking-mode-selector/ThinkingModeSelector';
+import { useInputContext } from '@/hooks/useInputContext';
 
-export interface InputControlsProps {
-  selectedModelId: string;
-  onModelChange: (modelId: string) => void;
-  onEnhance?: () => void;
-  dropdownPosition?: 'top' | 'bottom';
-  isLoading?: boolean;
-  isEnhancing?: boolean;
-  hasMessage?: boolean;
-}
+export function InputControls() {
+  const { state, actions } = useInputContext();
 
-export function InputControls({
-  selectedModelId,
-  onModelChange,
-  onEnhance,
-  dropdownPosition = 'bottom',
-  isLoading = false,
-  isEnhancing = false,
-  hasMessage = false,
-}: InputControlsProps) {
   return (
     <div
       className="absolute bottom-2.5 left-3 right-20 flex flex-wrap items-center gap-1 sm:gap-1.5"
       onClick={(e) => e.preventDefault()}
     >
-      {onEnhance && (
-        <EnhanceButton
-          onEnhance={onEnhance}
-          isEnhancing={isEnhancing}
-          disabled={isLoading || !hasMessage}
-        />
-      )}
+      <EnhanceButton
+        onEnhance={actions.handleEnhancePrompt}
+        isEnhancing={state.isEnhancing}
+        disabled={state.isLoading || !state.hasMessage}
+      />
 
-      <PermissionModeSelector dropdownPosition={dropdownPosition} disabled={isLoading} />
+      <PermissionModeSelector
+        dropdownPosition={state.dropdownPosition}
+        disabled={state.isLoading}
+      />
 
-      <ThinkingModeSelector dropdownPosition={dropdownPosition} disabled={isLoading} />
+      <ThinkingModeSelector dropdownPosition={state.dropdownPosition} disabled={state.isLoading} />
 
       <ModelSelector
-        selectedModelId={selectedModelId}
-        onModelChange={onModelChange}
-        dropdownPosition={dropdownPosition}
-        disabled={isLoading}
+        selectedModelId={state.selectedModelId}
+        onModelChange={actions.onModelChange}
+        dropdownPosition={state.dropdownPosition}
+        disabled={state.isLoading}
       />
     </div>
   );

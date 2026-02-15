@@ -2,8 +2,11 @@ import { memo, type ReactNode, useState, useCallback, useEffect, useMemo } from 
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, ArrowLeft, Lock, ArrowRight, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { Layout } from '@/components/layout';
-import { Button, FieldMessage, Input, Label } from '@/components/ui';
-import { useResetPasswordMutation } from '@/hooks/queries';
+import { Button } from '@/components/ui/primitives/Button';
+import { FieldMessage } from '@/components/ui/primitives/FieldMessage';
+import { Input } from '@/components/ui/primitives/Input';
+import { Label } from '@/components/ui/primitives/Label';
+import { useResetPasswordMutation } from '@/hooks/queries/useAuthQueries';
 import { isValidPassword } from '@/utils/validation';
 
 interface ResetPasswordFormData {

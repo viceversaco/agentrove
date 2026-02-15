@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useFilesMetadataQuery } from '@/hooks/queries';
+import { useFilesMetadataQuery } from '@/hooks/queries/useSandboxQueries';
 import { buildFileStructureFromSandboxFiles } from '@/utils/file';
 import type { Chat as ChatSummary, FileStructure } from '@/types';
 

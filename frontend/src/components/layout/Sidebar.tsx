@@ -5,8 +5,15 @@ import toast from 'react-hot-toast';
 import { useInView } from 'react-intersection-observer';
 import type { FetchNextPageOptions } from '@tanstack/react-query';
 import type { Chat } from '@/types';
-import { Button, ConfirmDialog, RenameModal, Spinner } from '@/components/ui';
-import { useDeleteChatMutation, useUpdateChatMutation, usePinChatMutation } from '@/hooks/queries';
+import { Button } from '@/components/ui/primitives/Button';
+import { Spinner } from '@/components/ui/primitives/Spinner';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { RenameModal } from '@/components/ui/RenameModal';
+import {
+  useDeleteChatMutation,
+  useUpdateChatMutation,
+  usePinChatMutation,
+} from '@/hooks/queries/useChatQueries';
 import { cn } from '@/utils/cn';
 import { useUIStore, useStreamStore } from '@/store';
 import { useIsMobile } from '@/hooks';

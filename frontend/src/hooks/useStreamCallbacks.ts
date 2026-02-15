@@ -3,7 +3,8 @@ import type { Dispatch, SetStateAction } from 'react';
 import { QueryClient } from '@tanstack/react-query';
 import { StreamingContentAccumulator, type ContentRenderSnapshot } from '@/utils/stream';
 import { playNotificationSound } from '@/utils/audio';
-import { queryKeys, useSettingsQuery } from '@/hooks/queries';
+import { queryKeys } from '@/hooks/queries/queryKeys';
+import { useSettingsQuery } from '@/hooks/queries/useSettingsQueries';
 import type {
   AssistantStreamEvent,
   Chat,

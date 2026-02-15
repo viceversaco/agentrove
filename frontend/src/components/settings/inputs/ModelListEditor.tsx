@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Plus, X } from 'lucide-react';
-import { Button, Input, Switch } from '@/components/ui';
+import { Button } from '@/components/ui/primitives/Button';
+import { Input } from '@/components/ui/primitives/Input';
+import { Switch } from '@/components/ui/primitives/Switch';
 import type { CustomProviderModel } from '@/types';
 
 interface ModelListEditorProps {
