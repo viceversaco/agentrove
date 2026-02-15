@@ -17,6 +17,7 @@ import type { QueueProcessingData, StreamEnvelope, StreamState } from '@/types/s
 import { useMessageCache } from '@/hooks/useMessageCache';
 import { streamService } from '@/services/streamService';
 import type { StreamOptions } from '@/services/streamService';
+import { useUIStore } from '@/store/uiStore';
 
 const STREAM_FLUSH_INTERVAL_MS = 200;
 
@@ -333,6 +334,15 @@ export function useStreamCallbacks({
           onContextUsageUpdate(contextUsage, eventChatId);
         }
         return;
+      }
+
+      if (envelope.kind === 'tool_completed') {
+        const tool = (envelope.payload as { tool?: ToolEventPayload })?.tool;
+        if (tool?.name === 'EnterPlanMode') {
+          useUIStore.getState().setPermissionMode('plan');
+        } else if (tool?.name === 'ExitPlanMode') {
+          useUIStore.getState().setPermissionMode('auto');
+        }
       }
 
       const renderEvent = envelopeToRenderEvent(envelope);

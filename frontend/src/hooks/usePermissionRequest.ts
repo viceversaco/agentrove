@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { permissionService } from '@/services/permissionService';
 import { usePermissionStore } from '@/store/permissionStore';
-import { useUIStore } from '@/store/uiStore';
 import { addResolvedRequestId, isRequestResolved } from '@/utils/permissionStorage';
 import type { PermissionRequest } from '@/types/chat.types';
 
@@ -27,7 +26,6 @@ export function usePermissionRequest(chatId: string | undefined): UsePermissionR
   const pendingRequests = usePermissionStore((state) => state.pendingRequests);
   const setPermissionRequest = usePermissionStore((state) => state.setPermissionRequest);
   const clearPermissionRequest = usePermissionStore((state) => state.clearPermissionRequest);
-  const setPermissionMode = useUIStore((state) => state.setPermissionMode);
 
   const pendingRequest = chatId ? (pendingRequests.get(chatId) ?? null) : null;
 
@@ -55,11 +53,6 @@ export function usePermissionRequest(chatId: string | undefined): UsePermissionR
       await permissionService.respondToPermission(chatId, pendingRequest.request_id, true);
       addResolvedRequestId(pendingRequest.request_id);
       clearPermissionRequest(chatId);
-      if (pendingRequest.tool_name === 'ExitPlanMode') {
-        setPermissionMode('auto');
-      } else if (pendingRequest.tool_name === 'EnterPlanMode') {
-        setPermissionMode('plan');
-      }
     } catch (err) {
       if (isExpiredRequestError(err)) {
         addResolvedRequestId(pendingRequest.request_id);
@@ -70,7 +63,7 @@ export function usePermissionRequest(chatId: string | undefined): UsePermissionR
     } finally {
       setIsLoading(false);
     }
-  }, [chatId, pendingRequest, clearPermissionRequest, setPermissionMode]);
+  }, [chatId, pendingRequest, clearPermissionRequest]);
 
   const handleReject = useCallback(
     async (alternativeInstruction?: string) => {
