@@ -20,8 +20,8 @@ from app.models.schemas import CursorPaginatedMessages
 from app.models.types import MessageAttachmentDict
 from app.services.db import BaseDbService, SessionFactoryType
 from app.services.exceptions import MessageException, ErrorCode
-from app.utils.attachment_urls import build_attachment_preview_url
-from app.utils.cursor import encode_cursor, decode_cursor, InvalidCursorError
+from app.utils.attachment_urls import AttachmentURL
+from app.utils.cursor import Cursor, InvalidCursorError
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +133,7 @@ class MessageService(BaseDbService[Message]):
                     db.add(attachment)
                     await db.flush()
 
-                    attachment.file_url = build_attachment_preview_url(attachment.id)
+                    attachment.file_url = AttachmentURL.build_preview_url(attachment.id)
 
                 await db.commit()
                 await db.refresh(message, ["attachments"])
@@ -297,7 +297,7 @@ class MessageService(BaseDbService[Message]):
 
             if cursor:
                 try:
-                    ts, mid = decode_cursor(cursor)
+                    ts, mid = Cursor.decode(cursor)
                 except InvalidCursorError:
                     raise MessageException(
                         "Invalid pagination cursor",
@@ -320,7 +320,7 @@ class MessageService(BaseDbService[Message]):
             next_cursor = None
             if has_more and items:
                 last = items[-1]
-                next_cursor = encode_cursor(last.created_at, last.id)
+                next_cursor = Cursor.encode(last.created_at, last.id)
 
             return CursorPaginatedMessages(
                 items=items,

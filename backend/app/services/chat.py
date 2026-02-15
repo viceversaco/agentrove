@@ -53,9 +53,9 @@ from app.services.user import UserService
 if TYPE_CHECKING:
     from redis.asyncio.client import PubSub
 
-from app.utils.message_events import extract_user_prompt
+from app.utils.message_events import MessageEventParser
 from app.utils.redis import redis_connection, redis_pubsub
-from app.utils.attachment_urls import build_attachment_preview_url
+from app.utils.attachment_urls import AttachmentURL
 from app.utils.validators import APIKeyValidationError, validate_model_api_keys
 
 settings = get_settings()
@@ -644,7 +644,7 @@ class ChatService(BaseDbService[Chat]):
             )
 
         try:
-            user_prompt = extract_user_prompt(request.prompt)
+            user_prompt = MessageEventParser.extract_user_prompt(request.prompt)
             ai_prompt = user_prompt
         except (ValueError, KeyError, TypeError, AttributeError) as e:
             logger.error("Failed to parse message events: %s", e)
@@ -843,7 +843,7 @@ class ChatService(BaseDbService[Chat]):
                         db.add_all(all_attachments)
                         await db.flush()
                         for att in all_attachments:
-                            att.file_url = build_attachment_preview_url(att.id)
+                            att.file_url = AttachmentURL.build_preview_url(att.id)
 
                     await db.commit()
                     await db.refresh(new_chat)

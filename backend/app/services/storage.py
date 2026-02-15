@@ -9,10 +9,7 @@ from app.core.config import get_settings
 from app.models.types import MessageAttachmentDict
 from app.services.exceptions import StorageException
 from app.services.sandbox import SandboxService
-from app.utils.attachment_urls import (
-    build_attachment_preview_url,
-    build_temp_attachment_preview_url,
-)
+from app.utils.attachment_urls import AttachmentURL
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -86,9 +83,9 @@ class StorageService:
         physical_file_path.write_bytes(contents)
 
         if attachment_id:
-            file_url = build_attachment_preview_url(attachment_id)
+            file_url = AttachmentURL.build_preview_url(attachment_id)
         else:
-            file_url = build_temp_attachment_preview_url(relative_file_path)
+            file_url = AttachmentURL.build_temp_preview_url(relative_file_path)
 
         # Dual-write: file stored locally (for preview API) AND uploaded to sandbox (for AI access).
         # Sandbox upload failure is logged but not raised - local copy ensures preview still works.

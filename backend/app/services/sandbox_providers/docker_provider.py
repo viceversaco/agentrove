@@ -369,7 +369,7 @@ class LocalDockerProvider(SandboxProvider):
         cmd = [
             "bash",
             "-c",
-            f"command -v tmux >/dev/null && tmux new -A -s {tmux_session} \\; set -g status off || exec bash",
+            f"command -v tmux >/dev/null && tmux new -A -s {shlex.quote(tmux_session)} \\; set -g status off || exec bash",
         ]
 
         exec_id = container.client.api.exec_create(

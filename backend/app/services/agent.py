@@ -5,8 +5,6 @@ from app.models.types import CustomAgentDict, YamlMetadata
 from app.services.resource import BaseMarkdownResourceService
 from app.services.exceptions import AgentException
 
-AgentModel = Literal["sonnet", "opus", "haiku", "inherit"]
-
 VALID_AGENT_MODELS = ["sonnet", "opus", "haiku", "inherit"]
 
 
@@ -25,8 +23,8 @@ class AgentService(BaseMarkdownResourceService[CustomAgentDict]):
         self, name: str, metadata: YamlMetadata, content: str
     ) -> CustomAgentDict:
         model_value = metadata.get("model", "inherit")
-        valid_model: AgentModel = (
-            cast(AgentModel, model_value)
+        valid_model: Literal["sonnet", "opus", "haiku", "inherit"] = (
+            cast(Literal["sonnet", "opus", "haiku", "inherit"], model_value)
             if model_value in ("sonnet", "opus", "haiku", "inherit")
             else "inherit"
         )

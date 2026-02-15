@@ -26,13 +26,14 @@ from starlette.requests import Request
 E = TypeVar("E", bound=Enum)
 
 
-def _coerce_enum(enum_class: type[E]) -> Any:
-    def coerce(value: E | str) -> str:
-        if isinstance(value, enum_class):
+class EnumCoercer:
+    def __init__(self, enum_class: type[E]) -> None:
+        self._enum_class = enum_class
+
+    def __call__(self, value: Any) -> str:
+        if isinstance(value, self._enum_class):
             return str(value.value)
         return str(value)
-
-    return coerce
 
 
 def _calculate_remaining_messages(user: User) -> str | int:
@@ -263,11 +264,11 @@ class MessageAdmin(ModelView, model=Message):
     form_args = {
         "role": {
             "choices": [(r.value, r.value) for r in MessageRole],
-            "coerce": _coerce_enum(MessageRole),
+            "coerce": EnumCoercer(MessageRole),
         },
         "stream_status": {
             "choices": [(s.value, s.value) for s in MessageStreamStatus],
-            "coerce": _coerce_enum(MessageStreamStatus),
+            "coerce": EnumCoercer(MessageStreamStatus),
         },
     }
 
@@ -323,7 +324,7 @@ class MessageAttachmentAdmin(ModelView, model=MessageAttachment):
     form_args = {
         "file_type": {
             "choices": [(t.value, t.value) for t in AttachmentType],
-            "coerce": _coerce_enum(AttachmentType),
+            "coerce": EnumCoercer(AttachmentType),
         },
     }
 

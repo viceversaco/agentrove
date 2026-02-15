@@ -10,6 +10,7 @@ class UserRead(schemas.BaseUser[UUID]):
     username: str
     daily_message_limit: int | None
 
+    # mypy does not support stacking decorators on @property (prop-decorator)
     @computed_field  # type: ignore[prop-decorator]
     @property
     def email_verification_required(self) -> bool:

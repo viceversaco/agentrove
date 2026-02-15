@@ -8,6 +8,27 @@ from uuid import UUID
 
 from app.models.types import JSONDict, JSONValue
 
+StreamEventType = Literal[
+    "assistant_text",
+    "assistant_thinking",
+    "tool_started",
+    "tool_completed",
+    "tool_failed",
+    "user_text",
+    "system",
+    "permission_request",
+    "prompt_suggestions",
+]
+MAX_AUDIT_STRING_LENGTH = 4096
+SENSITIVE_KEY_PARTS = (
+    "token",
+    "api_key",
+    "secret",
+    "password",
+    "authorization",
+    "cookie",
+)
+
 
 @dataclass(kw_only=True)
 class ChatStreamRequest:
@@ -24,27 +45,11 @@ class ChatStreamRequest:
     is_custom_prompt: bool = False
 
 
-StreamEventType = Literal[
-    "assistant_text",
-    "assistant_thinking",
-    "tool_started",
-    "tool_completed",
-    "tool_failed",
-    "user_text",
-    "system",
-    "permission_request",
-    "prompt_suggestions",
-]
-
-# Tool status values - should match ToolStatus enum in app.models.db_models.enums
-ToolStatusLiteral = Literal["started", "completed", "failed"]
-
-
 class ToolPayload(TypedDict, total=False):
     id: str
     name: str
     title: str
-    status: ToolStatusLiteral
+    status: Literal["started", "completed", "failed"]
     parent_id: str | None
     input: JSONDict | None
     result: JSONValue
@@ -80,17 +85,6 @@ class ActiveToolState:
             "input": self.input or None,
         }
         return payload
-
-
-MAX_AUDIT_STRING_LENGTH = 4096
-SENSITIVE_KEY_PARTS = (
-    "token",
-    "api_key",
-    "secret",
-    "password",
-    "authorization",
-    "cookie",
-)
 
 
 @dataclass

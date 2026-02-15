@@ -1,4 +1,5 @@
 import logging
+import shlex
 import uuid
 from typing import Any
 
@@ -222,7 +223,7 @@ class E2BSandboxProvider(SandboxProvider):
             timeout=None,
         )
 
-        tmux_cmd = f"command -v tmux >/dev/null && exec tmux new -A -s {tmux_session} \\; set -g status off\n"
+        tmux_cmd = f"command -v tmux >/dev/null && exec tmux new -A -s {shlex.quote(tmux_session)} \\; set -g status off\n"
         await sandbox.pty.send_stdin(pty.pid, tmux_cmd.encode())
 
         self._register_pty_session(

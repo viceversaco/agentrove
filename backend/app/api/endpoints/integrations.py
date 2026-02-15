@@ -26,7 +26,9 @@ from app.models.schemas.integrations import (
     PollTokenRequest,
     PollTokenResponse,
 )
-from app.services import copilot_oauth, gmail_oauth, openai_oauth
+from app.services.copilot_oauth import CopilotOAuthService
+from app.services.gmail_oauth import GmailOAuthService
+from app.services.openai_oauth import VERIFICATION_URI, OpenAIOAuthService
 from app.services.exceptions import UserException
 from app.services.user import UserService
 
@@ -42,7 +44,9 @@ async def upload_oauth_client(
     db: AsyncSession = Depends(get_db),
     user_service: UserService = Depends(get_user_service),
 ) -> OAuthClientResponse:
-    is_valid, error_msg = gmail_oauth.validate_client_config(request.client_config)
+    is_valid, error_msg = GmailOAuthService.validate_client_config(
+        request.client_config
+    )
     if not is_valid:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -112,11 +116,11 @@ async def get_oauth_url(
             detail="OAuth client not configured. Upload gcp-oauth.keys.json first.",
         )
 
-    client_id, _ = gmail_oauth.extract_client_credentials(
+    client_id, _ = GmailOAuthService.extract_client_credentials(
         user_settings.gmail_oauth_client
     )
-    state = gmail_oauth.create_oauth_state(current_user.id)
-    url = gmail_oauth.build_authorization_url(client_id, state)
+    state = GmailOAuthService.create_oauth_state(current_user.id)
+    url = GmailOAuthService.build_authorization_url(client_id, state)
 
     return OAuthUrlResponse(url=url)
 
@@ -128,7 +132,7 @@ async def oauth_callback(
     db: AsyncSession = Depends(get_db),
     user_service: UserService = Depends(get_user_service),
 ) -> HTMLResponse:
-    user_id = gmail_oauth.verify_oauth_state(state)
+    user_id = GmailOAuthService.verify_oauth_state(state)
     if not user_id:
         return HTMLResponse(
             content=_callback_html("Authentication failed: Invalid state token"),
@@ -151,12 +155,12 @@ async def oauth_callback(
             status_code=400,
         )
 
-    client_id, client_secret = gmail_oauth.extract_client_credentials(
+    client_id, client_secret = GmailOAuthService.extract_client_credentials(
         user_settings.gmail_oauth_client
     )
 
     try:
-        tokens = await gmail_oauth.exchange_code_for_tokens(
+        tokens = await GmailOAuthService.exchange_code_for_tokens(
             code, client_id, client_secret
         )
     except httpx.HTTPError as e:
@@ -168,7 +172,7 @@ async def oauth_callback(
             status_code=500,
         )
 
-    email = await gmail_oauth.get_user_email(tokens.get("access_token", ""))
+    email = await GmailOAuthService.get_user_email(tokens.get("access_token", ""))
 
     if "expires_in" in tokens:
         expiry = datetime.now(timezone.utc) + timedelta(seconds=tokens["expires_in"])
@@ -217,7 +221,7 @@ async def disconnect_gmail(
     if user_settings.gmail_oauth_tokens:
         refresh_token = user_settings.gmail_oauth_tokens.get("refresh_token")
         if refresh_token:
-            await gmail_oauth.revoke_token(refresh_token)
+            await GmailOAuthService.revoke_token(refresh_token)
 
     user_settings.gmail_oauth_tokens = None
     user_settings.gmail_connected_at = None
@@ -236,7 +240,7 @@ async def start_device_flow(
     _current_user: User = Depends(get_current_user),
 ) -> DeviceCodeResponse:
     try:
-        data: dict[str, Any] = await copilot_oauth.start_device_authorization()
+        data: dict[str, Any] = await CopilotOAuthService.start_device_authorization()
     except httpx.HTTPError:
         raise HTTPException(
             status_code=502,
@@ -258,7 +262,7 @@ async def poll_token(
     _current_user: User = Depends(get_current_user),
 ) -> PollTokenResponse:
     try:
-        data: dict[str, Any] = await copilot_oauth.poll_access_token(
+        data: dict[str, Any] = await CopilotOAuthService.poll_access_token(
             request.device_code
         )
     except httpx.HTTPError:
@@ -284,7 +288,7 @@ async def start_openai_device_flow(
     _current_user: User = Depends(get_current_user),
 ) -> DeviceCodeResponse:
     try:
-        data: dict[str, Any] = await openai_oauth.start_device_authorization()
+        data: dict[str, Any] = await OpenAIOAuthService.start_device_authorization()
     except httpx.HTTPError:
         raise HTTPException(
             status_code=502,
@@ -292,7 +296,7 @@ async def start_openai_device_flow(
         )
 
     return DeviceCodeResponse(
-        verification_uri=openai_oauth.VERIFICATION_URI,
+        verification_uri=VERIFICATION_URI,
         user_code=data["user_code"],
         device_code=data["device_auth_id"],
         interval=int(data.get("interval", 5)),
@@ -306,7 +310,7 @@ async def poll_openai_token(
     _current_user: User = Depends(get_current_user),
 ) -> PollTokenResponse:
     try:
-        data: dict[str, Any] = await openai_oauth.poll_device_token(
+        data: dict[str, Any] = await OpenAIOAuthService.poll_device_token(
             request.device_code, request.user_code
         )
     except httpx.HTTPError:
@@ -325,7 +329,7 @@ async def poll_openai_token(
                 detail="Incomplete authorization response from OpenAI",
             )
         try:
-            tokens = await openai_oauth.exchange_authorization_code(
+            tokens = await OpenAIOAuthService.exchange_authorization_code(
                 auth_code, code_verifier
             )
         except httpx.HTTPError:

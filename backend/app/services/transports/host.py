@@ -4,6 +4,7 @@ import logging
 import os
 import pwd
 import shlex
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -68,11 +69,12 @@ class HostSandboxTransport(BaseSandboxTransport):
 
     @staticmethod
     def _preexec_drop_privileges(uid: int, gid: int) -> Any:
-        def _inner() -> None:
-            os.setgid(gid)
-            os.setuid(uid)
+        return partial(HostSandboxTransport._set_process_ids, uid, gid)
 
-        return _inner
+    @staticmethod
+    def _set_process_ids(uid: int, gid: int) -> None:
+        os.setgid(gid)
+        os.setuid(uid)
 
     async def connect(self) -> None:
         if self._ready:

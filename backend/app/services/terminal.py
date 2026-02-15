@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import shlex
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -120,7 +121,7 @@ class TerminalSessionRecord:
         session_name = self._get_tmux_session_name()
         try:
             await self.sandbox_service.execute_command(
-                self.sandbox_id, f"tmux kill-session -t {session_name}"
+                self.sandbox_id, f"tmux kill-session -t {shlex.quote(session_name)}"
             )
         except Exception:
             pass

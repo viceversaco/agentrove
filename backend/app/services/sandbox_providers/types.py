@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Coroutine
 
+PtyDataCallbackType = Callable[[bytes], Coroutine[Any, Any, None]]
+
 
 class SandboxProviderType(str, Enum):
     E2B = "e2b"
@@ -76,6 +78,3 @@ class DockerConfig:
     openvscode_port: int = 8765
     traefik_network: str = ""
     traefik_entrypoint: str = "https"
-
-
-PtyDataCallbackType = Callable[[bytes], Coroutine[Any, Any, None]]

@@ -1,5 +1,7 @@
 from typing import Literal, TypedDict
 
+ExceptionDetails = dict[str, str]
+
 
 class BaseResourceDict(TypedDict, total=False):
     name: str
@@ -90,9 +92,6 @@ class ParsedResourceResult(TypedDict):
 class EnabledResourceInfo(TypedDict):
     name: str
     path: str
-
-
-ExceptionDetails = dict[str, str]
 
 
 type JSONValue = (

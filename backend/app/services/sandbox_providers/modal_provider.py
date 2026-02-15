@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import shlex
 import uuid
 from typing import Any
 
@@ -259,7 +260,7 @@ class ModalSandboxProvider(SandboxProvider):
             sandbox.exec.aio,
             "bash",
             "-c",
-            f"command -v tmux >/dev/null && tmux new -A -s {tmux_session} \\; set -g status off || exec bash",
+            f"command -v tmux >/dev/null && tmux new -A -s {shlex.quote(tmux_session)} \\; set -g status off || exec bash",
             pty=True,
             env={"TERM": TERMINAL_TYPE},
         )

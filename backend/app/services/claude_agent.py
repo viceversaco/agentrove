@@ -32,18 +32,8 @@ from app.services.transports import (
 )
 from app.services.user import UserService
 
-SDKPermissionMode = Literal["default", "acceptEdits", "plan", "bypassPermissions"]
-
 settings = get_settings()
 logger = logging.getLogger(__name__)
-
-
-class SessionParams(NamedTuple):
-    options: ClaudeAgentOptions
-    sandbox_id: str
-    sandbox_provider: str
-    transport_factory: Callable[[], SandboxTransport]
-
 
 THINKING_MODE_TOKENS = {
     "low": 4000,
@@ -58,11 +48,20 @@ ALLOWED_SLASH_COMMANDS = [
     "/review",
     "/init",
 ]
-SDK_PERMISSION_MODE_MAP: dict[str, SDKPermissionMode] = {
+SDK_PERMISSION_MODE_MAP: dict[
+    str, Literal["default", "acceptEdits", "plan", "bypassPermissions"]
+] = {
     "plan": "plan",
     "ask": "default",
     "auto": "bypassPermissions",
 }
+
+
+class SessionParams(NamedTuple):
+    options: ClaudeAgentOptions
+    sandbox_id: str
+    sandbox_provider: str
+    transport_factory: Callable[[], SandboxTransport]
 
 
 MCP_TYPE_CONFIGS: dict[str, dict[str, Any]] = {
@@ -491,7 +490,7 @@ class ClaudeAgentService:
         if provider_type != ProviderType.ANTHROPIC.value:
             disallowed_tools.append("WebSearch")
 
-        sdk_permission_mode: SDKPermissionMode = SDK_PERMISSION_MODE_MAP.get(
+        sdk_permission_mode = SDK_PERMISSION_MODE_MAP.get(
             permission_mode, "bypassPermissions"
         )
 

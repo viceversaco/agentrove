@@ -23,7 +23,6 @@ from app.services.skill import SkillService
 
 logger = logging.getLogger(__name__)
 
-McpCommandType = Literal["npx", "bunx", "uvx", "http"]
 SUPPORTED_MCP_COMMANDS: set[str] = {"npx", "bunx", "uvx"}
 
 
@@ -242,7 +241,7 @@ class PluginInstallerService:
             logger.warning(f"MCP server '{name}' uses unsupported command: {command}")
             return None
 
-        command_type = cast(McpCommandType, command)
+        command_type = cast(Literal["npx", "bunx", "uvx", "http"], command)
         package: str | None = None
         filtered_args: list[str] = []
 

@@ -16,7 +16,7 @@ from app.constants import (
 from app.core.config import get_settings
 from app.models.types import CustomSkillDict, EnabledResourceInfo, YamlMetadata
 from app.services.exceptions import SkillException
-from app.utils.yaml_parser import parse_yaml_frontmatter
+from app.utils.yaml_parser import YAMLParser
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ class SkillService:
 
     def _parse_skill_yaml(self, content: str) -> YamlMetadata:
         try:
-            parsed = parse_yaml_frontmatter(content)
+            parsed = YAMLParser.parse(content)
         except ValueError as e:
             raise SkillException(str(e))
 

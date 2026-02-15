@@ -23,7 +23,7 @@ from app.models.types import (
     YamlMetadata,
 )
 from app.services.exceptions import ServiceException
-from app.utils.yaml_parser import parse_yaml_frontmatter
+from app.utils.yaml_parser import YAMLParser
 
 T = TypeVar("T", bound=BaseResourceDict)
 
@@ -124,7 +124,7 @@ class BaseMarkdownResourceService(ABC, Generic[T]):
 
     def _parse_frontmatter(self, content: str) -> ParsedResourceResult:
         try:
-            parsed = parse_yaml_frontmatter(content)
+            parsed = YAMLParser.parse(content)
         except ValueError as e:
             self._raise(str(e))
 

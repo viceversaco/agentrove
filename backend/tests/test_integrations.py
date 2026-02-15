@@ -8,6 +8,7 @@ from httpx import AsyncClient, HTTPStatusError
 
 from app.models.db_models import User
 from app.services import gmail_oauth
+from app.services.gmail_oauth import GmailOAuthService
 
 VALID_WEB_OAUTH_CLIENT = {
     "web": {
@@ -174,7 +175,7 @@ class TestUploadOAuthClient:
             json={"client_config": VALID_WEB_OAUTH_CLIENT},
         )
 
-        state = gmail_oauth.create_oauth_state(integration_user_fixture.id)
+        state = GmailOAuthService.create_oauth_state(integration_user_fixture.id)
 
         mock_token_response = MagicMock()
         mock_token_response.status_code = 200
@@ -306,7 +307,7 @@ class TestDeleteOAuthClient:
             json={"client_config": VALID_WEB_OAUTH_CLIENT},
         )
 
-        state = gmail_oauth.create_oauth_state(integration_user_fixture.id)
+        state = GmailOAuthService.create_oauth_state(integration_user_fixture.id)
 
         mock_token_response = MagicMock()
         mock_token_response.status_code = 200
@@ -423,7 +424,7 @@ class TestOAuthCallback:
             json={"client_config": VALID_WEB_OAUTH_CLIENT},
         )
 
-        state = gmail_oauth.create_oauth_state(integration_user_fixture.id)
+        state = GmailOAuthService.create_oauth_state(integration_user_fixture.id)
 
         mock_token_response = MagicMock()
         mock_token_response.status_code = 200
@@ -463,7 +464,7 @@ class TestOAuthCallback:
             json={"client_config": VALID_WEB_OAUTH_CLIENT},
         )
 
-        state = gmail_oauth.create_oauth_state(integration_user_fixture.id)
+        state = GmailOAuthService.create_oauth_state(integration_user_fixture.id)
 
         mock_token_response = MagicMock()
         mock_token_response.status_code = 200
@@ -542,7 +543,7 @@ class TestOAuthCallback:
             json={"client_config": VALID_WEB_OAUTH_CLIENT},
         )
 
-        state = gmail_oauth.create_oauth_state(integration_user_fixture.id)
+        state = GmailOAuthService.create_oauth_state(integration_user_fixture.id)
 
         with patch("app.services.gmail_oauth.httpx.AsyncClient") as mock_client:
             mock_async_client = AsyncMock()
@@ -568,7 +569,7 @@ class TestOAuthCallback:
         async_client: AsyncClient,
         integration_user_fixture: User,
     ) -> None:
-        state = gmail_oauth.create_oauth_state(integration_user_fixture.id)
+        state = GmailOAuthService.create_oauth_state(integration_user_fixture.id)
 
         response = await async_client.get(
             "/api/v1/integrations/gmail/callback",
@@ -648,7 +649,7 @@ class TestGetGmailStatus:
             json={"client_config": VALID_WEB_OAUTH_CLIENT},
         )
 
-        state = gmail_oauth.create_oauth_state(integration_user_fixture.id)
+        state = GmailOAuthService.create_oauth_state(integration_user_fixture.id)
 
         mock_token_response = MagicMock()
         mock_token_response.status_code = 200
@@ -707,7 +708,7 @@ class TestDisconnectGmail:
             json={"client_config": VALID_WEB_OAUTH_CLIENT},
         )
 
-        state = gmail_oauth.create_oauth_state(integration_user_fixture.id)
+        state = GmailOAuthService.create_oauth_state(integration_user_fixture.id)
 
         mock_token_response = MagicMock()
         mock_token_response.status_code = 200
@@ -769,7 +770,7 @@ class TestDisconnectGmail:
             json={"client_config": VALID_WEB_OAUTH_CLIENT},
         )
 
-        state = gmail_oauth.create_oauth_state(integration_user_fixture.id)
+        state = GmailOAuthService.create_oauth_state(integration_user_fixture.id)
 
         mock_token_response = MagicMock()
         mock_token_response.status_code = 200
