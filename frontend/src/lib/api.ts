@@ -14,6 +14,16 @@ interface TokenResponse {
   token_type: string;
 }
 
+class RefreshTokenError extends Error {
+  status: number;
+
+  constructor(status: number, message = 'Token refresh failed') {
+    super(message);
+    this.name = 'RefreshTokenError';
+    this.status = status;
+  }
+}
+
 export type { ApiStreamResponse as StreamResponse } from '@/types/stream.types';
 
 const trimTrailingSlash = (url: string): string => url.replace(/\/+$/, '');
@@ -40,7 +50,7 @@ let refreshingPromise: Promise<TokenResponse> | null = null;
 async function performTokenRefresh(baseURL: string): Promise<TokenResponse> {
   const refreshToken = authStorage.getRefreshToken();
   if (!refreshToken) {
-    throw new Error('No refresh token available');
+    throw new RefreshTokenError(401, 'No refresh token available');
   }
 
   const response = await fetch(`${baseURL}/auth/jwt/refresh`, {
@@ -50,8 +60,7 @@ async function performTokenRefresh(baseURL: string): Promise<TokenResponse> {
   });
 
   if (!response.ok) {
-    authStorage.clearAuth();
-    throw new Error('Token refresh failed');
+    throw new RefreshTokenError(response.status);
   }
 
   const data: TokenResponse = await response.json();
@@ -73,6 +82,13 @@ async function refreshTokenIfNeeded(baseURL: string): Promise<TokenResponse> {
   } finally {
     refreshingPromise = null;
   }
+}
+
+function shouldInvalidateSession(error: unknown): boolean {
+  if (!(error instanceof RefreshTokenError)) {
+    return false;
+  }
+  return error.status === 401 || error.status === 403;
 }
 
 const extractErrorMessage = async (response: Response): Promise<string> => {
@@ -146,10 +162,13 @@ class APIClient {
         try {
           await refreshTokenIfNeeded(this.baseURL);
           return this.request<T>(endpoint, method, options, additionalHeaders, true);
-        } catch {
-          authStorage.clearAuth();
-          window.location.href = '/login';
-          throw new Error('Session expired');
+        } catch (error) {
+          if (shouldInvalidateSession(error)) {
+            authStorage.clearAuth();
+            window.location.href = '/login';
+            throw new Error('Session expired');
+          }
+          throw error;
         }
       }
     }
@@ -194,10 +213,13 @@ class APIClient {
         try {
           await refreshTokenIfNeeded(this.baseURL);
           return this.getBlob(endpoint, signal, true);
-        } catch {
-          authStorage.clearAuth();
-          window.location.href = '/login';
-          throw new Error('Session expired');
+        } catch (error) {
+          if (shouldInvalidateSession(error)) {
+            authStorage.clearAuth();
+            window.location.href = '/login';
+            throw new Error('Session expired');
+          }
+          throw error;
         }
       }
     }

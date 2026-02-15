@@ -34,11 +34,7 @@ function AppContent() {
   const setAuthenticated = useAuthStore((state) => state.setAuthenticated);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const hasToken = !!authService.getToken();
-  const {
-    data: user,
-    error,
-    isLoading,
-  } = useCurrentUserQuery({
+  const { data: user, isLoading } = useCurrentUserQuery({
     enabled: hasToken,
     retry: false,
   });
@@ -46,10 +42,10 @@ function AppContent() {
   useEffect(() => {
     if (hasToken && user) {
       setAuthenticated(true);
-    } else if (isAuthenticated && error) {
+    } else if (isAuthenticated && !hasToken) {
       setAuthenticated(false);
     }
-  }, [user, hasToken, error, isAuthenticated, setAuthenticated]);
+  }, [user, hasToken, isAuthenticated, setAuthenticated]);
 
   const { data: chatsData, isLoading: isChatsLoading } = useInfiniteChatsQuery({
     enabled: isAuthenticated,

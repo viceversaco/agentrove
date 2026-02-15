@@ -139,7 +139,7 @@ export function buildQueryString(
 }
 
 function handleAuthError(): void {
-  authStorage.removeToken();
+  authStorage.clearAuth();
   window.location.href = '/login';
 }
 

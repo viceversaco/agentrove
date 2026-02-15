@@ -73,10 +73,6 @@ export const authStorage = {
     cachedToken = token;
     safeSetItem('auth_token', token);
   },
-  removeToken: (): void => {
-    cachedToken = null;
-    safeRemoveItem('auth_token');
-  },
   getRefreshToken: (): string | null => {
     initTokenCache();
     return cachedRefreshToken;
