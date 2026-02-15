@@ -1,4 +1,5 @@
 import { memo, useMemo, useEffect } from 'react';
+import { Cpu } from 'lucide-react';
 import { Dropdown } from '@/components/ui/primitives/Dropdown';
 import type { DropdownItemType } from '@/components/ui/primitives/Dropdown';
 import { useAuthStore } from '@/store/authStore';
@@ -86,6 +87,7 @@ export const ModelSelector = memo(function ModelSelector({
       getItemLabel={(model) => `${model.provider_name} - ${model.name}`}
       getItemShortLabel={(model) => model.name}
       onSelect={(model) => onModelChange(model.model_id)}
+      leftIcon={Cpu}
       width="w-64"
       dropdownPosition={dropdownPosition}
       disabled={disabled}

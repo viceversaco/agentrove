@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { Shield } from 'lucide-react';
 import { Dropdown } from '@/components/ui/primitives/Dropdown';
 import { useUIStore } from '@/store/uiStore';
 
@@ -37,6 +38,7 @@ export const PermissionModeSelector = memo(function PermissionModeSelector({
       getItemKey={(mode) => mode.value}
       getItemLabel={(mode) => mode.label}
       onSelect={(mode) => setPermissionMode(mode.value)}
+      leftIcon={Shield}
       width="w-48"
       itemClassName="flex flex-col gap-0.5"
       dropdownPosition={dropdownPosition}

@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { Brain } from 'lucide-react';
 import { Dropdown } from '@/components/ui/primitives/Dropdown';
 import { useUIStore } from '@/store/uiStore';
 
@@ -38,6 +39,7 @@ export const ThinkingModeSelector = memo(function ThinkingModeSelector({
       getItemKey={(mode) => mode.value || 'off'}
       getItemLabel={(mode) => mode.label}
       onSelect={(mode) => setThinkingMode(mode.value)}
+      leftIcon={Brain}
       width="w-32"
       dropdownPosition={dropdownPosition}
       disabled={disabled}
