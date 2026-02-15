@@ -1,7 +1,7 @@
 import { apiClient } from '@/lib/api';
-import { ensureResponse, serviceCall } from '@/services/base';
+import { ensureResponse, serviceCall } from '@/services/base/BaseService';
 import { validateId, validateRequired } from '@/utils/validation';
-import type { QueuedMessage, QueueUpsertResponse } from '@/types';
+import type { QueuedMessage, QueueUpsertResponse } from '@/types/queue.types';
 
 async function queueMessage(
   chatId: string,

@@ -1,12 +1,15 @@
 import { memo, useEffect, useState } from 'react';
 import { logger } from '@/utils/logger';
 import { base64ToUint8Array } from '@/utils/base64';
-import JSZip from 'jszip';
-import type { FileStructure } from '@/types';
+import type { FileStructure } from '@/types/file-system.types';
 import { Button } from '@/components/ui/primitives/Button';
 import { PreviewContainer } from './PreviewContainer';
 import { previewBackgroundClass } from './previewConstants';
 import { getDisplayFileName, isValidBase64 } from './previewUtils';
+
+const TEXT_CONTENT_RE = /<a:t>([^<]+)<\/a:t>/g;
+const TITLE_CONTENT_RE = /<p:ph[^>]*type="title"[^>]*>.*?<a:t>([^<]+)<\/a:t>/gs;
+const SLIDE_NUMBER_RE = /slide(\d+)\.xml$/;
 
 export interface PowerPointPreviewProps {
   file: FileStructure;
@@ -23,12 +26,12 @@ interface SlideData {
 const parseSlideContent = (xmlContent: string): string => {
   const textContent: string[] = [];
 
-  const textMatches = xmlContent.matchAll(/<a:t>([^<]+)<\/a:t>/g);
+  const textMatches = xmlContent.matchAll(TEXT_CONTENT_RE);
   for (const match of textMatches) {
     textContent.push(match[1]);
   }
 
-  const titleMatches = xmlContent.matchAll(/<p:ph[^>]*type="title"[^>]*>.*?<a:t>([^<]+)<\/a:t>/gs);
+  const titleMatches = xmlContent.matchAll(TITLE_CONTENT_RE);
   for (const match of titleMatches) {
     textContent.unshift(`## ${match[1]}`);
   }
@@ -79,13 +82,14 @@ export const PowerPointPreview = memo(function PowerPointPreview({
       try {
         const bytes = base64ToUint8Array(file.content);
 
+        const { default: JSZip } = await import('jszip');
         const pptx = await new JSZip().loadAsync(bytes);
 
         const slideRels = pptx.file(/^ppt\/slides\/_rels\/slide\d+\.xml\.rels$/);
         const slideFiles = pptx.file(/^ppt\/slides\/slide\d+\.xml$/);
         const sortedSlides = slideFiles.sort((a, b) => {
-          const aMatch = a.name.match(/slide(\d+)\.xml$/);
-          const bMatch = b.name.match(/slide(\d+)\.xml$/);
+          const aMatch = a.name.match(SLIDE_NUMBER_RE);
+          const bMatch = b.name.match(SLIDE_NUMBER_RE);
           const aNum = aMatch ? parseInt(aMatch[1], 10) : 0;
           const bNum = bMatch ? parseInt(bMatch[1], 10) : 0;
           return aNum - bNum;

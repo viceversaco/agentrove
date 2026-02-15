@@ -1,6 +1,6 @@
 import { memo, useMemo, type CSSProperties } from 'react';
 import { logger } from '@/utils/logger';
-import type { FileStructure } from '@/types';
+import type { FileStructure } from '@/types/file-system.types';
 
 const IMAGE_STYLE: CSSProperties = { imageRendering: 'auto' };
 import { PreviewContainer } from './PreviewContainer';

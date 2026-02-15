@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { useFilesMetadataQuery } from '@/hooks/queries/useSandboxQueries';
 import { buildFileStructureFromSandboxFiles } from '@/utils/file';
-import type { Chat as ChatSummary, FileStructure } from '@/types';
+import type { Chat as ChatSummary } from '@/types/chat.types';
+import type { FileStructure } from '@/types/file-system.types';
 
 interface UseSandboxFilesResult {
   fileStructure: FileStructure[];

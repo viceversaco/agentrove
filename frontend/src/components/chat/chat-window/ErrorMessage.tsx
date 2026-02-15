@@ -1,4 +1,4 @@
-import { StreamProcessingError } from '@/types';
+import { StreamProcessingError } from '@/types/stream.types';
 import { Button } from '@/components/ui/primitives/Button';
 
 interface ErrorMessageProps {

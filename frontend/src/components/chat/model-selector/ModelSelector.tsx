@@ -1,7 +1,8 @@
 import { memo, useMemo, useEffect } from 'react';
 import { Dropdown } from '@/components/ui/primitives/Dropdown';
 import type { DropdownItemType } from '@/components/ui/primitives/Dropdown';
-import { useAuthStore, useUIStore } from '@/store';
+import { useAuthStore } from '@/store/authStore';
+import { useUIStore } from '@/store/uiStore';
 import { useModelSelection } from '@/hooks/queries/useModelQueries';
 import type { Model } from '@/types/chat.types';
 

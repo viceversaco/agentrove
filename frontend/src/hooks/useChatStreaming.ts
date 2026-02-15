@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { logger } from '@/utils/logger';
 import { QueryClient } from '@tanstack/react-query';
-import { useStreamStore } from '@/store';
-import type { Chat, ContextUsage, Message, PermissionRequest, StreamState } from '@/types';
+import { useStreamStore } from '@/store/streamStore';
+import type { Chat, ContextUsage, Message, PermissionRequest } from '@/types/chat.types';
+import type { StreamState } from '@/types/stream.types';
 import { cleanupExpiredPdfBlobs, storePdfBlobUrl } from '@/hooks/usePdfBlobCache';
 import { useMessageActions } from '@/hooks/useMessageActions';
 import { useInputState } from '@/hooks/useInputState';
@@ -57,6 +58,16 @@ interface UseChatStreamingResult {
   setWasAborted: Dispatch<SetStateAction<boolean>>;
   currentMessageId: string | null;
   streamState: StreamState;
+}
+
+function findActiveStreamForChat(chatId: string) {
+  const activeStreams = useStreamStore.getState().activeStreams;
+  for (const stream of activeStreams.values()) {
+    if (stream.chatId === chatId && stream.isActive) {
+      return stream;
+    }
+  }
+  return undefined;
 }
 
 export function useChatStreaming({
@@ -134,10 +145,7 @@ export function useChatStreaming({
     if (!chatId) return;
 
     const checkAndUpdateCallbacks = () => {
-      const activeStreams = useStreamStore.getState().activeStreams;
-      const existingStream = Array.from(activeStreams.values()).find(
-        (stream) => stream.chatId === chatId && stream.isActive,
-      );
+      const existingStream = findActiveStreamForChat(chatId);
 
       if (existingStream && lastConnectedStreamRef.current !== existingStream.id) {
         lastConnectedStreamRef.current = existingStream.id;
@@ -171,10 +179,7 @@ export function useChatStreaming({
     if (!chatId) return;
 
     const syncStreamState = () => {
-      const activeStreams = useStreamStore.getState().activeStreams;
-      const activeStreamForChat = Array.from(activeStreams.values()).find(
-        (stream) => stream.chatId === chatId && stream.isActive,
-      );
+      const activeStreamForChat = findActiveStreamForChat(chatId);
 
       if (activeStreamForChat) {
         const isPendingStop = pendingStopRef.current.has(activeStreamForChat.messageId);

@@ -1,8 +1,9 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useEffect, useState, Suspense, lazy } from 'react';
-import { Layout } from '@/components/layout';
+import { Layout } from '@/components/layout/Layout';
 import { Toaster } from 'react-hot-toast';
-import { useAuthStore, useUIStore } from '@/store';
+import { useAuthStore } from '@/store/authStore';
+import { useUIStore } from '@/store/uiStore';
 import { useCurrentUserQuery } from '@/hooks/queries/useAuthQueries';
 import { useInfiniteChatsQuery } from '@/hooks/queries/useChatQueries';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';

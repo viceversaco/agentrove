@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { HelpCircle, ChevronUp, ChevronDown, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/primitives/Button';
-import type { ToolAggregate, UserQuestion } from '@/types';
-import { ToolCard } from './common';
+import type { ToolAggregate } from '@/types/tools.types';
+import type { UserQuestion } from '@/types/chat.types';
+import { ToolCard } from './common/ToolCard';
 import { useUserQuestion } from '@/hooks/useUserQuestion';
 
 const LETTER_OPTIONS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';

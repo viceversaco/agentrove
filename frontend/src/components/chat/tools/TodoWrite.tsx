@@ -1,7 +1,7 @@
 import React from 'react';
 import { ListTodo, CheckCircle2, Circle, Clock } from 'lucide-react';
-import type { ToolAggregate } from '@/types';
-import { ToolCard } from './common';
+import type { ToolAggregate } from '@/types/tools.types';
+import { ToolCard } from './common/ToolCard';
 
 interface Todo {
   content: string;

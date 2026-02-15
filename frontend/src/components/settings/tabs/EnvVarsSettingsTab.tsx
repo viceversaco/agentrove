@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/primitives/Button';
 import { ListManagementTab } from '@/components/ui/ListManagementTab';
-import type { CustomEnvVar } from '@/types';
+import type { CustomEnvVar } from '@/types/user.types';
 import { Key, Eye, EyeOff } from 'lucide-react';
 import { useState } from 'react';
 

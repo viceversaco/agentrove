@@ -1,7 +1,7 @@
 import { memo, type ReactNode, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, ArrowLeft, Mail, ArrowRight, CheckCircle } from 'lucide-react';
-import { Layout } from '@/components/layout';
+import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/primitives/Button';
 import { FieldMessage } from '@/components/ui/primitives/FieldMessage';
 import { Input } from '@/components/ui/primitives/Input';

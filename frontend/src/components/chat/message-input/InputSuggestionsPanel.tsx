@@ -1,10 +1,11 @@
 import { memo } from 'react';
 import { SlashCommandsPanel } from './SlashCommandsPanel';
 import { MentionSuggestionsPanel } from './MentionSuggestionsPanel';
-import { useInputContext } from '@/hooks/useInputContext';
+import { useInputState, useInputActions } from '@/hooks/useInputContext';
 
 export const InputSuggestionsPanel = memo(function InputSuggestionsPanel() {
-  const { state, actions } = useInputContext();
+  const state = useInputState();
+  const actions = useInputActions();
 
   if (state.isMentionActive) {
     return (

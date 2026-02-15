@@ -7,11 +7,11 @@ import {
   Smartphone,
   Monitor,
 } from 'lucide-react';
-import { useUIStore } from '@/store';
+import { useUIStore } from '@/store/uiStore';
 import { cn } from '@/utils/cn';
 import type { ViewType } from '@/types/ui.types';
 import { LAYOUT_CLASSES } from '@/config/constants';
-import { useIsMobile } from '@/hooks';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { Tooltip } from './Tooltip';
 
 function VSCodeIcon({ className }: { className?: string; strokeWidth?: number }) {

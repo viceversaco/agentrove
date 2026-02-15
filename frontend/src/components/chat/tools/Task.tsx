@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Bot } from 'lucide-react';
-import type { ToolAggregate } from '@/types';
-import { ToolCard, CollapsibleButton } from './common';
+import type { ToolAggregate } from '@/types/tools.types';
+import { ToolCard } from './common/ToolCard';
+import { CollapsibleButton } from './common/CollapsibleButton';
 import { getToolComponent } from './registry';
 
 interface TaskProps {

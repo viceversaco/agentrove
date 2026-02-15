@@ -1,5 +1,7 @@
-import { useCallback, useMemo } from 'react';
-import type { FileStructure, CustomAgent, CustomPrompt, MentionItem } from '@/types';
+import { useCallback, useDeferredValue, useMemo } from 'react';
+import type { FileStructure } from '@/types/file-system.types';
+import type { CustomAgent, CustomPrompt } from '@/types/user.types';
+import type { MentionItem } from '@/types/ui.types';
 import { useSuggestionBase } from './useSuggestionBase';
 import { traverseFileStructure, getFileName } from '@/utils/file';
 import { parseMentionQuery } from '@/utils/mentionParser';
@@ -61,14 +63,19 @@ export const useMentionSuggestions = ({
     cursorPosition,
   );
 
+  const deferredQuery = useDeferredValue(query);
+
   const { filteredFiles, filteredAgents, filteredPrompts, allSuggestions } = useMemo(() => {
     if (!isActive) {
       return { filteredFiles: [], filteredAgents: [], filteredPrompts: [], allSuggestions: [] };
     }
 
-    const files = fuzzySearch(query, allFiles, { keys: ['name', 'path'], limit: 30 });
-    const agents = fuzzySearch(query, allAgents, { keys: ['name', 'description'], limit: 20 });
-    const prompts = fuzzySearch(query, allPrompts, { keys: ['name'], limit: 20 });
+    const files = fuzzySearch(deferredQuery, allFiles, { keys: ['name', 'path'], limit: 30 });
+    const agents = fuzzySearch(deferredQuery, allAgents, {
+      keys: ['name', 'description'],
+      limit: 20,
+    });
+    const prompts = fuzzySearch(deferredQuery, allPrompts, { keys: ['name'], limit: 20 });
 
     return {
       filteredFiles: files,
@@ -76,7 +83,7 @@ export const useMentionSuggestions = ({
       filteredPrompts: prompts,
       allSuggestions: [...files, ...agents, ...prompts],
     };
-  }, [isActive, query, allFiles, allAgents, allPrompts]);
+  }, [isActive, deferredQuery, allFiles, allAgents, allPrompts]);
 
   const hasSuggestions = allSuggestions.length > 0;
 

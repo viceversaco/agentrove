@@ -1,5 +1,5 @@
 import { detectFileType } from './fileTypes';
-import type { Message } from '@/types';
+import type { Message } from '@/types/chat.types';
 
 export function createInitialMessage(
   prompt: string,

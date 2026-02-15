@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { detectFileType } from '@/utils/fileTypes';
 import { createInitialMessage } from '@/utils/message';
 import { chatStorage } from '@/utils/storage';
-import type { Message } from '@/types';
+import type { Message } from '@/types/chat.types';
 
 interface UseMessageInitializationParams {
   fetchedMessages: Message[];

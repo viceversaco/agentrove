@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Eye, EyeOff, AlertCircle, RefreshCw } from 'lucide-react';
-import DOMPurify from 'dompurify';
 import { Button } from './primitives/Button';
-import { useUIStore } from '@/store';
+import { useUIStore } from '@/store/uiStore';
 
 interface MermaidProps {
   content: string;
@@ -17,14 +16,15 @@ type RenderState =
 const FONT_FAMILY =
   'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
 
-const sanitizeSvg = (svg: string): string =>
-  DOMPurify.sanitize(svg, {
+const sanitizeSvg = async (svg: string): Promise<string> => {
+  const DOMPurify = (await import('dompurify')).default;
+  return DOMPurify.sanitize(svg, {
     USE_PROFILES: { svg: true, svgFilters: true },
     ADD_TAGS: ['style', 'foreignObject'],
     ADD_ATTR: ['style', 'xmlns', 'class', 'requiredFeatures'],
-    // Required for foreignObject HTML content to render (DOMPurify 3.1.7+ blocks by default)
     HTML_INTEGRATION_POINTS: { foreignobject: true },
   });
+};
 
 export function Mermaid({ content }: MermaidProps) {
   const theme = useUIStore((state) => state.theme);
@@ -56,8 +56,9 @@ export function Mermaid({ content }: MermaidProps) {
 
         const { svg } = await mermaid.render(id, content);
 
+        const sanitized = await sanitizeSvg(svg);
         if (currentRenderId === renderIdRef.current) {
-          setState({ status: 'success', svg: sanitizeSvg(svg) });
+          setState({ status: 'success', svg: sanitized });
         }
       } catch (err) {
         if (currentRenderId === renderIdRef.current) {

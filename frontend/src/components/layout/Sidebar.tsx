@@ -4,7 +4,7 @@ import { Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useInView } from 'react-intersection-observer';
 import type { FetchNextPageOptions } from '@tanstack/react-query';
-import type { Chat } from '@/types';
+import type { Chat } from '@/types/chat.types';
 import { Button } from '@/components/ui/primitives/Button';
 import { Spinner } from '@/components/ui/primitives/Spinner';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -15,8 +15,9 @@ import {
   usePinChatMutation,
 } from '@/hooks/queries/useChatQueries';
 import { cn } from '@/utils/cn';
-import { useUIStore, useStreamStore } from '@/store';
-import { useIsMobile } from '@/hooks';
+import { useUIStore } from '@/store/uiStore';
+import { useStreamStore } from '@/store/streamStore';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { SidebarChatItem } from './SidebarChatItem';
 import { ChatDropdown } from './ChatDropdown';
 import { DROPDOWN_WIDTH, DROPDOWN_HEIGHT, DROPDOWN_MARGIN } from '@/config/constants';
@@ -114,11 +115,10 @@ export function Sidebar({
   const setSidebarOpen = useUIStore((state) => state.setSidebarOpen);
   const isMobile = useIsMobile();
   const activeStreamMetadata = useStreamStore((state) => state.activeStreamMetadata);
-  const streamingChatIds = useMemo(
-    () => activeStreamMetadata.map((meta) => meta.chatId),
+  const streamingChatIdSet = useMemo(
+    () => new Set(activeStreamMetadata.map((meta) => meta.chatId)),
     [activeStreamMetadata],
   );
-  const [searchQuery] = useState('');
   const [hoveredChatId, setHoveredChatId] = useState<string | null>(null);
   const [chatToDelete, setChatToDelete] = useState<string | null>(null);
   const [chatToRename, setChatToRename] = useState<Chat | null>(null);
@@ -148,14 +148,11 @@ export function Sidebar({
   }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const { pinnedChats, unpinnedGroups } = useMemo(() => {
-    const filtered = chats.filter((chat) =>
-      chat.title.toLowerCase().includes(searchQuery.toLowerCase()),
-    );
     return {
-      pinnedChats: filtered.filter((chat) => !!chat.pinned_at),
-      unpinnedGroups: groupChatsByDate(filtered.filter((chat) => !chat.pinned_at)),
+      pinnedChats: chats.filter((chat) => !!chat.pinned_at),
+      unpinnedGroups: groupChatsByDate(chats.filter((chat) => !chat.pinned_at)),
     };
-  }, [chats, searchQuery]);
+  }, [chats]);
 
   const hasAnyChats = pinnedChats.length > 0 || unpinnedGroups.length > 0;
 
@@ -190,7 +187,7 @@ export function Sidebar({
       }
     };
 
-    scrollContainer?.addEventListener('scroll', handleScroll);
+    scrollContainer?.addEventListener('scroll', handleScroll, { passive: true });
     return () => scrollContainer?.removeEventListener('scroll', handleScroll);
   }, [dropdown]);
 
@@ -331,7 +328,7 @@ export function Sidebar({
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-2 pt-1">
           {!hasAnyChats ? (
             <p className="py-8 text-center text-xs text-text-quaternary dark:text-text-dark-quaternary">
-              {searchQuery ? 'No matching chats' : 'No chats yet'}
+              No chats yet
             </p>
           ) : (
             <div>
@@ -350,7 +347,7 @@ export function Sidebar({
                         isSelected={chat.id === selectedChatId}
                         isHovered={hoveredChatId === chat.id}
                         isDropdownOpen={dropdown?.chatId === chat.id}
-                        isChatStreaming={streamingChatIds.includes(chat.id)}
+                        isChatStreaming={streamingChatIdSet.has(chat.id)}
                         onSelect={handleChatSelect}
                         onDropdownClick={handleDropdownClick}
                         onMouseEnter={handleMouseEnter}
@@ -376,7 +373,7 @@ export function Sidebar({
                         isSelected={chat.id === selectedChatId}
                         isHovered={hoveredChatId === chat.id}
                         isDropdownOpen={dropdown?.chatId === chat.id}
-                        isChatStreaming={streamingChatIds.includes(chat.id)}
+                        isChatStreaming={streamingChatIdSet.has(chat.id)}
                         onSelect={handleChatSelect}
                         onDropdownClick={handleDropdownClick}
                         onMouseEnter={handleMouseEnter}

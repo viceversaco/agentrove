@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { PermissionRequest } from '@/types';
+import type { PermissionRequest } from '@/types/chat.types';
 
 interface PermissionState {
   pendingRequests: Map<string, PermissionRequest>;

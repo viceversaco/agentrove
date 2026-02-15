@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { logger } from '@/utils/logger';
-import { useStreamStore } from '@/store';
+import { useStreamStore } from '@/store/streamStore';
 import { streamService } from '@/services/streamService';
 import { chatService } from '@/services/chatService';
 

@@ -1,5 +1,5 @@
 import { createContext, use } from 'react';
-import type { FileStructure } from '@/types';
+import type { FileStructure } from '@/types/file-system.types';
 
 export type FileTreeHandlers = {
   onFileSelect: (file: FileStructure) => void;

@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { MoreHorizontal, Loader2, Pin } from 'lucide-react';
 import { Button } from '@/components/ui/primitives/Button';
 import { cn } from '@/utils/cn';
-import type { Chat } from '@/types';
+import type { Chat } from '@/types/chat.types';
 
 function getRelativeTime(dateStr: string): string {
   const now = Date.now();

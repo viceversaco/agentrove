@@ -3,9 +3,9 @@ import remarkGfm from 'remark-gfm';
 import { useMemo, useState, useCallback, memo, useEffect, lazy, Suspense } from 'react';
 import type { Components } from 'react-markdown';
 import type { AnchorHTMLAttributes, HTMLAttributes, ImgHTMLAttributes } from 'react';
-import { AttachmentViewer } from './';
+import { AttachmentViewer } from './AttachmentViewer';
 import { Button } from './primitives/Button';
-import type { MessageAttachment } from '@/types';
+import type { MessageAttachment } from '@/types/chat.types';
 import { isImageUrl } from '@/utils/fileTypes';
 
 const Mermaid = lazy(() => import('./Mermaid').then((m) => ({ default: m.Mermaid })));

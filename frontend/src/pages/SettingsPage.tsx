@@ -21,7 +21,14 @@ import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import type { UserSettings, UserSettingsUpdate } from '@/types';
+import type {
+  UserSettings,
+  UserSettingsUpdate,
+  CustomPrompt,
+  CustomProvider,
+  SandboxProviderType,
+} from '@/types/user.types';
+import type { ApiFieldKey } from '@/types/settings.types';
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import { useDeleteAllChatsMutation } from '@/hooks/queries/useChatQueries';
 import { useModelsQuery } from '@/hooks/queries/useModelQueries';
@@ -62,7 +69,6 @@ const PromptEditDialog = lazy(() =>
     default: m.PromptEditDialog,
   })),
 );
-import type { ApiFieldKey, CustomPrompt, CustomProvider, SandboxProviderType } from '@/types';
 import { useCrudForm } from '@/hooks/useCrudForm';
 import { useTaskManagement } from '@/hooks/useTaskManagement';
 import { useFileResourceManagement } from '@/hooks/useFileResourceManagement';

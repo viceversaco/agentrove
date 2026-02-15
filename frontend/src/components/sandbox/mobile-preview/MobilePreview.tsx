@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import QRCode from 'qrcode';
 import { Smartphone, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/primitives/Button';
 import { Select } from '@/components/ui/primitives/Select';
@@ -36,16 +35,24 @@ export const MobilePreview = ({ sandboxId }: MobilePreviewProps) => {
     if (!previewUrl) return;
 
     setIsLoadingQr(true);
-    QRCode.toDataURL(expoUrl, {
-      width: 280,
-      margin: 1,
-      color: {
-        dark: '#000000',
-        light: '#FFFFFF',
-      },
-    })
-      .then(setQrCode)
-      .finally(() => setIsLoadingQr(false));
+    (async () => {
+      try {
+        const QRCode = (await import('qrcode')).default;
+        const dataUrl = await QRCode.toDataURL(expoUrl, {
+          width: 280,
+          margin: 1,
+          color: {
+            dark: '#000000',
+            light: '#FFFFFF',
+          },
+        });
+        setQrCode(dataUrl);
+      } catch {
+        setQrCode('');
+      } finally {
+        setIsLoadingQr(false);
+      }
+    })();
   }, [previewUrl, expoUrl]);
 
   const handleRefresh = useCallback(() => {

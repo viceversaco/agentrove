@@ -1,21 +1,25 @@
-import { useRef, useState, useCallback, useEffect, useMemo, type ReactNode } from 'react';
+import { useRef, useState, useCallback, useMemo, type ReactNode } from 'react';
 import { useDragAndDrop } from '@/hooks/useDragAndDrop';
 import { useFileHandling } from '@/hooks/useFileHandling';
 import { useInputFileOperations } from '@/hooks/useInputFileOperations';
 import { useSlashCommandSuggestions } from '@/hooks/useSlashCommandSuggestions';
 import { useEnhancePromptMutation } from '@/hooks/queries/useChatQueries';
 import { useMentionSuggestions } from '@/hooks/useMentionSuggestions';
-import { useMessageQueueStore, useUIStore } from '@/store';
+import { useMessageQueueStore } from '@/store/messageQueueStore';
+import { useUIStore } from '@/store/uiStore';
 import { useChatContext } from '@/hooks/useChatContext';
 import {
   InputContext,
+  InputStateContext,
+  InputActionsContext,
+  InputMetaContext,
   type InputState,
   type InputActions,
   type InputMeta,
   type InputContextValue,
 } from './InputContext';
 import type { InputProps } from './Input';
-import type { MentionItem, SlashCommand } from '@/types';
+import type { MentionItem, SlashCommand } from '@/types/ui.types';
 
 export function InputProvider({
   message,
@@ -41,8 +45,19 @@ export function InputProvider({
   const { fileStructure, customAgents, customSlashCommands, customPrompts } = useChatContext();
   const formRef = useRef<HTMLFormElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [showPreview, setShowPreview] = useState(true);
+  const [previewDismissed, setPreviewDismissed] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
+
+  const hasMessage = message.trim().length > 0;
+  const hasAttachments = (attachedFiles?.length ?? 0) > 0;
+
+  const prevHasAttachments = useRef(hasAttachments);
+  if (prevHasAttachments.current !== hasAttachments) {
+    prevHasAttachments.current = hasAttachments;
+    setPreviewDismissed(false);
+  }
+
+  const showPreview = showAttachedFilesPreview && hasAttachments && !previewDismissed;
 
   const queueMessage = useMessageQueueStore((state) => state.queueMessage);
   const permissionMode = useUIStore((state) => state.permissionMode);
@@ -91,13 +106,11 @@ export function InputProvider({
     },
   });
 
-  const hasMessage = message.trim().length > 0;
-  const hasAttachments = (attachedFiles?.length ?? 0) > 0;
   const isEnhancing = enhancePromptMutation.isPending;
 
   const handleSlashCommandSelect = useCallback(
     (command: SlashCommand) => {
-      setShowPreview(false);
+      setPreviewDismissed(true);
       const newMessage = `${command.value} `;
       setMessage(newMessage);
       focusTextarea(newMessage);
@@ -152,16 +165,12 @@ export function InputProvider({
     onSelect: handleMentionSelect,
   });
 
-  useEffect(() => {
-    setShowPreview(showAttachedFilesPreview && hasAttachments);
-  }, [hasAttachments, showAttachedFilesPreview]);
-
   const handleSubmit = useCallback(
     (event: React.FormEvent) => {
       event.preventDefault();
       if (!hasMessage) return;
 
-      setShowPreview(false);
+      setPreviewDismissed(true);
       onSubmit(event);
     },
     [hasMessage, onSubmit],
@@ -184,7 +193,7 @@ export function InputProvider({
       );
       setMessage('');
       clearAttachedFiles?.([]);
-      setShowPreview(false);
+      setPreviewDismissed(true);
       return;
     }
 
@@ -195,7 +204,7 @@ export function InputProvider({
 
     if (!hasMessage) return;
 
-    setShowPreview(false);
+    setPreviewDismissed(true);
 
     const formElement = formRef.current;
     if (formElement && typeof formElement.requestSubmit === 'function') {
@@ -376,5 +385,13 @@ export function InputProvider({
     [stateValue, actionsValue, metaValue],
   );
 
-  return <InputContext.Provider value={value}>{children}</InputContext.Provider>;
+  return (
+    <InputContext.Provider value={value}>
+      <InputStateContext.Provider value={stateValue}>
+        <InputActionsContext.Provider value={actionsValue}>
+          <InputMetaContext.Provider value={metaValue}>{children}</InputMetaContext.Provider>
+        </InputActionsContext.Provider>
+      </InputStateContext.Provider>
+    </InputContext.Provider>
+  );
 }

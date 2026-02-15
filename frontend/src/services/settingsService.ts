@@ -1,6 +1,7 @@
 import { apiClient } from '@/lib/api';
-import { ensureResponse, ValidationError, withAuth } from '@/services/base';
-import type { UserSettings, UserSettingsUpdate } from '@/types';
+import { ensureResponse, withAuth } from '@/services/base/BaseService';
+import { ValidationError } from '@/services/base/ServiceError';
+import type { UserSettings, UserSettingsUpdate } from '@/types/user.types';
 
 async function getSettings(): Promise<UserSettings> {
   return withAuth(async () => {

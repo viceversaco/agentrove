@@ -1,6 +1,6 @@
 import { apiClient } from '@/lib/api';
-import { withAuth } from '@/services/base';
-import type { Model } from '@/types';
+import { withAuth } from '@/services/base/BaseService';
+import type { Model } from '@/types/chat.types';
 
 async function getModels(): Promise<Model[]> {
   return withAuth(async () => {

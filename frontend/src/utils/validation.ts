@@ -1,4 +1,4 @@
-import { ValidationError } from '@/services/base';
+import { ValidationError } from '@/services/base/ServiceError';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const USERNAME_REGEX = /^[a-zA-Z0-9_]+$/;

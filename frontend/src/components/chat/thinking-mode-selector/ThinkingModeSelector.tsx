@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Dropdown } from '@/components/ui/primitives/Dropdown';
-import { useUIStore } from '@/store';
+import { useUIStore } from '@/store/uiStore';
 
 export interface ThinkingModeOption {
   value: string | null;

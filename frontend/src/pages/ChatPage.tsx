@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useCallback, useRef, ReactNode, lazy, Suspense } from 'react';
 import { useParams, Navigate, useNavigate } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
-import { Sidebar, useLayoutSidebar } from '@/components/layout';
-import { useUIStore, useChatStore } from '@/store';
+import { Sidebar } from '@/components/layout/Sidebar';
+import { useLayoutSidebar } from '@/components/layout/layoutState';
+import { useUIStore } from '@/store/uiStore';
+import { useChatStore } from '@/store/chatStore';
 import { ViewSwitcher } from '@/components/ui/ViewSwitcher';
 import { SplitViewContainer } from '@/components/ui/SplitViewContainer';
 import { Spinner } from '@/components/ui/primitives/Spinner';

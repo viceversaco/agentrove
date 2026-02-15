@@ -2,8 +2,8 @@ import { memo, useState, useCallback } from 'react';
 import { Map, CheckCircle, XCircle, AlertCircle, Terminal } from 'lucide-react';
 import { Button } from '@/components/ui/primitives/Button';
 import { LazyMarkDown } from '@/components/ui/LazyMarkDown';
-import type { ToolAggregate } from '@/types';
-import { ToolCard } from './common';
+import type { ToolAggregate } from '@/types/tools.types';
+import { ToolCard } from './common/ToolCard';
 import { useExitPlanMode } from '@/hooks/useExitPlanMode';
 
 interface PlanModeToolProps {

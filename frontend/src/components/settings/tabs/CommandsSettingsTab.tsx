@@ -1,6 +1,6 @@
 import { Switch } from '@/components/ui/primitives/Switch';
 import { ListManagementTab } from '@/components/ui/ListManagementTab';
-import type { CustomCommand } from '@/types';
+import type { CustomCommand } from '@/types/user.types';
 import { Terminal } from 'lucide-react';
 
 interface CommandsSettingsTabProps {

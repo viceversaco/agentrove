@@ -1,7 +1,7 @@
 import { memo, useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import type { ComponentType } from 'react';
 import { createPortal } from 'react-dom';
-import type { FileStructure } from '@/types';
+import type { FileStructure } from '@/types/file-system.types';
 import {
   isCsvFile,
   isMarkdownFile,

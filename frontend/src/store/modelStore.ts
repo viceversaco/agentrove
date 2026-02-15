@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ModelSelectionState } from '@/types';
+import type { ModelSelectionState } from '@/types/ui.types';
 
 export const useModelStore = create<ModelSelectionState>()(
   persist(

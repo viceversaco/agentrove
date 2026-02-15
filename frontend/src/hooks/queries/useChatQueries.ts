@@ -1,14 +1,9 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UseMutationOptions, UseQueryOptions, InfiniteData } from '@tanstack/react-query';
 import { chatService } from '@/services/chatService';
-import { useMessageQueueStore } from '@/store';
-import type {
-  Chat,
-  ContextUsage,
-  CreateChatRequest,
-  ForkChatResponse,
-  PaginatedChats,
-} from '@/types';
+import { useMessageQueueStore } from '@/store/messageQueueStore';
+import type { Chat, ContextUsage, CreateChatRequest, ForkChatResponse } from '@/types/chat.types';
+import type { PaginatedChats } from '@/types/api.types';
 import { queryKeys } from './queryKeys';
 
 export const useInfiniteChatsQuery = (options?: { perPage?: number; enabled?: boolean }) => {

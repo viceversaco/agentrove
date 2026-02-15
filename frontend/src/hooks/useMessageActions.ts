@@ -4,7 +4,8 @@ import { logger } from '@/utils/logger';
 import { createAttachmentsFromFiles } from '@/utils/message';
 import { extractPromptMention } from '@/utils/mentionParser';
 import { MAX_MESSAGE_SIZE_BYTES } from '@/config/constants';
-import type { ChatRequest, Message, StreamState } from '@/types';
+import type { ChatRequest, Message } from '@/types/chat.types';
+import type { StreamState } from '@/types/stream.types';
 
 interface UseMessageActionsParams {
   chatId: string | undefined;

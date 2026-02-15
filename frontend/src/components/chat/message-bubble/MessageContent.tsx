@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { MessageRenderer } from './MessageRenderer';
-import type { AssistantStreamEvent, MessageAttachment } from '@/types';
+import type { AssistantStreamEvent, MessageAttachment } from '@/types/chat.types';
 import { MessageAttachments } from './MessageAttachments';
 
 interface SharedContentProps {

@@ -2,7 +2,7 @@ import { memo, useMemo } from 'react';
 import { UserMessageContent, AssistantMessageContent } from './MessageContent';
 import { MessageActions } from './MessageActions';
 import { useModelsQuery } from '@/hooks/queries/useModelQueries';
-import type { AssistantStreamEvent, MessageAttachment } from '@/types';
+import type { AssistantStreamEvent, MessageAttachment } from '@/types/chat.types';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { formatRelativeTime, formatFullTimestamp } from '@/utils/date';
 import { useChatContext } from '@/hooks/useChatContext';

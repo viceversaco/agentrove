@@ -1,3 +1,5 @@
+const PROMPT_MENTION_RE = /@prompt:([^\s]+)/;
+
 interface MentionParseResult {
   isActive: boolean;
   query: string;
@@ -18,8 +20,7 @@ export interface ExtractedPromptMention {
 }
 
 export const extractPromptMention = (message: string): ExtractedPromptMention => {
-  const promptMentionRegex = /@prompt:([^\s]+)/g;
-  const match = promptMentionRegex.exec(message);
+  const match = PROMPT_MENTION_RE.exec(message);
 
   if (!match) {
     return { promptName: null, cleanedMessage: message };

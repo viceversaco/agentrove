@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { logger } from '@/utils/logger';
-import type { ActiveStream, StreamMetadata } from '@/types';
+import type { ActiveStream, StreamMetadata } from '@/types/stream.types';
 
 interface StreamState {
   activeStreams: Map<string, ActiveStream>;

@@ -6,7 +6,7 @@ import type {
   CreateScheduledTaskRequest,
   UpdateScheduledTaskRequest,
   TaskToggleResponse,
-} from '@/types';
+} from '@/types/scheduler.types';
 import { queryKeys } from './queryKeys';
 
 export const useScheduledTasksQuery = (options?: Partial<UseQueryOptions<ScheduledTask[]>>) => {
@@ -50,8 +50,10 @@ export const useUpdateScheduledTaskMutation = (
     mutationFn: ({ taskId, data }: UpdateScheduledTaskParams) =>
       schedulerService.updateTask(taskId, data),
     onSuccess: async (data, variables, context, mutation) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.scheduler.task(variables.taskId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.scheduler.tasks });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.scheduler.task(variables.taskId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scheduler.tasks }),
+      ]);
       if (onSuccess) {
         await onSuccess(data, variables, context, mutation);
       }
@@ -87,8 +89,10 @@ export const useToggleScheduledTaskMutation = (
   return useMutation({
     mutationFn: (taskId: string) => schedulerService.toggleTask(taskId),
     onSuccess: async (data, taskId, context, mutation) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.scheduler.tasks });
-      queryClient.invalidateQueries({ queryKey: queryKeys.scheduler.task(taskId) });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.scheduler.tasks }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scheduler.task(taskId) }),
+      ]);
       if (onSuccess) {
         await onSuccess(data, taskId, context, mutation);
       }

@@ -1,4 +1,4 @@
-import type { AssistantStreamEvent } from '@/types';
+import type { AssistantStreamEvent } from '@/types/chat.types';
 import { logger } from '@/utils/logger';
 
 function isAssistantStreamEventArray(value: unknown): value is AssistantStreamEvent[] {

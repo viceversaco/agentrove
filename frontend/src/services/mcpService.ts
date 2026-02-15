@@ -1,7 +1,7 @@
 import { apiClient } from '@/lib/api';
-import { ensureResponse, withAuth } from '@/services/base';
+import { ensureResponse, withAuth } from '@/services/base/BaseService';
 import { validateRequired } from '@/utils/validation';
-import type { CustomMcp } from '@/types';
+import type { CustomMcp } from '@/types/user.types';
 
 interface McpCreateRequest {
   name: string;

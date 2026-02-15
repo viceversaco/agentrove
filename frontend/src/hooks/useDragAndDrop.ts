@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 
 interface UseDragAndDropOptions {
   onFilesDrop?: (files: File[]) => void;
@@ -65,12 +65,15 @@ export function useDragAndDrop({ onFilesDrop, disabled = false }: UseDragAndDrop
     dragCounter.current = 0;
   }, []);
 
-  const dragHandlers = {
-    onDragEnter: handleDragIn,
-    onDragLeave: handleDragOut,
-    onDragOver: handleDragOver,
-    onDrop: handleDrop,
-  };
+  const dragHandlers = useMemo(
+    () => ({
+      onDragEnter: handleDragIn,
+      onDragLeave: handleDragOut,
+      onDragOver: handleDragOver,
+      onDrop: handleDrop,
+    }),
+    [handleDragIn, handleDragOut, handleDragOver, handleDrop],
+  );
 
   return {
     isDragging,

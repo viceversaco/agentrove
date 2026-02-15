@@ -2,8 +2,9 @@ import { memo, useMemo } from 'react';
 import { diffLines } from 'diff';
 import { FileSearch, FileEdit as FileEditIcon, FilePlus } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { ToolAggregate, ToolComponent } from '@/types';
-import { ToolCard } from './common';
+import type { ToolAggregate } from '@/types/tools.types';
+import type { ToolComponent } from '@/types/ui.types';
+import { ToolCard } from './common/ToolCard';
 
 interface FileOperationToolProps {
   tool: ToolAggregate;

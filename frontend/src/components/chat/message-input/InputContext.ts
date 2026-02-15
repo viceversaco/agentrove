@@ -1,5 +1,5 @@
 import { createContext, type RefObject } from 'react';
-import type { MentionItem, SlashCommand } from '@/types';
+import type { MentionItem, SlashCommand } from '@/types/ui.types';
 import type { ContextUsageInfo } from './ContextUsageIndicator';
 
 export interface InputState {
@@ -67,3 +67,6 @@ export interface InputContextValue {
 }
 
 export const InputContext = createContext<InputContextValue | null>(null);
+export const InputStateContext = createContext<InputState | null>(null);
+export const InputActionsContext = createContext<InputActions | null>(null);
+export const InputMetaContext = createContext<InputMeta | null>(null);

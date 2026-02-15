@@ -2,7 +2,7 @@ import { useState, useCallback, type Dispatch, type SetStateAction } from 'react
 import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { logger } from '@/utils/logger';
-import type { UserSettings } from '@/types';
+import type { UserSettings } from '@/types/user.types';
 import { queryKeys } from './queries/queryKeys';
 
 type PersistSettingsFn = (

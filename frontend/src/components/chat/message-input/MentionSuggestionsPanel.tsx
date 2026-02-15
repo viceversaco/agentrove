@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/primitives/Button';
-import type { MentionItem } from '@/types';
+import type { MentionItem } from '@/types/ui.types';
 
 interface MentionSuggestionsPanelProps {
   files: MentionItem[];

@@ -4,7 +4,7 @@ import { ThinkingBlock } from './ThinkingBlock';
 import { PromptSuggestions } from './PromptSuggestions';
 import { getToolComponent } from '@/components/chat/tools/registry';
 import { buildSegments } from './segmentBuilder';
-import type { AssistantStreamEvent } from '@/types';
+import type { AssistantStreamEvent } from '@/types/chat.types';
 import { Spinner } from '@/components/ui/primitives/Spinner';
 
 interface MessageRendererProps {

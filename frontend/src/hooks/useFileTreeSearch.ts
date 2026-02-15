@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import type { FileStructure } from '@/types';
+import { useDeferredValue, useMemo } from 'react';
+import type { FileStructure } from '@/types/file-system.types';
 import { traverseFileStructure, getFileName } from '@/utils/file';
 import { fuzzySearch } from '@/utils/fuzzySearch';
 
@@ -101,10 +101,11 @@ export const useFileTreeSearch = ({
   searchQuery,
   expandedFolders,
 }: UseFileTreeSearchOptions): UseFileTreeSearchResult => {
+  const deferredQuery = useDeferredValue(searchQuery);
   const flattenedFiles = useMemo(() => flattenFileStructure(files), [files]);
 
   const searchResults = useMemo(() => {
-    const trimmedQuery = searchQuery.trim();
+    const trimmedQuery = deferredQuery.trim();
 
     if (!trimmedQuery) {
       return {
@@ -120,7 +121,7 @@ export const useFileTreeSearch = ({
     const matchedPaths = new Set(matchedFiles.map((file) => file.path));
 
     return { matchedFiles, matchedPaths };
-  }, [searchQuery, flattenedFiles]);
+  }, [deferredQuery, flattenedFiles]);
 
   const searchExpandedFolders = useMemo(() => {
     if (searchResults.matchedFiles.length === 0) {
@@ -131,7 +132,7 @@ export const useFileTreeSearch = ({
   }, [searchResults.matchedFiles]);
 
   const filteredFiles = useMemo(() => {
-    if (!searchQuery.trim()) {
+    if (!deferredQuery.trim()) {
       return files;
     }
 
@@ -140,7 +141,7 @@ export const useFileTreeSearch = ({
     }
 
     return filterFileStructure(files, searchResults.matchedPaths);
-  }, [files, searchQuery, searchResults.matchedPaths]);
+  }, [files, deferredQuery, searchResults.matchedPaths]);
 
   const mergedExpandedFolders = useMemo(() => {
     return {
@@ -153,6 +154,6 @@ export const useFileTreeSearch = ({
     filteredFiles,
     matchedPaths: searchResults.matchedPaths,
     searchExpandedFolders: mergedExpandedFolders,
-    hasResults: searchResults.matchedPaths.size > 0 || !searchQuery.trim(),
+    hasResults: searchResults.matchedPaths.size > 0 || !deferredQuery.trim(),
   };
 };

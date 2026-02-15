@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
-import type { ITerminalInitOnlyOptions, ITerminalOptions } from 'xterm';
-import { Terminal as XTerm } from 'xterm';
+import type { Terminal as XTerm, ITerminalInitOnlyOptions, ITerminalOptions } from 'xterm';
 import type { FitAddon as FitAddonType } from 'xterm-addon-fit';
-import { FitAddon } from 'xterm-addon-fit';
 
 import { buildTerminalTheme, createTerminalOptions } from '@/utils/terminal';
-import type { TerminalSize } from '@/types';
+import type { TerminalSize } from '@/types/sandbox.types';
 
 interface UseXtermOptions {
   disableStdin?: boolean;
@@ -108,38 +106,51 @@ export const useXterm = ({
       return undefined;
     }
 
-    const theme = buildTerminalTheme(initialModeRef.current);
-    const baseOptions = createTerminalOptions(theme);
-
-    const xterm = new XTerm({
-      ...baseOptions,
-      disableStdin,
-    });
-    const fitAddon = new FitAddon();
-
-    hasInitializedRef.current = true;
-    fitAddonRef.current = fitAddon;
-    terminalRef.current = xterm;
-
-    xterm.loadAddon(fitAddon);
-
+    let cancelled = false;
     let openFrameId: number | null = null;
+    let xterm: XTerm | null = null;
 
-    openFrameId = requestAnimationFrame(() => {
-      openFrameId = null;
-      if (!container.isConnected || terminalRef.current !== xterm) {
-        return;
-      }
-      try {
-        xterm.open(container);
-        setIsReady(true);
-      } catch {
-        terminalRef.current = null;
-        hasInitializedRef.current = false;
-      }
-    });
+    (async () => {
+      const [{ Terminal }, { FitAddon }] = await Promise.all([
+        import('xterm'),
+        import('xterm-addon-fit'),
+      ]);
+
+      if (cancelled) return;
+
+      const theme = buildTerminalTheme(initialModeRef.current);
+      const baseOptions = createTerminalOptions(theme);
+
+      xterm = new Terminal({
+        ...baseOptions,
+        disableStdin,
+      });
+      const fitAddon = new FitAddon();
+
+      hasInitializedRef.current = true;
+      fitAddonRef.current = fitAddon;
+      terminalRef.current = xterm;
+
+      xterm.loadAddon(fitAddon);
+
+      const currentXterm = xterm;
+      openFrameId = requestAnimationFrame(() => {
+        openFrameId = null;
+        if (cancelled || !container.isConnected || terminalRef.current !== currentXterm) {
+          return;
+        }
+        try {
+          currentXterm.open(container);
+          setIsReady(true);
+        } catch {
+          terminalRef.current = null;
+          hasInitializedRef.current = false;
+        }
+      });
+    })();
 
     return () => {
+      cancelled = true;
       if (openFrameId !== null) {
         cancelAnimationFrame(openFrameId);
       }
@@ -148,7 +159,7 @@ export const useXterm = ({
       fitAddonRef.current = null;
       terminalRef.current = null;
       try {
-        xterm.dispose();
+        xterm?.dispose();
       } catch {
         // Ignore dispose errors
       }

@@ -1,7 +1,7 @@
 import React, { useMemo, type CSSProperties } from 'react';
 import { Search, Globe } from 'lucide-react';
-import type { ToolAggregate } from '@/types';
-import { ToolCard } from './common';
+import type { ToolAggregate } from '@/types/tools.types';
+import { ToolCard } from './common/ToolCard';
 
 const DELAY_0: CSSProperties = { animationDelay: '0ms' };
 const DELAY_150: CSSProperties = { animationDelay: '150ms' };

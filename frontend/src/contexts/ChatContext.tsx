@@ -1,5 +1,6 @@
 import { type ReactNode, useMemo } from 'react';
-import type { FileStructure, CustomAgent, CustomCommand, CustomPrompt } from '@/types';
+import type { FileStructure } from '@/types/file-system.types';
+import type { CustomAgent, CustomCommand, CustomPrompt } from '@/types/user.types';
 import { ChatContext } from './ChatContextDefinition';
 
 const EMPTY_FILES: FileStructure[] = [];

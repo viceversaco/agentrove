@@ -1,8 +1,8 @@
 import { memo, useEffect, ReactNode } from 'react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
-import { useUIStore } from '@/store';
+import { useUIStore } from '@/store/uiStore';
 import { cn } from '@/utils/cn';
-import { useIsMobile } from '@/hooks';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import type { ViewType } from '@/types/ui.types';
 
 interface SplitViewContainerProps {

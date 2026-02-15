@@ -1,8 +1,7 @@
-import { memo, useMemo, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { logger } from '@/utils/logger';
 import { base64ToUint8Array } from '@/utils/base64';
-import * as XLSX from 'xlsx';
-import type { FileStructure } from '@/types';
+import type { FileStructure } from '@/types/file-system.types';
 import { Button } from '@/components/ui/primitives/Button';
 import { PreviewContainer } from './PreviewContainer';
 import { previewBackgroundClass, tableBorderClass } from './previewConstants';
@@ -27,60 +26,70 @@ export const XlsxPreview = memo(function XlsxPreview({
   onToggleFullscreen,
 }: XlsxPreviewProps) {
   const [activeSheet, setActiveSheet] = useState(0);
+  const [worksheetData, setWorksheetData] = useState<WorksheetData[]>([]);
   const fileName = getDisplayFileName(file, 'spreadsheet');
 
-  const worksheetData = useMemo(() => {
-    if (!file.content) return [];
+  useEffect(() => {
+    setWorksheetData([]);
+    setActiveSheet(0);
 
-    try {
-      if (!isValidBase64(file.content)) {
-        return [];
-      }
-
-      const bytes = base64ToUint8Array(file.content);
-
-      const workbook = XLSX.read(bytes, { type: 'array' });
-
-      if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
-        return [];
-      }
-
-      const worksheets: WorksheetData[] = workbook.SheetNames.map((sheetName) => {
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
-
-        const rowLengths = (jsonData as unknown[][]).map((row) => row.length);
-        const maxCols = rowLengths.length > 0 ? Math.max(...rowLengths) : 0;
-
-        const data: SpreadsheetData = (jsonData as unknown[][])
-          .filter(
-            (row) =>
-              row.length > 0 &&
-              row.some((cell) => cell !== '' && cell !== null && cell !== undefined),
-          )
-          .map((row: unknown[]) => {
-            const paddedRow = Array(maxCols)
-              .fill('')
-              .map((_, index) => {
-                const cellValue = row[index];
-                return {
-                  value: cellValue === null || cellValue === undefined ? '' : String(cellValue),
-                };
-              });
-            return paddedRow;
-          });
-
-        return {
-          name: sheetName,
-          data,
-        };
-      });
-
-      return worksheets;
-    } catch (error) {
-      logger.error('XLSX preview load failed', 'XlsxPreview', error);
-      return [];
+    if (!file.content || !isValidBase64(file.content)) {
+      return;
     }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const XLSX = await import('xlsx');
+        if (cancelled) return;
+
+        const bytes = base64ToUint8Array(file.content!);
+        const workbook = XLSX.read(bytes, { type: 'array' });
+
+        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+          setWorksheetData([]);
+          return;
+        }
+
+        const worksheets: WorksheetData[] = workbook.SheetNames.map((sheetName) => {
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+          const rowLengths = (jsonData as unknown[][]).map((row) => row.length);
+          const maxCols = rowLengths.length > 0 ? Math.max(...rowLengths) : 0;
+
+          const data: SpreadsheetData = (jsonData as unknown[][])
+            .filter(
+              (row) =>
+                row.length > 0 &&
+                row.some((cell) => cell !== '' && cell !== null && cell !== undefined),
+            )
+            .map((row: unknown[]) => {
+              const paddedRow = Array(maxCols)
+                .fill('')
+                .map((_, index) => {
+                  const cellValue = row[index];
+                  return {
+                    value: cellValue === null || cellValue === undefined ? '' : String(cellValue),
+                  };
+                });
+              return paddedRow;
+            });
+
+          return { name: sheetName, data };
+        });
+
+        if (!cancelled) setWorksheetData(worksheets);
+      } catch (error) {
+        logger.error('XLSX preview load failed', 'XlsxPreview', error);
+        if (!cancelled) setWorksheetData([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [file.content]);
 
   if (worksheetData.length === 0) {

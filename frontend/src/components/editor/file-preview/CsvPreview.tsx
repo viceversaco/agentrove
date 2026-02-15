@@ -1,5 +1,5 @@
 import { memo, useMemo } from 'react';
-import type { FileStructure } from '@/types';
+import type { FileStructure } from '@/types/file-system.types';
 import { PreviewContainer } from './PreviewContainer';
 import {
   previewBackgroundClass,

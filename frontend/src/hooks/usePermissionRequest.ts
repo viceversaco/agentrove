@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import { permissionService } from '@/services/permissionService';
-import { usePermissionStore, useUIStore } from '@/store';
+import { usePermissionStore } from '@/store/permissionStore';
+import { useUIStore } from '@/store/uiStore';
 import { addResolvedRequestId, isRequestResolved } from '@/utils/permissionStorage';
-import type { PermissionRequest } from '@/types';
+import type { PermissionRequest } from '@/types/chat.types';
 
 type ApiError = Error & { status?: number };
 

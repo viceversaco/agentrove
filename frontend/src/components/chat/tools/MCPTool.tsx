@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 import { Wrench } from 'lucide-react';
-import type { ToolAggregate } from '@/types';
-import { ToolCard } from './common';
+import type { ToolAggregate } from '@/types/tools.types';
+import { ToolCard } from './common/ToolCard';
 
 interface MCPToolProps {
   tool: ToolAggregate;

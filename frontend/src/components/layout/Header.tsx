@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, LogOut, Moon, Settings, Sun } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useAuthStore, useUIStore } from '@/store';
+import { useAuthStore } from '@/store/authStore';
+import { useUIStore } from '@/store/uiStore';
 import {
   useCurrentUserQuery,
   useLogoutMutation,
@@ -11,7 +12,7 @@ import { Button } from '@/components/ui/primitives/Button';
 import { ToggleButton } from '@/components/ui/ToggleButton';
 import { cn } from '@/utils/cn';
 import { UserAvatarCircle } from '@/components/chat/message-bubble/MessageAvatars';
-import type { UserUsage } from '@/types';
+import type { UserUsage } from '@/types/user.types';
 
 export interface HeaderProps {
   onLogout?: () => void;

@@ -3,13 +3,13 @@ import { logger } from '@/utils/logger';
 import type { FC } from 'react';
 import 'xterm/css/xterm.css';
 
-import { useUIStore } from '@/store';
+import { useUIStore } from '@/store/uiStore';
 import { authService } from '@/services/authService';
 import { WS_BASE_URL } from '@/lib/api';
 
 import { getTerminalBackgroundClass } from '@/utils/terminal';
 import { useXterm } from '@/hooks/useXterm';
-import type { TerminalSize } from '@/types';
+import type { TerminalSize } from '@/types/sandbox.types';
 
 export interface TerminalTabProps {
   isVisible: boolean;

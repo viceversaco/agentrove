@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { LocalQueuedMessage } from '@/types';
+import type { LocalQueuedMessage } from '@/types/queue.types';
 import { queueService } from '@/services/queueService';
 
 export const EMPTY_QUEUE: LocalQueuedMessage[] = [];

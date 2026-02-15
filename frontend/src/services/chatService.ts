@@ -1,19 +1,21 @@
 import { apiClient, StreamResponse } from '@/lib/api';
-import { ensureResponse, serviceCall, buildQueryString } from '@/services/base';
+import { ensureResponse, serviceCall, buildQueryString } from '@/services/base/BaseService';
 import { authService } from '@/services/authService';
 import { validateRequired, validateId } from '@/utils/validation';
 import { chatStorage } from '@/utils/storage';
-import {
+import type {
   ChatRequest,
   Chat,
   CreateChatRequest,
+  ContextUsage,
+  ForkChatResponse,
+} from '@/types/chat.types';
+import type {
   PaginationParams,
   CursorPaginationParams,
   PaginatedChats,
   PaginatedMessages,
-  ContextUsage,
-  ForkChatResponse,
-} from '@/types';
+} from '@/types/api.types';
 import { CONTEXT_WINDOW_TOKENS } from '@/config/constants';
 
 async function createCompletion(

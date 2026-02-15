@@ -1,5 +1,5 @@
 import { apiClient } from '@/lib/api';
-import { ensureResponse, withAuth } from '@/services/base';
+import { ensureResponse, withAuth } from '@/services/base/BaseService';
 import type {
   InstallComponentRequest,
   InstallResponse,

@@ -3,7 +3,7 @@ import { ChevronRight } from 'lucide-react';
 import { FileName } from './FileName';
 import { FileIcon } from './FileIcon';
 import { useFileTreeContext } from './fileTreeContext';
-import type { FileStructure } from '@/types';
+import type { FileStructure } from '@/types/file-system.types';
 import { getFileName } from '@/utils/file';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/primitives/Button';

@@ -1,5 +1,5 @@
 import { lazy } from 'react';
-import type { ToolComponent } from '@/types';
+import type { ToolComponent } from '@/types/ui.types';
 type ToolModuleLoader = () => Promise<{ default: ToolComponent }>;
 
 const toLazy = (loader: ToolModuleLoader): ToolComponent =>

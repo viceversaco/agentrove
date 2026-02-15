@@ -1,13 +1,14 @@
 import { apiClient } from '@/lib/api';
-import { ensureResponse, NotFoundError, serviceCall, ValidationError } from '@/services/base';
+import { ensureResponse, serviceCall } from '@/services/base/BaseService';
+import { NotFoundError, ValidationError } from '@/services/base/ServiceError';
+import type { PreviewLinksResponse } from '@/types/chat.types';
 import type {
   FileContent,
   FileMetadata,
   PortInfo,
-  PreviewLinksResponse,
   Secret,
   UpdateFileResult,
-} from '@/types';
+} from '@/types/sandbox.types';
 import { logger } from '@/utils/logger';
 import { validateRequired } from '@/utils/validation';
 

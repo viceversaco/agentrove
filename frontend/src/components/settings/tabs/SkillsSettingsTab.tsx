@@ -1,6 +1,6 @@
 import { Switch } from '@/components/ui/primitives/Switch';
 import { ListManagementTab } from '@/components/ui/ListManagementTab';
-import type { CustomSkill } from '@/types';
+import type { CustomSkill } from '@/types/user.types';
 import { Zap } from 'lucide-react';
 
 interface SkillsSettingsTabProps {

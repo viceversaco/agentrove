@@ -1,11 +1,11 @@
 import { apiClient } from '@/lib/api';
-import { ensureResponse, withAuth } from '@/services/base';
+import { ensureResponse, withAuth } from '@/services/base/BaseService';
 import type {
   ScheduledTask,
   CreateScheduledTaskRequest,
   UpdateScheduledTaskRequest,
   TaskToggleResponse,
-} from '@/types';
+} from '@/types/scheduler.types';
 import { validateId } from '@/utils/validation';
 
 async function createTask(data: CreateScheduledTaskRequest): Promise<ScheduledTask> {

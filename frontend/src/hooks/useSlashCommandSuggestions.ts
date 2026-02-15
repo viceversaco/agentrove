@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useSuggestionBase } from './useSuggestionBase';
-import type { SlashCommand, CustomCommand } from '@/types';
+import type { SlashCommand } from '@/types/ui.types';
+import type { CustomCommand } from '@/types/user.types';
 
 const SLASH_COMMANDS: SlashCommand[] = [
   {

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UseMutationOptions, UseQueryOptions } from '@tanstack/react-query';
 import { settingsService } from '@/services/settingsService';
-import type { UserSettings, UserSettingsUpdate } from '@/types';
+import type { UserSettings, UserSettingsUpdate } from '@/types/user.types';
 import { queryKeys } from './queryKeys';
 
 export const useSettingsQuery = (options?: Partial<UseQueryOptions<UserSettings>>) => {

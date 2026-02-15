@@ -2,8 +2,9 @@ import { ReactNode, useCallback, useMemo, useState } from 'react';
 import { Header, type HeaderProps } from './Header';
 import { cn } from '@/utils/cn';
 import { LayoutContext, type LayoutContextValue } from './layoutState';
-import { useUIStore } from '@/store';
-import { useSwipeGesture, useIsMobile } from '@/hooks';
+import { useUIStore } from '@/store/uiStore';
+import { useSwipeGesture } from '@/hooks/useSwipeGesture';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 function MobileSidebarOverlay() {
   const sidebarOpen = useUIStore((state) => state.sidebarOpen);

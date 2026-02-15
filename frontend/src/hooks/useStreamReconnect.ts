@@ -3,7 +3,8 @@ import type { Dispatch, SetStateAction } from 'react';
 import { logger } from '@/utils/logger';
 import { chatService } from '@/services/chatService';
 import { chatStorage } from '@/utils/storage';
-import type { Message, StreamState } from '@/types';
+import type { Message } from '@/types/chat.types';
+import type { StreamState } from '@/types/stream.types';
 
 interface UseStreamReconnectParams {
   chatId: string | undefined;

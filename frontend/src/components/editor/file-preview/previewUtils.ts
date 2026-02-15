@@ -1,4 +1,4 @@
-import type { FileStructure } from '@/types';
+import type { FileStructure } from '@/types/file-system.types';
 
 const PATH_SEPARATOR = '/';
 const BASE64_REGEX = /^[A-Za-z0-9+/]*={0,2}$/;

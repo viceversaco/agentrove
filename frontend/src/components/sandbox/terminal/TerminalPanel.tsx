@@ -1,5 +1,5 @@
 import { Container } from './Container';
-import type { Chat } from '@/types';
+import type { Chat } from '@/types/chat.types';
 
 interface TerminalPanelProps {
   currentChat?: Chat | null;

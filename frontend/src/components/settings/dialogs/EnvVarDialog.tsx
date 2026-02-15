@@ -1,4 +1,4 @@
-import type { CustomEnvVar } from '@/types';
+import type { CustomEnvVar } from '@/types/user.types';
 import { Button } from '@/components/ui/primitives/Button';
 import { Input } from '@/components/ui/primitives/Input';
 import { Label } from '@/components/ui/primitives/Label';

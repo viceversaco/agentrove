@@ -1,4 +1,4 @@
-import type { FileStructure } from '@/types';
+import type { FileStructure } from '@/types/file-system.types';
 import toast from 'react-hot-toast';
 import { logger } from '@/utils/logger';
 import { isSupportedUploadedFile } from '@/utils/fileTypes';
@@ -47,6 +47,8 @@ const LANGUAGE_MAP: Record<string, string> = {
   vue: 'vue',
   astro: 'astro',
 };
+
+const LEADING_SLASH_RE = /^\.?\/+/;
 
 function sortFiles(files: FileStructure[]): FileStructure[] {
   const sorted = [...files].sort((a, b) => {
@@ -130,7 +132,7 @@ const createDirectoryPath = (
   pathToFile: Map<string, FileStructure>,
   newFileStructure: FileStructure[],
 ) => {
-  const normalizedDirPath = dirPath.replace(/^\.?\/+/, '');
+  const normalizedDirPath = dirPath.replace(LEADING_SLASH_RE, '');
   if (!normalizedDirPath) return;
 
   const pathParts = normalizedDirPath.split('/').filter((part) => part);
@@ -187,7 +189,7 @@ export function buildFileStructureFromSandboxFiles(
 
   sandboxFiles.forEach((file) => {
     try {
-      const normalizedPath = file.path.replace(/^\.?\/+/, '');
+      const normalizedPath = file.path.replace(LEADING_SLASH_RE, '');
       if (!normalizedPath) {
         return;
       }

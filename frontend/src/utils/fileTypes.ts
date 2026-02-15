@@ -1,6 +1,8 @@
-import type { FileStructure } from '@/types';
+import type { FileStructure } from '@/types/file-system.types';
 
 type UploadedFileType = 'image' | 'pdf' | 'xlsx';
+
+const IMAGE_EXT_RE = /\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i;
 
 const checkMimeType = (file: File, mimeType: string | string[], extension?: string): boolean => {
   const types = Array.isArray(mimeType) ? mimeType : [mimeType];
@@ -88,10 +90,7 @@ export const detectFileType = (filename: string, mimeType?: string): UploadedFil
     return 'pdf';
   }
 
-  if (
-    lowerMimeType.startsWith('image/') ||
-    /\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i.test(lowerFilename)
-  ) {
+  if (lowerMimeType.startsWith('image/') || IMAGE_EXT_RE.test(lowerFilename)) {
     return 'image';
   }
 

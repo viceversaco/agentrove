@@ -1,5 +1,5 @@
 import { TerminalPanel } from '../sandbox/terminal/TerminalPanel';
-import type { Chat } from '@/types';
+import type { Chat } from '@/types/chat.types';
 
 interface TerminalViewProps {
   currentChat?: Chat | null;

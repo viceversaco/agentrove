@@ -1,6 +1,6 @@
 import { memo, useState, useCallback } from 'react';
 import { Panel } from './Panel';
-import type { PortInfo } from '@/types';
+import type { PortInfo } from '@/types/sandbox.types';
 import { usePreviewLinksQuery } from '@/hooks/queries/useSandboxQueries';
 import { NoOpenPortsState } from '../shared/NoOpenPortsState';
 

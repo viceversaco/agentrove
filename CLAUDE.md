@@ -101,6 +101,30 @@
 - Create explicit variant components instead of one component with many boolean modes (e.g., `ThreadComposer`, `EditComposer` instead of `<Composer isThread isEditing />`)
 - Use `children` for composing static structure; use render props only when the parent needs to pass data back to the child (e.g., `renderItem` in lists)
 
+## Frontend Performance Conventions
+
+### Bundle Size
+- Do not create barrel/index.ts files — import directly from the source file (e.g., `from '@/components/layout/Layout'` not `from '@/components/layout'`)
+- Heavy libraries must use dynamic `import()`, never static imports at module level — applies to: `xlsx`, `jszip`, `xterm`, `@monaco-editor/react`, `react-vnc`, `qrcode`, `dompurify`, `mermaid`
+- For heavy React components, use `React.lazy()` + `<Suspense>` (e.g., Monaco Editor in dialogs, VncScreen)
+- For heavy libraries used inside hooks/effects, use `await import('lib')` inside the async function where the library is consumed
+- Audit `package.json` periodically for unused dependencies — remove any package with zero imports in `src/`
+
+### Async-to-Sync Migration Safety
+- When converting synchronous code (useMemo, inline expressions) to async (useEffect + useState with dynamic imports), always clear the previous state at the top of the effect before the async work begins — otherwise users see stale data from the previous input while the new async result loads
+- Pattern: `useEffect(() => { setState(initial); if (!input) return; let cancelled = false; (async () => { ... })(); return () => { cancelled = true; }; }, [input])`
+
+### Re-render Optimization
+- Zustand selectors for action functions (used only in callbacks, not in JSX) must use `useStore.getState().action()` at the call site instead of subscribing with `useStore((s) => s.action)` — subscriptions cause re-renders when the store updates
+- Use `Set` instead of arrays for membership checks in render loops — wrap with `useMemo(() => new Set(arr), [arr])` and use `.has()` instead of `.includes()`
+- Do not wrap trivial expressions in `useMemo` (e.g., `useMemo(() => x || [], [x])`) — use direct expressions (`x ?? []`)
+- Hoist regex patterns to module-level constants — never create RegExp inside loops or frequently-called functions
+- Prefer single-pass iteration (`.reduce()`) over chained `.filter().map()` in render paths
+
+### Async Patterns
+- Use `Promise.all()` for independent async operations (e.g., multiple `queryClient.invalidateQueries()` calls)
+- When dynamically importing multiple libraries in the same function, parallelize with `Promise.all([import('a'), import('b')])`
+
 ## Frontend UI/UX Guidelines
 
 ### Design Philosophy

@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Globe } from 'lucide-react';
-import type { ToolAggregate } from '@/types';
-import { ToolCard } from './common';
+import type { ToolAggregate } from '@/types/tools.types';
+import { ToolCard } from './common/ToolCard';
 
 interface WebFetchInput {
   url: string;

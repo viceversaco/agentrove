@@ -1,5 +1,5 @@
 import { ListManagementTab } from '@/components/ui/ListManagementTab';
-import type { CustomPrompt } from '@/types';
+import type { CustomPrompt } from '@/types/user.types';
 import { FileText } from 'lucide-react';
 
 interface PromptsSettingsTabProps {

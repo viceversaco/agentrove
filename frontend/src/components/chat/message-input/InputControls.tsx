@@ -2,10 +2,11 @@ import { EnhanceButton } from './EnhanceButton';
 import { PermissionModeSelector } from '@/components/chat/permission-mode-selector/PermissionModeSelector';
 import { ModelSelector } from '@/components/chat/model-selector/ModelSelector';
 import { ThinkingModeSelector } from '@/components/chat/thinking-mode-selector/ThinkingModeSelector';
-import { useInputContext } from '@/hooks/useInputContext';
+import { useInputState, useInputActions } from '@/hooks/useInputContext';
 
 export function InputControls() {
-  const { state, actions } = useInputContext();
+  const state = useInputState();
+  const actions = useInputActions();
 
   return (
     <div

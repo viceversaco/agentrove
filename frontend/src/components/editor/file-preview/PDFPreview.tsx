@@ -1,7 +1,7 @@
 import { memo, useMemo, useState, useEffect } from 'react';
 import { logger } from '@/utils/logger';
 import { base64ToUint8Array } from '@/utils/base64';
-import type { FileStructure } from '@/types';
+import type { FileStructure } from '@/types/file-system.types';
 import { PreviewContainer } from './PreviewContainer';
 import { previewBackgroundClass } from './previewConstants';
 import { getDisplayFileName, isValidBase64 } from './previewUtils';

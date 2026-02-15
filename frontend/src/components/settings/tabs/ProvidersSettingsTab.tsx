@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/primitives/Button';
 import { Switch } from '@/components/ui/primitives/Switch';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/utils/cn';
-import type { CustomProvider, ProviderType } from '@/types';
+import type { CustomProvider, ProviderType } from '@/types/user.types';
 
 interface ProvidersSettingsTabProps {
   providers: CustomProvider[] | null;

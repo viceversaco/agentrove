@@ -1,5 +1,5 @@
 import { apiClient } from '@/lib/api';
-import { serviceCall } from '@/services/base';
+import { serviceCall } from '@/services/base/BaseService';
 import { validateId } from '@/utils/validation';
 
 async function respondToPermission(

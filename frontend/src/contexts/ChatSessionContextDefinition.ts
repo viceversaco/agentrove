@@ -1,5 +1,5 @@
 import { createContext } from 'react';
-import type { Message, PermissionRequest } from '@/types';
+import type { Message, PermissionRequest } from '@/types/chat.types';
 import type { ContextUsageInfo } from '@/components/chat/message-input/ContextUsageIndicator';
 
 export interface ChatSessionState {

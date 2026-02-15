@@ -1,7 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UseMutationOptions, UseQueryOptions } from '@tanstack/react-query';
 import { sandboxService } from '@/services/sandboxService';
-import type { FileContent, FileMetadata, PortInfo, Secret, UpdateFileResult } from '@/types';
+import type {
+  FileContent,
+  FileMetadata,
+  PortInfo,
+  Secret,
+  UpdateFileResult,
+} from '@/types/sandbox.types';
 import { queryKeys } from './queryKeys';
 
 export const usePreviewLinksQuery = (

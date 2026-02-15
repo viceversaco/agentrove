@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
-import type { RecurrenceType, ScheduledTask } from '@/types';
+import type { RecurrenceType, ScheduledTask } from '@/types/scheduler.types';
 import {
   useCreateScheduledTaskMutation,
   useUpdateScheduledTaskMutation,

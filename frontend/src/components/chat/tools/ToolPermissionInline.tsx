@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { ShieldAlert, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/primitives/Button';
 import { LazyMarkDown } from '@/components/ui/LazyMarkDown';
-import type { PermissionRequest } from '@/types';
+import type { PermissionRequest } from '@/types/chat.types';
 
 function formatValue(value: unknown): string {
   if (value === null || value === undefined) return 'null';

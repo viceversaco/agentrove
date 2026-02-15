@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { logger } from '@/utils/logger';
-import { useStreamStore } from '@/store';
-import type { Chat, StreamMetadata } from '@/types';
+import { useStreamStore } from '@/store/streamStore';
+import type { Chat } from '@/types/chat.types';
+import type { StreamMetadata } from '@/types/stream.types';
 import { chatService } from '@/services/chatService';
 
 interface UseStreamRestorationOptions {

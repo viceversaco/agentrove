@@ -4,7 +4,7 @@ import {
   useInfiniteMessagesQuery,
   useChatQuery,
 } from '@/hooks/queries/useChatQueries';
-import type { Chat as ChatSummary, Message } from '@/types';
+import type { Chat as ChatSummary, Message } from '@/types/chat.types';
 
 interface UseChatDataResult {
   chats: ChatSummary[];

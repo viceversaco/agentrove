@@ -2,9 +2,9 @@ import { memo, useState, useCallback } from 'react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { Tree } from '../file-tree/Tree';
 import { View } from '../editor-view/View';
-import type { FileStructure } from '@/types';
+import type { FileStructure } from '@/types/file-system.types';
 import { cn } from '@/utils/cn';
-import { useIsMobile } from '@/hooks';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 export interface CodeViewProps {
   files: FileStructure[];

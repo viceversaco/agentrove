@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import Editor from '@monaco-editor/react';
+import { useState, useEffect, lazy, Suspense } from 'react';
+
+const Editor = lazy(() => import('@monaco-editor/react'));
 import { BaseModal } from '@/components/ui/shared/BaseModal';
 import { Button } from '@/components/ui/primitives/Button';
 import { useUIStore } from '@/store/uiStore';
@@ -68,28 +69,34 @@ export const AgentEditDialog: React.FC<AgentEditDialogProps> = ({
       </div>
 
       <div className="h-[600px] p-4">
-        <Editor
-          height="100%"
-          language="markdown"
-          value={editedContent}
-          onChange={(value) => setEditedContent(value || '')}
-          theme={theme === 'dark' ? 'vs-dark' : 'vs'}
-          options={{
-            minimap: { enabled: false },
-            wordWrap: 'on',
-            automaticLayout: true,
-            fontSize: 13,
-            lineNumbers: 'on',
-            scrollBeyondLastLine: false,
-            fontFamily:
-              'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-          }}
-          loading={
-            <div className="flex h-full items-center justify-center text-text-quaternary dark:text-text-dark-quaternary">
-              Loading editor...
-            </div>
+        <Suspense
+          fallback={
+            <div className="h-full animate-pulse rounded-lg bg-surface-secondary dark:bg-surface-dark-secondary" />
           }
-        />
+        >
+          <Editor
+            height="100%"
+            language="markdown"
+            value={editedContent}
+            onChange={(value) => setEditedContent(value || '')}
+            theme={theme === 'dark' ? 'vs-dark' : 'vs'}
+            options={{
+              minimap: { enabled: false },
+              wordWrap: 'on',
+              automaticLayout: true,
+              fontSize: 13,
+              lineNumbers: 'on',
+              scrollBeyondLastLine: false,
+              fontFamily:
+                'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+            }}
+            loading={
+              <div className="flex h-full items-center justify-center text-text-quaternary dark:text-text-dark-quaternary">
+                Loading editor...
+              </div>
+            }
+          />
+        </Suspense>
       </div>
 
       {error && (

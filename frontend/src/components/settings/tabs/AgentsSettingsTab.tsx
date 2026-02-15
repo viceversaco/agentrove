@@ -1,6 +1,6 @@
 import { Switch } from '@/components/ui/primitives/Switch';
 import { ListManagementTab } from '@/components/ui/ListManagementTab';
-import type { CustomAgent } from '@/types';
+import type { CustomAgent } from '@/types/user.types';
 import { Bot } from 'lucide-react';
 
 interface AgentsSettingsTabProps {

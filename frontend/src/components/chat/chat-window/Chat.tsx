@@ -19,7 +19,8 @@ import { LoadingIndicator } from './LoadingIndicator';
 import { ScrollButton } from './ScrollButton';
 import { ErrorMessage } from './ErrorMessage';
 import { Spinner } from '@/components/ui/primitives/Spinner';
-import { useStreamStore, useMessageQueueStore, EMPTY_QUEUE } from '@/store';
+import { useStreamStore } from '@/store/streamStore';
+import { useMessageQueueStore, EMPTY_QUEUE } from '@/store/messageQueueStore';
 import { ToolPermissionInline } from '@/components/chat/tools/ToolPermissionInline';
 import { useChatContext } from '@/hooks/useChatContext';
 import { useChatSessionContext } from '@/hooks/useChatSessionContext';
@@ -72,33 +73,31 @@ export const Chat = memo(function Chat() {
       return ids;
     }),
   );
+  const streamingMessageIdSet = useMemo(() => new Set(streamingMessageIds), [streamingMessageIds]);
 
   const pendingMessages = useMessageQueueStore((s) =>
     chatId ? (s.queues.get(chatId) ?? EMPTY_QUEUE) : EMPTY_QUEUE,
   );
-  const updateQueuedMessage = useMessageQueueStore((s) => s.updateQueuedMessage);
-  const clearAndSync = useMessageQueueStore((s) => s.clearAndSync);
-  const fetchQueueFn = useMessageQueueStore((s) => s.fetchQueue);
 
   useEffect(() => {
     if (chatId) {
-      void fetchQueueFn(chatId);
+      void useMessageQueueStore.getState().fetchQueue(chatId);
     }
-  }, [chatId, fetchQueueFn]);
+  }, [chatId]);
 
   const handleCancelPending = useCallback(() => {
     if (chatId) {
-      clearAndSync(chatId);
+      useMessageQueueStore.getState().clearAndSync(chatId);
     }
-  }, [chatId, clearAndSync]);
+  }, [chatId]);
 
   const handleEditPending = useCallback(
     (newContent: string) => {
       if (chatId) {
-        updateQueuedMessage(chatId, newContent);
+        useMessageQueueStore.getState().updateQueuedMessage(chatId, newContent);
       }
     },
-    [chatId, updateQueuedMessage],
+    [chatId],
   );
 
   const chatWindowRef = useRef<HTMLDivElement>(null);
@@ -282,7 +281,7 @@ export const Chat = memo(function Chat() {
     pendingPermissionRequest.tool_name !== 'AskUserQuestion' &&
     pendingPermissionRequest.tool_name !== 'ExitPlanMode';
   const lastBotMessage = lastBotMessageIndex >= 0 ? messages[lastBotMessageIndex] : undefined;
-  const lastBotIsStreaming = !!lastBotMessage && streamingMessageIds.includes(lastBotMessage.id);
+  const lastBotIsStreaming = !!lastBotMessage && streamingMessageIdSet.has(lastBotMessage.id);
   const showPermissionAtEnd =
     canShowPermissionInline && (lastBotMessageIndex < 0 || lastBotIsStreaming);
 
@@ -307,15 +306,16 @@ export const Chat = memo(function Chat() {
               </div>
             )}
             {messages.map((msg, index) => {
-              const messageIsStreaming = streamingMessageIds.includes(msg.id);
+              const messageIsStreaming = streamingMessageIdSet.has(msg.id);
               const isBotMessage = msg.is_bot ?? msg.role === 'assistant';
               const isLastBotMessage = isBotMessage && index === lastBotMessageIndex;
               const showPermissionAfterThis =
                 isLastBotMessage && !messageIsStreaming && canShowPermissionInline;
               const localAttachmentIds =
-                msg.attachments
-                  ?.filter((attachment) => isBrowserObjectUrl(attachment.file_url))
-                  .map((attachment) => attachment.id) ?? [];
+                msg.attachments?.reduce<string[]>((acc, attachment) => {
+                  if (isBrowserObjectUrl(attachment.file_url)) acc.push(attachment.id);
+                  return acc;
+                }, []) ?? [];
               const isLatestUserMessage = !isBotMessage && msg.id === latestUserMessageId;
               const shouldShowUploadingOverlay =
                 localAttachmentIds.length > 0 &&

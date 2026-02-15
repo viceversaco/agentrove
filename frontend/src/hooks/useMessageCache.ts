@@ -1,7 +1,8 @@
 import { useCallback } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/hooks/queries/queryKeys';
-import type { Message, PaginatedMessages } from '@/types';
+import type { Message } from '@/types/chat.types';
+import type { PaginatedMessages } from '@/types/api.types';
 
 interface UseMessageCacheParams {
   chatId: string | undefined;

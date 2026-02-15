@@ -1,13 +1,13 @@
 import { memo, useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Mail, RefreshCw, AlertCircle, CheckCircle } from 'lucide-react';
-import { Layout } from '@/components/layout';
+import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/primitives/Button';
 import {
   useVerifyEmailMutation,
   useResendVerificationMutation,
 } from '@/hooks/queries/useAuthQueries';
-import { useAuthStore } from '@/store';
+import { useAuthStore } from '@/store/authStore';
 import { cn } from '@/utils/cn';
 
 type VerificationState = 'pending' | 'verifying' | 'error' | 'success';

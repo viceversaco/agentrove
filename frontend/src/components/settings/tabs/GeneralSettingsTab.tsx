@@ -2,12 +2,8 @@ import { Button } from '@/components/ui/primitives/Button';
 import { Input } from '@/components/ui/primitives/Input';
 import { Switch } from '@/components/ui/primitives/Switch';
 import { SegmentedControl } from '@/components/ui/primitives/SegmentedControl';
-import type {
-  UserSettings,
-  GeneralSecretFieldConfig,
-  ApiFieldKey,
-  SandboxProviderType,
-} from '@/types';
+import type { ApiFieldKey, GeneralSecretFieldConfig } from '@/types/settings.types';
+import type { UserSettings, SandboxProviderType } from '@/types/user.types';
 import { SecretInput } from '@/components/settings/inputs/SecretInput';
 import { cn } from '@/utils/cn';
 

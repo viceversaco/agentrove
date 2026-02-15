@@ -9,13 +9,8 @@ import { SecretInput } from '../inputs/SecretInput';
 import { OpenAIAuthButton } from '../inputs/OpenAIAuthButton';
 import { CopilotAuthButton } from '../inputs/CopilotAuthButton';
 import { ModelListEditor } from '../inputs/ModelListEditor';
-import type {
-  CustomProvider,
-  CustomProviderModel,
-  ProviderType,
-  HelperTextCode,
-  HelperTextLink,
-} from '@/types';
+import type { CustomProvider, CustomProviderModel, ProviderType } from '@/types/user.types';
+import type { HelperTextCode, HelperTextLink } from '@/types/settings.types';
 
 interface ProviderDialogProps {
   isOpen: boolean;

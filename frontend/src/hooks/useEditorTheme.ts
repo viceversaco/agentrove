@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useUIStore } from '@/store';
+import { useUIStore } from '@/store/uiStore';
 import type * as monaco from 'monaco-editor';
 
 const LIGHT_THEME: monaco.editor.IStandaloneThemeData = {

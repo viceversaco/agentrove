@@ -5,7 +5,7 @@ import { LoadingState } from './LoadingState';
 import { Item } from './Item';
 import { FileTreeProvider } from './FileTreeProvider';
 import { useFileTreeSearch } from '@/hooks/useFileTreeSearch';
-import type { FileStructure } from '@/types';
+import type { FileStructure } from '@/types/file-system.types';
 import { hasActualFiles } from '@/utils/file';
 
 export interface TreeProps {

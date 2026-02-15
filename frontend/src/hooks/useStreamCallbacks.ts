@@ -11,11 +11,9 @@ import type {
   ContextUsage,
   Message,
   PermissionRequest,
-  QueueProcessingData,
-  StreamEnvelope,
-  StreamState,
-  ToolEventPayload,
-} from '@/types';
+} from '@/types/chat.types';
+import type { ToolEventPayload } from '@/types/tools.types';
+import type { QueueProcessingData, StreamEnvelope, StreamState } from '@/types/stream.types';
 import { useMessageCache } from '@/hooks/useMessageCache';
 import { streamService } from '@/services/streamService';
 import type { StreamOptions } from '@/services/streamService';
@@ -263,15 +261,19 @@ export function useStreamCallbacks({
   }, [messages]);
 
   useEffect(() => {
+    const flushTimers = flushTimersRef.current;
+    const accumulators = accumulatorsRef.current;
+    const streamSessions = streamSessionsRef.current;
+
     return () => {
       timerIdsRef.current.forEach(clearTimeout);
       timerIdsRef.current = [];
 
-      flushTimersRef.current.forEach((timer) => clearTimeout(timer));
-      flushTimersRef.current.clear();
+      flushTimers.forEach((timer) => clearTimeout(timer));
+      flushTimers.clear();
 
-      accumulatorsRef.current.clear();
-      streamSessionsRef.current.clear();
+      accumulators.clear();
+      streamSessions.clear();
     };
   }, []);
 

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { permissionService } from '@/services/permissionService';
-import { usePermissionStore } from '@/store';
+import { usePermissionStore } from '@/store/permissionStore';
 import { addResolvedRequestId } from '@/utils/permissionStorage';
 
 export function useUserQuestion(chatId: string | undefined) {

@@ -1,6 +1,5 @@
-import { memo, useMemo } from 'react';
-import DOMPurify from 'dompurify';
-import type { FileStructure } from '@/types';
+import { memo, useEffect, useState } from 'react';
+import type { FileStructure } from '@/types/file-system.types';
 import { PreviewContainer } from './PreviewContainer';
 import { previewBackgroundClass } from './previewConstants';
 import { getDisplayFileName } from './previewUtils';
@@ -16,13 +15,32 @@ export const HtmlPreview = memo(function HtmlPreview({
   isFullscreen = false,
   onToggleFullscreen,
 }: HtmlPreviewProps) {
-  const sanitizedContent = useMemo(() => {
-    if (!file.content) return '';
-    return DOMPurify.sanitize(file.content, {
-      WHOLE_DOCUMENT: true,
-      ADD_TAGS: ['style', 'link'],
-      ADD_ATTR: ['target', 'rel'],
-    });
+  const [sanitizedContent, setSanitizedContent] = useState('');
+
+  useEffect(() => {
+    setSanitizedContent('');
+
+    if (!file.content) {
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      const DOMPurify = (await import('dompurify')).default;
+      if (cancelled) return;
+      setSanitizedContent(
+        DOMPurify.sanitize(file.content, {
+          WHOLE_DOCUMENT: true,
+          ADD_TAGS: ['style', 'link'],
+          ADD_ATTR: ['target', 'rel'],
+        }),
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [file.content]);
 
   if (!file.content) {

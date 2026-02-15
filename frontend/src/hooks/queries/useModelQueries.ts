@@ -2,8 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import type { UseQueryOptions } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import { modelService } from '@/services/modelService';
-import type { Model } from '@/types';
-import { useModelStore } from '@/store';
+import type { Model } from '@/types/chat.types';
+import { useModelStore } from '@/store/modelStore';
 import { queryKeys } from './queryKeys';
 
 export const useModelsQuery = (options?: Partial<UseQueryOptions<Model[]>>) => {

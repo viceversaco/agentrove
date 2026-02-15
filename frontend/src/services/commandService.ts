@@ -1,7 +1,8 @@
 import { apiClient } from '@/lib/api';
-import { ensureResponse, ValidationError, withAuth } from '@/services/base';
+import { ensureResponse, withAuth } from '@/services/base/BaseService';
+import { ValidationError } from '@/services/base/ServiceError';
 import { MAX_UPLOAD_SIZE_BYTES } from '@/config/constants';
-import type { CustomCommand } from '@/types';
+import type { CustomCommand } from '@/types/user.types';
 import { validateRequired } from '@/utils/validation';
 
 async function uploadCommand(file: File): Promise<CustomCommand> {

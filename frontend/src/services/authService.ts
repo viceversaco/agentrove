@@ -1,6 +1,7 @@
 import { apiClient } from '@/lib/api';
-import { ensureResponse, serviceCall, ValidationError, withAuth } from '@/services/base';
-import type { AuthResponse, User, UserUsage } from '@/types';
+import { ensureResponse, serviceCall, withAuth } from '@/services/base/BaseService';
+import { ValidationError } from '@/services/base/ServiceError';
+import type { AuthResponse, User, UserUsage } from '@/types/user.types';
 import { authStorage } from '@/utils/storage';
 import {
   validateRequired,

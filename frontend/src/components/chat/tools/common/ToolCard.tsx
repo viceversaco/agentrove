@@ -1,6 +1,6 @@
 import React, { JSX, memo, useState } from 'react';
 import { Check, ChevronRight, Circle, X } from 'lucide-react';
-import type { ToolEventStatus } from '@/types';
+import type { ToolEventStatus } from '@/types/tools.types';
 
 const statusIndicator: Record<ToolEventStatus, JSX.Element> = {
   completed: <Check className="h-3 w-3 text-success-600 dark:text-success-400" />,

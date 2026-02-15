@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { User } from 'lucide-react';
-import { useAuthStore } from '@/store';
+import { useAuthStore } from '@/store/authStore';
 import { useCurrentUserQuery } from '@/hooks/queries/useAuthQueries';
 import { cn } from '@/utils/cn';
 import iconDark from '/assets/images/icon-dark.svg';

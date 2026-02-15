@@ -1,4 +1,5 @@
-import type { AssistantStreamEvent, ToolAggregate, ToolEventStatus } from '@/types';
+import type { AssistantStreamEvent } from '@/types/chat.types';
+import type { ToolAggregate, ToolEventStatus } from '@/types/tools.types';
 
 export interface TextSegment {
   kind: 'text';

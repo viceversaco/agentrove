@@ -3,7 +3,7 @@ import { Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/primitives/Button';
 import { Input } from '@/components/ui/primitives/Input';
 import { Switch } from '@/components/ui/primitives/Switch';
-import type { CustomProviderModel } from '@/types';
+import type { CustomProviderModel } from '@/types/user.types';
 
 interface ModelListEditorProps {
   models: CustomProviderModel[];

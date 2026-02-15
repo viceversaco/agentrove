@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { FileText, FileSpreadsheet, Download } from 'lucide-react';
 import { logger } from '@/utils/logger';
-import type { MessageAttachment } from '@/types';
+import type { MessageAttachment } from '@/types/chat.types';
 import { Button } from './primitives/Button';
 import { Spinner } from './primitives/Spinner';
 import { cn } from '@/utils/cn';

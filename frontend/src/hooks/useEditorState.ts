@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { FileStructure } from '@/types';
+import type { FileStructure } from '@/types/file-system.types';
 
 export function useEditorState(refetchFilesMetadata: () => Promise<unknown>) {
   const [isRefreshing, setIsRefreshing] = useState(false);

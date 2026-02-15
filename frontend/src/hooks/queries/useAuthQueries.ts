@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UseMutationOptions, UseQueryOptions } from '@tanstack/react-query';
 import { authService } from '@/services/authService';
-import type { AuthResponse, User, UserUsage } from '@/types';
+import type { AuthResponse, User, UserUsage } from '@/types/user.types';
 import { queryKeys } from './queryKeys';
 
 export const useCurrentUserQuery = (options?: Partial<UseQueryOptions<User>>) => {

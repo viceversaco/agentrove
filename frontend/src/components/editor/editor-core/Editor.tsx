@@ -1,8 +1,9 @@
 import { memo, useState, useCallback, useMemo } from 'react';
 import { logger } from '@/utils/logger';
 import { CodeView } from '../code-view/CodeView';
-import type { FileStructure, Chat } from '@/types';
-import { useUIStore } from '@/store';
+import type { FileStructure } from '@/types/file-system.types';
+import type { Chat } from '@/types/chat.types';
+import { useUIStore } from '@/store/uiStore';
 import { sandboxService } from '@/services/sandboxService';
 
 const collectFolderPaths = (items: FileStructure[], validPaths: Set<string>) => {

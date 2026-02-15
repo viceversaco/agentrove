@@ -1,6 +1,8 @@
-import { useStreamStore, useMessageQueueStore } from '@/store';
-import type { ChatRequest, ActiveStream, QueueProcessingData, StreamEnvelope } from '@/types';
-import { StreamProcessingError } from '@/types';
+import { useStreamStore } from '@/store/streamStore';
+import { useMessageQueueStore } from '@/store/messageQueueStore';
+import type { ChatRequest } from '@/types/chat.types';
+import type { ActiveStream, QueueProcessingData, StreamEnvelope } from '@/types/stream.types';
+import { StreamProcessingError } from '@/types/stream.types';
 import { chatService } from '@/services/chatService';
 import { logger } from '@/utils/logger';
 import { chatStorage } from '@/utils/storage';

@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { integrationsService, type GmailStatus } from '@/services/integrationsService';
 import { API_ORIGIN } from '@/lib/api';
@@ -8,6 +8,13 @@ const GMAIL_STATUS_KEY = ['integrations', 'gmail', 'status'] as const;
 
 export const useGmailIntegration = () => {
   const queryClient = useQueryClient();
+  const cleanupRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    return () => {
+      cleanupRef.current?.();
+    };
+  }, []);
 
   const { data: status, isLoading } = useQuery<GmailStatus>({
     queryKey: GMAIL_STATUS_KEY,
@@ -73,9 +80,15 @@ export const useGmailIntegration = () => {
         if (popup?.closed) {
           clearInterval(pollInterval);
           window.removeEventListener('message', handleMessage);
+          cleanupRef.current = null;
           queryClient.invalidateQueries({ queryKey: GMAIL_STATUS_KEY });
         }
       }, 1000);
+
+      cleanupRef.current = () => {
+        clearInterval(pollInterval);
+        window.removeEventListener('message', handleMessage);
+      };
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to start OAuth flow');
     }

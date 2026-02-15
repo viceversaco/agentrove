@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import type { Chat, UIActions, UIState } from '@/types';
+import type { Chat } from '@/types/chat.types';
+import type { UIActions, UIState } from '@/types/ui.types';
 
 type ChatStoreType = Pick<UIState, 'currentChat' | 'attachedFiles'> &
   Pick<UIActions, 'setCurrentChat' | 'setAttachedFiles'>;

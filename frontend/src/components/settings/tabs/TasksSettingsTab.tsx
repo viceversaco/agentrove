@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { logger } from '@/utils/logger';
-import type { ScheduledTask } from '@/types';
-import { RecurrenceType, TaskStatus } from '@/types';
+import type { ScheduledTask } from '@/types/scheduler.types';
+import { RecurrenceType, TaskStatus } from '@/types/scheduler.types';
 import { Button } from '@/components/ui/primitives/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import {
@@ -45,11 +45,11 @@ export const TasksSettingsTab: React.FC<TasksSettingsTabProps> = ({ onAddTask, o
   const deleteTask = useDeleteScheduledTaskMutation();
   const toggleTask = useToggleScheduledTaskMutation();
 
-  const tasksList = useMemo(() => tasks || [], [tasks]);
+  const tasksList = tasks ?? [];
   const total = tasksList.length;
   const activeCount = useMemo(
-    () => tasksList.filter((t) => t.status === TaskStatus.ACTIVE).length,
-    [tasksList],
+    () => (tasks ?? []).filter((t) => t.status === TaskStatus.ACTIVE).length,
+    [tasks],
   );
 
   const handleToggleTask = useCallback(
