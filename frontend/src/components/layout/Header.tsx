@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Command, LogOut, Moon, Settings, Sun } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { AlertTriangle, ArrowLeft, Command, LogOut, Moon, Settings, Sun } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useUIStore } from '@/store/uiStore';
 import {
@@ -258,6 +258,10 @@ function UserMenu({
 
 export function Header({ onLogout, userName = 'User', isAuthPage = false }: HeaderProps) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isChatPage = location.pathname.startsWith('/chat/');
+  const isLandingPage = location.pathname === '/';
+  const showSidebar = isChatPage || isLandingPage;
   const theme = useUIStore((state) => state.theme);
   const toggleTheme = useUIStore((state) => state.toggleTheme);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -304,7 +308,24 @@ export function Header({ onLogout, userName = 'User', isAuthPage = false }: Head
     <header className="z-50 border-b border-border/50 bg-surface px-4 dark:border-border-dark/50 dark:bg-surface-dark">
       <div className="relative flex h-10 items-center justify-between">
         <div className="flex items-center gap-1">
-          {isAuthenticated && !isAuthPage && (
+          {isAuthPage && (
+            <Button
+              onClick={() => navigate('/')}
+              variant="unstyled"
+              className={cn(
+                'flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs',
+                'text-text-tertiary hover:text-text-primary',
+                'dark:text-text-dark-tertiary dark:hover:text-text-dark-primary',
+                'hover:bg-surface-hover dark:hover:bg-surface-dark-hover',
+                'transition-colors duration-200',
+              )}
+              aria-label="Back to home"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span>Home</span>
+            </Button>
+          )}
+          {isAuthenticated && showSidebar && (
             <>
               <ToggleButton
                 isOpen={sidebarOpen}
@@ -312,20 +333,22 @@ export function Header({ onLogout, userName = 'User', isAuthPage = false }: Head
                 position="left"
                 className="mr-1"
               />
-              <Button
-                onClick={() => useUIStore.getState().setCommandMenuOpen(true)}
-                variant="unstyled"
-                className={cn(
-                  'rounded-full p-1.5 md:hidden',
-                  'text-text-tertiary hover:text-text-primary',
-                  'dark:text-text-dark-quaternary dark:hover:text-text-dark-primary',
-                  'hover:bg-surface-hover dark:hover:bg-surface-dark-hover',
-                  'transition-colors duration-200',
-                )}
-                aria-label="Open command menu"
-              >
-                <Command className="h-3.5 w-3.5" />
-              </Button>
+              {isChatPage && (
+                <Button
+                  onClick={() => useUIStore.getState().setCommandMenuOpen(true)}
+                  variant="unstyled"
+                  className={cn(
+                    'rounded-full p-1.5',
+                    'text-text-tertiary hover:text-text-primary',
+                    'dark:text-text-dark-quaternary dark:hover:text-text-dark-primary',
+                    'hover:bg-surface-hover dark:hover:bg-surface-dark-hover',
+                    'transition-colors duration-200',
+                  )}
+                  aria-label="Open command menu"
+                >
+                  <Command className="h-3.5 w-3.5" />
+                </Button>
+              )}
             </>
           )}
         </div>
