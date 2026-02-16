@@ -1,4 +1,3 @@
-import { startTransition } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type {
@@ -51,46 +50,35 @@ export const useUIStore = create<UIStoreState>()(
       secondaryView: null,
       splitDirection: 'horizontal',
 
-      setCurrentView: (view) =>
-        startTransition(() => {
-          set({ currentView: view, isSplitMode: false, secondaryView: null });
-        }),
+      setCurrentView: (view) => set({ currentView: view, isSplitMode: false, secondaryView: null }),
 
-      setSecondaryView: (view) =>
-        startTransition(() => {
-          set({ secondaryView: view, isSplitMode: view !== null });
-        }),
+      setSecondaryView: (view) => set({ secondaryView: view, isSplitMode: view !== null }),
 
-      exitSplitMode: () =>
-        startTransition(() => {
-          set({ isSplitMode: false, secondaryView: null });
-        }),
+      exitSplitMode: () => set({ isSplitMode: false, secondaryView: null }),
 
       setSplitDirection: (direction) => set({ splitDirection: direction }),
 
       handleViewClick: (view, isShiftClick) => {
         const state = get();
-        startTransition(() => {
-          if (
-            isShiftClick &&
-            typeof window !== 'undefined' &&
-            window.innerWidth >= MOBILE_BREAKPOINT
-          ) {
-            if (state.currentView === view) {
-              return;
-            }
-            set({
-              secondaryView: view,
-              isSplitMode: true,
-            });
-          } else {
-            set({
-              currentView: view,
-              isSplitMode: false,
-              secondaryView: null,
-            });
+        if (
+          isShiftClick &&
+          typeof window !== 'undefined' &&
+          window.innerWidth >= MOBILE_BREAKPOINT
+        ) {
+          if (state.currentView === view) {
+            return;
           }
-        });
+          set({
+            secondaryView: view,
+            isSplitMode: true,
+          });
+        } else {
+          set({
+            currentView: view,
+            isSplitMode: false,
+            secondaryView: null,
+          });
+        }
       },
     }),
     {
