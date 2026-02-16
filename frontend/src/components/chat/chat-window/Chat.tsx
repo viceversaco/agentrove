@@ -106,6 +106,9 @@ export const Chat = memo(function Chat() {
   const scrollerRef = useRef<HTMLElement | null>(null);
   const hasScrolledToBottom = useRef(false);
   const isNearBottomRef = useRef(true);
+  const allowTopPaginationRef = useRef(false);
+  const lastScrollTopRef = useRef<number | null>(null);
+  const lastPaginatedMessageIdRef = useRef<string | null>(null);
   const previousMessagesMetaRef = useRef<{
     chatId: string | undefined;
     firstMessageId: string | null;
@@ -123,6 +126,9 @@ export const Chat = memo(function Chat() {
   useEffect(() => {
     hasScrolledToBottom.current = false;
     isNearBottomRef.current = true;
+    allowTopPaginationRef.current = false;
+    lastScrollTopRef.current = null;
+    lastPaginatedMessageIdRef.current = null;
     setShowScrollButton(false);
     setFirstItemIndex(INITIAL_FIRST_ITEM_INDEX);
     previousMessagesMetaRef.current = {
@@ -139,6 +145,10 @@ export const Chat = memo(function Chat() {
 
     const firstMessageId = messages[0]?.id ?? null;
     const previousMeta = previousMessagesMetaRef.current;
+
+    if (firstMessageId !== previousMeta.firstMessageId) {
+      lastPaginatedMessageIdRef.current = null;
+    }
 
     if (
       previousMeta.chatId === chatId &&
@@ -162,11 +172,13 @@ export const Chat = memo(function Chat() {
   const setVirtualScrollerRef = useCallback((ref: HTMLElement | null | Window) => {
     if (ref instanceof HTMLElement) {
       scrollerRef.current = ref;
+      lastScrollTopRef.current = ref.scrollTop;
       setScrollerElement(ref);
       return;
     }
 
     scrollerRef.current = null;
+    lastScrollTopRef.current = null;
     setScrollerElement(null);
   }, []);
 
@@ -182,8 +194,23 @@ export const Chat = memo(function Chat() {
   }, []);
 
   const handleScroll = useCallback(() => {
+    const container = scrollerRef.current;
+    if (!container) return;
+
+    const { scrollTop } = container;
     const isAtBottom = checkIfNearBottom();
     isNearBottomRef.current = isAtBottom;
+
+    if (
+      !allowTopPaginationRef.current &&
+      lastScrollTopRef.current !== null &&
+      scrollTop < lastScrollTopRef.current &&
+      !isAtBottom
+    ) {
+      allowTopPaginationRef.current = true;
+    }
+
+    lastScrollTopRef.current = scrollTop;
     setShowScrollButton(!isAtBottom);
   }, [checkIfNearBottom]);
 
@@ -228,22 +255,34 @@ export const Chat = memo(function Chat() {
 
   const followOutput = useCallback(
     (isAtBottom: boolean) => {
-      if ((isStreaming || isLoading) && (isAtBottom || isNearBottomRef.current)) {
+      if (isStreaming && (isAtBottom || isNearBottomRef.current)) {
         return 'smooth';
       }
 
       return false;
     },
-    [isLoading, isStreaming],
+    [isStreaming],
   );
 
   const handleStartReached = useCallback(() => {
-    if (!hasScrolledToBottom.current || !hasNextPage || isFetchingNextPage || !fetchNextPage) {
+    if (
+      !allowTopPaginationRef.current ||
+      !hasScrolledToBottom.current ||
+      !hasNextPage ||
+      isFetchingNextPage ||
+      !fetchNextPage
+    ) {
       return;
     }
 
+    const firstMessageId = messages[0]?.id;
+    if (!firstMessageId || lastPaginatedMessageIdRef.current === firstMessageId) {
+      return;
+    }
+
+    lastPaginatedMessageIdRef.current = firstMessageId;
     void fetchNextPage();
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage, messages]);
 
   const lastBotMessageId = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
