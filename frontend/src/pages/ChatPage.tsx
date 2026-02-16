@@ -52,16 +52,13 @@ export function ChatPage() {
   const { chatId } = useParams();
   const navigate = useNavigate();
 
-  const setCurrentChat = useChatStore((state) => state.setCurrentChat);
-
   const { selectedModelId } = useModelSelection();
   useCommandMenu();
 
-  const { currentView, secondaryView, setCurrentView } = useUIStore(
+  const { currentView, secondaryView } = useUIStore(
     useShallow((state) => ({
       currentView: state.currentView,
       secondaryView: state.secondaryView,
-      setCurrentView: state.setCurrentView,
     })),
   );
 
@@ -123,13 +120,13 @@ export function ChatPage() {
     useEditorState(refetchFilesMetadata);
 
   useEffect(() => {
-    setCurrentChat(currentChat || null);
-  }, [currentChat, setCurrentChat]);
+    useChatStore.getState().setCurrentChat(currentChat || null);
+  }, [currentChat]);
 
   useEffect(() => {
     setSelectedFile(null);
-    setCurrentView('agent');
-  }, [chatId, setSelectedFile, setCurrentView]);
+    useUIStore.getState().setCurrentView('agent');
+  }, [chatId, setSelectedFile]);
 
   const handleChatSelect = useCallback(
     (selectedChatId: string) => {

@@ -9,7 +9,6 @@ interface UseGlobalStreamOptions {
 }
 
 export function useGlobalStream(options?: UseGlobalStreamOptions) {
-  const removeStreamMetadata = useStreamStore((state) => state.removeStreamMetadata);
   const hasValidatedRef = useRef(false);
 
   useEffect(() => {
@@ -26,11 +25,11 @@ export function useGlobalStream(options?: UseGlobalStreamOptions) {
           const status = await chatService.checkChatStatus(streamMeta.chatId);
 
           if (!status?.has_active_task) {
-            removeStreamMetadata(streamMeta.chatId);
+            useStreamStore.getState().removeStreamMetadata(streamMeta.chatId);
           }
         } catch (error) {
           logger.error('Stream validation failed', 'useGlobalStream', error);
-          removeStreamMetadata(streamMeta.chatId);
+          useStreamStore.getState().removeStreamMetadata(streamMeta.chatId);
         }
       });
 
@@ -41,7 +40,7 @@ export function useGlobalStream(options?: UseGlobalStreamOptions) {
     const timeoutId = setTimeout(validateStreams, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [removeStreamMetadata, options]);
+  }, [options]);
 
   const stopAllStreams = useCallback(async () => {
     await streamService.stopAllStreams();

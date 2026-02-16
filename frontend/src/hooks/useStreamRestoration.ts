@@ -17,7 +17,6 @@ export function useStreamRestoration({
   enabled = true,
 }: UseStreamRestorationOptions) {
   const hasRestoredRef = useRef(false);
-  const addStreamMetadata = useStreamStore((state) => state.addStreamMetadata);
 
   useEffect(() => {
     if (!enabled || hasRestoredRef.current || isLoading || !chats || chats.length === 0) {
@@ -47,7 +46,7 @@ export function useStreamRestoration({
               startTime: Date.now(),
             };
 
-            addStreamMetadata(metadata);
+            useStreamStore.getState().addStreamMetadata(metadata);
           }
         } catch (error) {
           logger.error('Failed to check chat status', 'useStreamRestoration', {
@@ -64,7 +63,7 @@ export function useStreamRestoration({
     restoreStreamMetadata().catch((error) => {
       logger.error('Stream restoration failed', 'useStreamRestoration', error);
     });
-  }, [chats, isLoading, enabled, addStreamMetadata]);
+  }, [chats, isLoading, enabled]);
 
   return { hasRestored: hasRestoredRef.current };
 }

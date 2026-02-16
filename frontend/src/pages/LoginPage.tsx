@@ -95,14 +95,13 @@ const getFieldConfigs = (
 ];
 
 export function LoginPage() {
-  const setAuthenticated = useAuthStore((state) => state.setAuthenticated);
   const navigate = useNavigate();
   const [values, setValues] = useState<LoginFormData>({ email: '', password: '' });
   const [errors, setErrors] = useState<LoginFormErrors | null>(null);
 
   const loginMutation = useLoginMutation({
     onSuccess: () => {
-      setAuthenticated(true);
+      useAuthStore.getState().setAuthenticated(true);
       navigate('/');
     },
   });

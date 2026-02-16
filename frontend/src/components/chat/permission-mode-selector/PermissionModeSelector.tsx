@@ -25,7 +25,6 @@ export const PermissionModeSelector = memo(function PermissionModeSelector({
   disabled = false,
 }: PermissionModeSelectorProps) {
   const permissionMode = useUIStore((state) => state.permissionMode);
-  const setPermissionMode = useUIStore((state) => state.setPermissionMode);
   const isSplitMode = useUIStore((state) => state.isSplitMode);
 
   const selectedMode =
@@ -37,7 +36,7 @@ export const PermissionModeSelector = memo(function PermissionModeSelector({
       items={PERMISSION_MODES}
       getItemKey={(mode) => mode.value}
       getItemLabel={(mode) => mode.label}
-      onSelect={(mode) => setPermissionMode(mode.value)}
+      onSelect={(mode) => useUIStore.getState().setPermissionMode(mode.value)}
       leftIcon={Shield}
       width="w-48"
       itemClassName="flex flex-col gap-0.5"

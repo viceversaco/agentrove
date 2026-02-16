@@ -110,7 +110,6 @@ export function Sidebar({
 }: SidebarProps) {
   const navigate = useNavigate();
   const sidebarOpen = useUIStore((state) => state.sidebarOpen);
-  const setSidebarOpen = useUIStore((state) => state.setSidebarOpen);
   const isMobile = useIsMobile();
   const activeStreamMetadata = useStreamStore((state) => state.activeStreamMetadata);
   const streamingChatIdSet = useMemo(
@@ -194,10 +193,10 @@ export function Sidebar({
       onChatSelect(chatId);
       setHoveredChatId(null);
       if (isMobile) {
-        setSidebarOpen(false);
+        useUIStore.getState().setSidebarOpen(false);
       }
     },
-    [onChatSelect, isMobile, setSidebarOpen],
+    [onChatSelect, isMobile],
   );
 
   const handleDeleteChat = useCallback((chatId: string) => {
@@ -237,7 +236,7 @@ export function Sidebar({
   const handleNewChat = () => {
     navigate('/');
     if (isMobile) {
-      setSidebarOpen(false);
+      useUIStore.getState().setSidebarOpen(false);
     }
   };
 

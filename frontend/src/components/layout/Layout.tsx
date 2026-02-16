@@ -8,14 +8,13 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 
 function MobileSidebarOverlay() {
   const sidebarOpen = useUIStore((state) => state.sidebarOpen);
-  const setSidebarOpen = useUIStore((state) => state.setSidebarOpen);
 
   if (!sidebarOpen) return null;
 
   return (
     <div
       className="fixed inset-0 z-30 bg-black/50 md:hidden"
-      onClick={() => setSidebarOpen(false)}
+      onClick={() => useUIStore.getState().setSidebarOpen(false)}
       aria-hidden="true"
     />
   );
@@ -39,13 +38,12 @@ export function Layout({
 }: LayoutProps) {
   const [sidebarContent, setSidebarContent] = useState<ReactNode | null>(null);
   const sidebarOpen = useUIStore((state) => state.sidebarOpen);
-  const setSidebarOpen = useUIStore((state) => state.setSidebarOpen);
   const isMobile = useIsMobile();
   const shouldPushContent = !!sidebarContent && sidebarOpen && !isMobile;
 
   useSwipeGesture({
-    onSwipeRight: () => setSidebarOpen(true),
-    onSwipeLeft: () => sidebarOpen && setSidebarOpen(false),
+    onSwipeRight: () => useUIStore.getState().setSidebarOpen(true),
+    onSwipeLeft: () => sidebarOpen && useUIStore.getState().setSidebarOpen(false),
     enabled: isMobile && !!sidebarContent,
   });
 

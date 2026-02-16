@@ -86,7 +86,6 @@ const validateForm = (values: SignupFormData): SignupFormErrors | null => {
 
 export function SignupPage() {
   const navigate = useNavigate();
-  const setAuthenticated = useAuthStore((state) => state.setAuthenticated);
   const [values, setValues] = useState<SignupFormData>({
     email: '',
     username: '',
@@ -99,7 +98,7 @@ export function SignupPage() {
     onSuccess: (user) => {
       const needsVerification = user.email_verification_required && !user.is_verified;
       if (!needsVerification && authService.isAuthenticated()) {
-        setAuthenticated(true);
+        useAuthStore.getState().setAuthenticated(true);
         navigate('/');
       } else {
         navigate(`/verify-email?email=${encodeURIComponent(user.email)}`);

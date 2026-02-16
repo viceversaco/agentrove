@@ -56,8 +56,10 @@ export const XlsxPreview = memo(function XlsxPreview({
           const worksheet = workbook.Sheets[sheetName];
           const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
 
-          const rowLengths = (jsonData as unknown[][]).map((row) => row.length);
-          const maxCols = rowLengths.length > 0 ? Math.max(...rowLengths) : 0;
+          let maxCols = 0;
+          for (const row of jsonData as unknown[][]) {
+            if (row.length > maxCols) maxCols = row.length;
+          }
 
           const data: SpreadsheetData = (jsonData as unknown[][])
             .filter(
@@ -203,10 +205,7 @@ export const XlsxPreview = memo(function XlsxPreview({
         <div className="h-16 shrink-0 border-t border-border bg-surface-secondary p-4 dark:border-border-dark dark:bg-surface-dark-secondary">
           <div className="text-sm text-text-secondary dark:text-text-dark-secondary">
             {currentSheet.data.length} rows ×{' '}
-            {currentSheet.data.length > 0
-              ? Math.max(...currentSheet.data.map((row) => row.length))
-              : 0}{' '}
-            columns
+            {currentSheet.data.reduce((max, row) => Math.max(max, row.length), 0)} columns
           </div>
         </div>
       </div>

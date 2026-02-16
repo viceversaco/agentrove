@@ -262,11 +262,8 @@ export function Header({ onLogout, userName = 'User', isAuthPage = false }: Head
   const isLandingPage = useMatch('/');
   const showSidebar = isChatPage || isLandingPage;
   const theme = useUIStore((state) => state.theme);
-  const toggleTheme = useUIStore((state) => state.toggleTheme);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const setAuthenticated = useAuthStore((state) => state.setAuthenticated);
   const sidebarOpen = useUIStore((state) => state.sidebarOpen);
-  const setSidebarOpen = useUIStore((state) => state.setSidebarOpen);
 
   const { data: user } = useCurrentUserQuery({
     enabled: isAuthenticated && !isAuthPage,
@@ -278,7 +275,7 @@ export function Header({ onLogout, userName = 'User', isAuthPage = false }: Head
 
   const logoutMutation = useLogoutMutation({
     onSuccess: () => {
-      setAuthenticated(false);
+      useAuthStore.getState().setAuthenticated(false);
       navigate('/login');
     },
   });
@@ -328,7 +325,7 @@ export function Header({ onLogout, userName = 'User', isAuthPage = false }: Head
             <>
               <ToggleButton
                 isOpen={sidebarOpen}
-                onClick={() => setSidebarOpen(!sidebarOpen)}
+                onClick={() => useUIStore.getState().setSidebarOpen(!sidebarOpen)}
                 position="left"
                 className="mr-1"
               />
@@ -353,13 +350,15 @@ export function Header({ onLogout, userName = 'User', isAuthPage = false }: Head
         </div>
 
         <div className="flex items-center gap-1.5">
-          {showStandaloneThemeToggle && <ThemeToggleButton theme={theme} onToggle={toggleTheme} />}
+          {showStandaloneThemeToggle && (
+            <ThemeToggleButton theme={theme} onToggle={() => useUIStore.getState().toggleTheme()} />
+          )}
           {isAuthPage ? null : isAuthenticated ? (
             <UserMenu
               displayName={displayName}
               usage={usage}
               theme={theme}
-              onToggleTheme={toggleTheme}
+              onToggleTheme={() => useUIStore.getState().toggleTheme()}
               onSettings={() => {
                 prefetchSettingsPage();
                 handleNavigate('/settings');

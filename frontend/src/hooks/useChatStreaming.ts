@@ -104,8 +104,6 @@ export function useChatStreaming({
     | null
   >(null);
 
-  const updateStreamCallbacks = useStreamStore((state) => state.updateStreamCallbacks);
-
   const isLoading = streamState === 'loading';
   const isStreaming = streamState === 'streaming';
 
@@ -149,7 +147,7 @@ export function useChatStreaming({
 
       if (existingStream && lastConnectedStreamRef.current !== existingStream.id) {
         lastConnectedStreamRef.current = existingStream.id;
-        updateStreamCallbacks(chatId, existingStream.messageId, {
+        useStreamStore.getState().updateStreamCallbacks(chatId, existingStream.messageId, {
           onEnvelope,
           onComplete,
           onError,
@@ -164,7 +162,7 @@ export function useChatStreaming({
 
     const unsubscribe = useStreamStore.subscribe(checkAndUpdateCallbacks);
     return () => unsubscribe();
-  }, [chatId, updateStreamCallbacks, onEnvelope, onComplete, onError, onQueueProcess]);
+  }, [chatId, onEnvelope, onComplete, onError, onQueueProcess]);
 
   useEffect(() => {
     if (prevChatIdRef.current !== chatId) {

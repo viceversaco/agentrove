@@ -27,7 +27,6 @@ export const ThinkingModeSelector = memo(function ThinkingModeSelector({
   disabled = false,
 }: ThinkingModeSelectorProps) {
   const thinkingMode = useUIStore((state) => state.thinkingMode);
-  const setThinkingMode = useUIStore((state) => state.setThinkingMode);
   const isSplitMode = useUIStore((state) => state.isSplitMode);
 
   const selectedMode = THINKING_MODES.find((m) => m.value === thinkingMode) || THINKING_MODES[0];
@@ -38,7 +37,7 @@ export const ThinkingModeSelector = memo(function ThinkingModeSelector({
       items={THINKING_MODES}
       getItemKey={(mode) => mode.value || 'off'}
       getItemLabel={(mode) => mode.label}
-      onSelect={(mode) => setThinkingMode(mode.value)}
+      onSelect={(mode) => useUIStore.getState().setThinkingMode(mode.value)}
       leftIcon={Brain}
       width="w-32"
       dropdownPosition={dropdownPosition}

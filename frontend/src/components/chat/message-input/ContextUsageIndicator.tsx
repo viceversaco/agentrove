@@ -1,5 +1,3 @@
-import { useMemo } from 'react';
-
 export interface ContextUsageInfo {
   tokensUsed: number;
   contextWindow: number;
@@ -15,32 +13,25 @@ export const ContextUsageIndicator = ({ usage }: { usage: ContextUsageInfo }) =>
   const percentage =
     usage.contextWindow > 0 ? Math.min((usage.tokensUsed / usage.contextWindow) * 100, 100) : 0;
 
-  const formattedPercentage = useMemo(() => {
-    if (percentage === 0) {
-      return '0';
-    }
-    if (percentage >= 10) {
-      return percentage.toFixed(0);
-    }
-    if (percentage >= 1) {
-      return percentage.toFixed(1);
-    }
-    return percentage.toFixed(2);
-  }, [percentage]);
+  const formattedPercentage =
+    percentage === 0
+      ? '0'
+      : percentage >= 10
+        ? percentage.toFixed(0)
+        : percentage >= 1
+          ? percentage.toFixed(1)
+          : percentage.toFixed(2);
 
   const radius = 9;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - percentage / 100);
 
-  const progressClass = useMemo(() => {
-    if (percentage >= 95) {
-      return 'text-error-500 dark:text-error-400';
-    }
-    if (percentage >= 75) {
-      return 'text-warning-500 dark:text-warning-400';
-    }
-    return 'text-text-primary dark:text-text-dark-primary';
-  }, [percentage]);
+  const progressClass =
+    percentage >= 95
+      ? 'text-error-500 dark:text-error-400'
+      : percentage >= 75
+        ? 'text-warning-500 dark:text-warning-400'
+        : 'text-text-primary dark:text-text-dark-primary';
 
   const tooltip = `${formatNumberCompact(usage.tokensUsed)}/${formatNumberCompact(usage.contextWindow)}`;
 

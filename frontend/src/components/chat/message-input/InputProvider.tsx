@@ -59,9 +59,6 @@ export function InputProvider({
 
   const showPreview = showAttachedFilesPreview && hasAttachments && !previewDismissed;
 
-  const queueMessage = useMessageQueueStore((state) => state.queueMessage);
-  const permissionMode = useUIStore((state) => state.permissionMode);
-  const thinkingMode = useUIStore((state) => state.thinkingMode);
   const clearAttachedFiles = onAttach;
 
   const { previewUrls } = useFileHandling({
@@ -183,14 +180,17 @@ export function InputProvider({
     }
 
     if (isStreaming && hasMessage && chatId) {
-      void queueMessage(
-        chatId,
-        message.trim(),
-        selectedModelId,
-        permissionMode,
-        thinkingMode,
-        attachedFiles ?? undefined,
-      );
+      const { permissionMode, thinkingMode } = useUIStore.getState();
+      void useMessageQueueStore
+        .getState()
+        .queueMessage(
+          chatId,
+          message.trim(),
+          selectedModelId,
+          permissionMode,
+          thinkingMode,
+          attachedFiles ?? undefined,
+        );
       setMessage('');
       clearAttachedFiles?.([]);
       setPreviewDismissed(true);
@@ -226,12 +226,9 @@ export function InputProvider({
     chatId,
     message,
     attachedFiles,
-    queueMessage,
     setMessage,
     clearAttachedFiles,
     selectedModelId,
-    permissionMode,
-    thinkingMode,
   ]);
 
   const handleKeyDown = useCallback(

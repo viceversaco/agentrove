@@ -46,8 +46,6 @@ const useExamplePrompts = () =>
 export function LandingPage() {
   const navigate = useNavigate();
   const attachedFiles = useChatStore((state) => state.attachedFiles);
-  const setAttachedFiles = useChatStore((state) => state.setAttachedFiles);
-  const setCurrentChat = useChatStore((state) => state.setCurrentChat);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const { selectedModelId, selectModel } = useModelSelection({ enabled: isAuthenticated });
 
@@ -87,15 +85,12 @@ export function LandingPage() {
   }, [settings?.custom_prompts]);
 
   useEffect(() => {
-    setCurrentChat(null);
-  }, [setCurrentChat]);
+    useChatStore.getState().setCurrentChat(null);
+  }, []);
 
-  const handleFileAttach = useCallback(
-    (files: File[]) => {
-      setAttachedFiles(files);
-    },
-    [setAttachedFiles],
-  );
+  const handleFileAttach = useCallback((files: File[]) => {
+    useChatStore.getState().setAttachedFiles(files);
+  }, []);
 
   const handleNewChat = useCallback(
     async (e: React.FormEvent) => {

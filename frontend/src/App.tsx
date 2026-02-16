@@ -33,7 +33,6 @@ const ResetPasswordPage = lazy(() =>
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
 
 function AppContent() {
-  const setAuthenticated = useAuthStore((state) => state.setAuthenticated);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const hasToken = !!authService.getToken();
   const isSessionAuthenticated = isAuthenticated && hasToken;
@@ -44,11 +43,11 @@ function AppContent() {
 
   useEffect(() => {
     if (hasToken && user) {
-      setAuthenticated(true);
+      useAuthStore.getState().setAuthenticated(true);
     } else if (isAuthenticated && !hasToken) {
-      setAuthenticated(false);
+      useAuthStore.getState().setAuthenticated(false);
     }
-  }, [user, hasToken, isAuthenticated, setAuthenticated]);
+  }, [user, hasToken, isAuthenticated]);
 
   const { data: chatsData, isLoading: isChatsLoading } = useInfiniteChatsQuery({
     enabled: isSessionAuthenticated,
