@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, ArrowLeft, Command, LogOut, Moon, Settings, Sun } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useMatch } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useUIStore } from '@/store/uiStore';
 import {
@@ -258,9 +258,8 @@ function UserMenu({
 
 export function Header({ onLogout, userName = 'User', isAuthPage = false }: HeaderProps) {
   const navigate = useNavigate();
-  const location = useLocation();
-  const isChatPage = location.pathname.startsWith('/chat/');
-  const isLandingPage = location.pathname === '/';
+  const isChatPage = useMatch('/chat/:chatId');
+  const isLandingPage = useMatch('/');
   const showSidebar = isChatPage || isLandingPage;
   const theme = useUIStore((state) => state.theme);
   const toggleTheme = useUIStore((state) => state.toggleTheme);
