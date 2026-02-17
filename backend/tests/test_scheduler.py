@@ -492,7 +492,7 @@ class TestSchedulerRecovery:
 
         scheduler_service = SchedulerService(session_factory=session_factory)
         running_dispatch = asyncio.create_task(asyncio.sleep(60))
-        scheduler_service._scheduled_tasks[str(execution.id)] = running_dispatch
+        scheduler_service._scheduled_tasks[execution.id] = running_dispatch
 
         try:
             result = await scheduler_service.check_due_tasks(limit=10)

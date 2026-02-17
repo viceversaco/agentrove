@@ -27,9 +27,9 @@ from app.models.schemas.integrations import (
     PollTokenResponse,
 )
 from app.services.copilot_oauth import CopilotOAuthService
+from app.services.exceptions import UserException
 from app.services.gmail_oauth import GmailOAuthService
 from app.services.openai_oauth import VERIFICATION_URI, OpenAIOAuthService
-from app.services.exceptions import UserException
 from app.services.user import UserService
 
 router = APIRouter()

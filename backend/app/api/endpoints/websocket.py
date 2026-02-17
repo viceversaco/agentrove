@@ -4,6 +4,7 @@ import json
 import logging
 
 from fastapi import APIRouter, WebSocket
+from sqlalchemy import select
 from starlette.websockets import WebSocketDisconnect
 
 from app.constants import (
@@ -22,8 +23,6 @@ from app.constants import (
 from app.core.config import get_settings
 from app.core.security import get_user_from_token
 from app.db.session import SessionLocal
-from sqlalchemy import select
-
 from app.models.db_models import Chat, User
 from app.services.exceptions import UserException
 from app.services.sandbox_providers import (
@@ -44,21 +43,9 @@ def _parse_dimension(
     min_value: int,
     max_value: int,
 ) -> int:
-    parsed: int
-    if isinstance(value, bool):
-        parsed = int(value)
-    elif isinstance(value, int):
-        parsed = value
-    elif isinstance(value, float):
-        parsed = int(value)
-    elif isinstance(value, str):
-        try:
-            parsed = int(value)
-        except ValueError:
-            return default
-    else:
+    if not isinstance(value, int) or isinstance(value, bool):
         return default
-    return max(min_value, min(parsed, max_value))
+    return max(min_value, min(value, max_value))
 
 
 async def _authenticate_user(
@@ -82,7 +69,6 @@ async def _authenticate_user(
                 sandbox_provider = SandboxProviderType.DOCKER.value
 
         return user, e2b_api_key, modal_api_key, sandbox_provider
-
     except Exception as e:
         logger.warning("WebSocket authentication failed: %s", e)
         return None, None, None, SandboxProviderType.DOCKER.value
@@ -91,32 +77,20 @@ async def _authenticate_user(
 async def _wait_for_auth(
     websocket: WebSocket, timeout: float = 10.0
 ) -> tuple[User | None, str | None, str | None, str]:
+    no_user = (None, None, None, SandboxProviderType.DOCKER.value)
+
     try:
         message = await asyncio.wait_for(websocket.receive(), timeout=timeout)
-    except asyncio.TimeoutError:
-        return None, None, None, SandboxProviderType.DOCKER.value
+        data = json.loads(message["text"])
+    except (asyncio.TimeoutError, json.JSONDecodeError, KeyError):
+        return no_user
 
-    if "text" not in message:
-        return None, None, None, SandboxProviderType.DOCKER.value
-
-    text_payload = message["text"]
-    if not isinstance(text_payload, str):
-        return None, None, None, SandboxProviderType.DOCKER.value
-
-    try:
-        data = json.loads(text_payload)
-    except json.JSONDecodeError:
-        return None, None, None, SandboxProviderType.DOCKER.value
-
-    if not isinstance(data, dict):
-        return None, None, None, SandboxProviderType.DOCKER.value
-
-    if data.get("type") != WS_MSG_AUTH:
-        return None, None, None, SandboxProviderType.DOCKER.value
+    if not isinstance(data, dict) or data.get("type") != WS_MSG_AUTH:
+        return no_user
 
     token = data.get("token")
     if not isinstance(token, str) or not token:
-        return None, None, None, SandboxProviderType.DOCKER.value
+        return no_user
 
     return await _authenticate_user(token)
 

@@ -134,7 +134,7 @@ class MarketplaceService:
                 response.raise_for_status()
                 data = response.json()
             except httpx.HTTPError as e:
-                logger.error(f"Failed to fetch marketplace catalog: {e}")
+                logger.error("Failed to fetch marketplace catalog: %s", e)
                 raise MarketplaceException(
                     f"Failed to fetch marketplace catalog: {e}",
                     error_code=ErrorCode.MARKETPLACE_FETCH_FAILED,
@@ -180,16 +180,16 @@ class MarketplaceService:
                 stat.st_mtime, tz=timezone.utc
             )
             return True
-        except Exception as e:
-            logger.warning(f"Failed to load disk cache: {e}")
+        except (OSError, json.JSONDecodeError) as e:
+            logger.warning("Failed to load disk cache: %s", e)
             return False
 
     def _save_disk_cache(self, plugins: list[MarketplacePluginDict]) -> None:
         try:
             with open(self._cache_file, "w") as f:
                 json.dump(plugins, f)
-        except Exception as e:
-            logger.warning(f"Failed to save disk cache: {e}")
+        except OSError as e:
+            logger.warning("Failed to save disk cache: %s", e)
 
     def _normalize_plugin(self, raw: dict[str, Any]) -> MarketplacePluginDict:
         author_raw = raw.get("author") or raw.get("owner")
@@ -390,7 +390,7 @@ class MarketplaceService:
                         zf.writestr(relative, response.content)
                     except httpx.HTTPError as e:
                         failed_files.append(file_path)
-                        logger.warning(f"Failed to download {file_path}: {e}")
+                        logger.warning("Failed to download %s: %s", file_path, e)
 
             if failed_files:
                 raise MarketplaceException(
@@ -412,13 +412,11 @@ class MarketplaceService:
         depth: int,
         total_count: list[int] | None = None,
     ) -> list[str]:
-        # mutable list used to share file count state across recursive calls
-        # (integers are immutable in Python so a list wrapper is needed)
         if total_count is None:
             total_count = [0]
 
         if depth > MAX_RECURSION_DEPTH:
-            logger.warning(f"Max recursion depth reached for {path}")
+            logger.warning("Max recursion depth reached for %s", path)
             return []
 
         if total_count[0] >= MAX_SKILL_FILES:
@@ -436,7 +434,7 @@ class MarketplaceService:
                 return []
             for item in data:
                 if total_count[0] >= MAX_SKILL_FILES:
-                    logger.warning(f"Max total file count ({MAX_SKILL_FILES}) reached")
+                    logger.warning("Max total file count (%d) reached", MAX_SKILL_FILES)
                     break
                 name = item.get("name", "")
                 if not self._validate_path_segment(name):

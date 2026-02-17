@@ -21,15 +21,11 @@ async def get_user_settings(
     current_user: User = Depends(get_current_user),
     user_service: UserService = Depends(get_user_service),
 ) -> UserSettingsResponse:
-    logger.info(f"[GET_SETTINGS] Fetching settings for user {current_user.id}")
     try:
         async with cache_connection() as cache:
-            response = await user_service.get_user_settings_response(
+            return await user_service.get_user_settings_response(
                 current_user.id, cache=cache
             )
-            agent_names = [a.name for a in (response.custom_agents or [])]
-            logger.info(f"[GET_SETTINGS] Returning agents: {agent_names}")
-            return response
     except UserException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
