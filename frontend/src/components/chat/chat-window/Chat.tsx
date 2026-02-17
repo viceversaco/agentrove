@@ -6,6 +6,7 @@ import React, {
   useLayoutEffect,
   memo,
   useMemo,
+  type ReactNode,
 } from 'react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { isBrowserObjectUrl } from '@/utils/attachmentUrl';
@@ -110,19 +111,13 @@ export const Chat = memo(function Chat() {
   const allowTopPaginationRef = useRef(false);
   const lastScrollTopRef = useRef<number | null>(null);
   const lastPaginatedMessageIdRef = useRef<string | null>(null);
-  const previousMessagesMetaRef = useRef<{
-    chatId: string | undefined;
-    firstMessageId: string | null;
-    length: number;
-  }>({
-    chatId: undefined,
-    firstMessageId: null,
-    length: 0,
-  });
+  const previousMessagesRef = useRef(messages);
 
   const [firstItemIndex, setFirstItemIndex] = useState(INITIAL_FIRST_ITEM_INDEX);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [scrollerElement, setScrollerElement] = useState<HTMLElement | null>(null);
+  const listHeaderRef = useRef<ReactNode>(null);
+  const listFooterRef = useRef<ReactNode>(null);
 
   useEffect(() => {
     hasScrolledToBottom.current = false;
@@ -132,11 +127,7 @@ export const Chat = memo(function Chat() {
     lastPaginatedMessageIdRef.current = null;
     setShowScrollButton(false);
     setFirstItemIndex(INITIAL_FIRST_ITEM_INDEX);
-    previousMessagesMetaRef.current = {
-      chatId,
-      firstMessageId: null,
-      length: 0,
-    };
+    previousMessagesRef.current = [];
   }, [chatId]);
 
   useEffect(() => {
@@ -144,30 +135,39 @@ export const Chat = memo(function Chat() {
       return;
     }
 
-    const firstMessageId = messages[0]?.id ?? null;
-    const previousMeta = previousMessagesMetaRef.current;
+    const currentMessages = messages;
+    const previousMessages = previousMessagesRef.current;
 
-    if (firstMessageId !== previousMeta.firstMessageId) {
+    if (previousMessages.length === 0) {
+      previousMessagesRef.current = currentMessages;
+      return;
+    }
+
+    const firstMessageId = currentMessages[0]?.id;
+    const previousFirstMessageId = previousMessages[0]?.id;
+
+    if (firstMessageId !== previousFirstMessageId) {
+      const previousFirstIndexInCurrent =
+        previousFirstMessageId !== undefined
+          ? currentMessages.findIndex((message) => message.id === previousFirstMessageId)
+          : -1;
+
+      if (previousFirstIndexInCurrent > 0) {
+        setFirstItemIndex((currentIndex) => currentIndex - previousFirstIndexInCurrent);
+      } else {
+        const currentFirstIndexInPrevious =
+          firstMessageId !== undefined
+            ? previousMessages.findIndex((message) => message.id === firstMessageId)
+            : -1;
+        if (currentFirstIndexInPrevious > 0) {
+          setFirstItemIndex((currentIndex) => currentIndex + currentFirstIndexInPrevious);
+        }
+      }
+
       lastPaginatedMessageIdRef.current = null;
     }
 
-    if (
-      previousMeta.chatId === chatId &&
-      previousMeta.length > 0 &&
-      previousMeta.firstMessageId !== null &&
-      firstMessageId !== null &&
-      firstMessageId !== previousMeta.firstMessageId &&
-      messages.length > previousMeta.length
-    ) {
-      const prependedCount = messages.length - previousMeta.length;
-      setFirstItemIndex((currentIndex) => currentIndex - prependedCount);
-    }
-
-    previousMessagesMetaRef.current = {
-      chatId,
-      firstMessageId,
-      length: messages.length,
-    };
+    previousMessagesRef.current = currentMessages;
   }, [chatId, messages]);
 
   const setVirtualScrollerRef = useCallback((ref: HTMLElement | null | Window) => {
@@ -188,6 +188,12 @@ export const Chat = memo(function Chat() {
     if (!container) return;
 
     const { scrollTop, scrollHeight, clientHeight } = container;
+
+    if (!hasScrolledToBottom.current) {
+      lastScrollTopRef.current = scrollTop;
+      return;
+    }
+
     const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
     const thresholdPixels = (clientHeight * SCROLL_THRESHOLD_PERCENT) / 100;
     const isAtBottom = distanceFromBottom <= thresholdPixels;
@@ -461,13 +467,13 @@ export const Chat = memo(function Chat() {
     showThinking,
   ]);
 
-  const virtuosoComponents = useMemo(
-    () => ({
-      Header: () => listHeader,
-      Footer: () => listFooter,
-    }),
-    [listFooter, listHeader],
-  );
+  listHeaderRef.current = listHeader;
+  listFooterRef.current = listFooter;
+
+  const virtuosoComponents = useRef({
+    Header: () => <>{listHeaderRef.current}</>,
+    Footer: () => <>{listFooterRef.current}</>,
+  }).current;
 
   return (
     <div className="relative flex min-w-0 flex-1 flex-col">

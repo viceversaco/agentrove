@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { detectFileType } from '@/utils/fileTypes';
 import { createInitialMessage } from '@/utils/message';
 import { chatStorage } from '@/utils/storage';
@@ -33,11 +33,14 @@ export function useMessageInitialization({
   setMessages,
   setInitialPrompt,
 }: UseMessageInitializationParams) {
+  const hasMessagesRef = useRef(hasMessages);
+  hasMessagesRef.current = hasMessages;
+
   useEffect(() => {
     if (!fetchedMessages || !chatId || isLoading || wasAborted) return;
 
     // Skip reprocessing during streaming to preserve attachment references and prevent image flashing
-    if (isStreaming && hasMessages) return;
+    if (isStreaming && hasMessagesRef.current) return;
 
     const formattedMessages = fetchedMessages.map((msg: Message) => {
       const processedAttachments = msg.attachments?.map((attachment) => {
@@ -96,7 +99,6 @@ export function useMessageInitialization({
     selectedModelId,
     initialPromptSent,
     wasAborted,
-    hasMessages,
     initialPromptFromRoute,
     attachedFiles,
     isLoading,
