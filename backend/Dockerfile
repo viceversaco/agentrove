@@ -27,7 +27,7 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | d
     apt-get install -y gh && \
     rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g @anthropic-ai/claude-code@2.1.42 @gongrzhe/server-gmail-autoauth-mcp @openai/codex @playwright/mcp@latest
+RUN npm install -g @anthropic-ai/claude-code@2.1.44 @gongrzhe/server-gmail-autoauth-mcp @openai/codex @playwright/mcp@latest
 
 # Install uv package manager
 RUN curl -LsSf https://astral.sh/uv/install.sh | bash

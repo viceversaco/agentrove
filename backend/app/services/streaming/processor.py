@@ -74,6 +74,8 @@ class StreamProcessor:
         if isinstance(message, ResultMessage):
             if message.total_cost_usd is not None:
                 self.total_cost_usd = message.total_cost_usd
+            if message.usage is not None:
+                self.usage = message.usage
 
     @staticmethod
     def _extract_command_stdout(content: str | list[Any]) -> str | None:
