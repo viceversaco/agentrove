@@ -27,7 +27,7 @@ export const CollapsibleButton: React.FC<CollapsibleButtonProps> = ({
       type="button"
       onClick={onToggle}
       variant="unstyled"
-      className={`flex items-center ${fullWidth ? 'w-full justify-between gap-2' : 'gap-1'} group/button rounded-lg bg-surface-tertiary/50 px-3 py-1.5 text-xs font-medium text-text-secondary transition-all duration-200 hover:bg-surface-hover dark:bg-surface-dark-tertiary/30 dark:text-text-dark-tertiary dark:hover:bg-surface-dark-hover`}
+      className={`flex items-center ${fullWidth ? 'w-full justify-between gap-2' : 'gap-1'} group/button px-0 py-0.5 text-xs font-medium text-text-tertiary transition-colors duration-200 hover:text-text-primary dark:text-text-dark-quaternary dark:hover:text-text-dark-secondary`}
     >
       <span>{displayLabel}</span>
       <ChevronDown

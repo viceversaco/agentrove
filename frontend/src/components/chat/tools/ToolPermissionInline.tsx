@@ -54,7 +54,7 @@ export function ToolPermissionInline({
     <div className="overflow-hidden rounded-lg border border-border bg-surface-tertiary dark:border-border-dark dark:bg-surface-dark-tertiary">
       <div className="flex items-center justify-between border-b border-border px-3 py-2 dark:border-border-dark">
         <div className="flex items-center gap-2">
-          <div className="rounded-md bg-black/5 p-1 dark:bg-white/10">
+          <div className="rounded-md bg-black/5 p-1 dark:bg-white/5">
             <ShieldAlert className="h-3.5 w-3.5 text-text-tertiary dark:text-text-dark-tertiary" />
           </div>
           <div className="min-w-0 flex-1">

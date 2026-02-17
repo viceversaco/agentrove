@@ -97,9 +97,9 @@ export default {
 
         // Border colors
         border: {
-          DEFAULT: '#e2e8f0',
-          secondary: '#cbd5e1',
-          hover: '#94a3b8',
+          DEFAULT: '#e2e2e2',
+          secondary: '#d1d1d1',
+          hover: '#9a9a9a',
           dark: {
             DEFAULT: '#2a2a2a',
             secondary: '#333333',
@@ -212,8 +212,8 @@ export default {
         soft: '0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04)',
         medium: '0 4px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
         strong: '0 10px 40px -10px rgba(0, 0, 0, 0.15), 0 4px 25px -5px rgba(0, 0, 0, 0.1)',
-        glow: '0 0 20px rgba(59, 130, 246, 0.15)',
-        'glow-lg': '0 0 40px rgba(59, 130, 246, 0.2)',
+        glow: '0 0 20px rgba(0, 0, 0, 0.15)',
+        'glow-lg': '0 0 40px rgba(0, 0, 0, 0.2)',
       },
 
       // Typography

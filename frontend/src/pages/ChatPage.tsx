@@ -11,7 +11,7 @@ import { useCommandMenu } from '@/hooks/useCommandMenu';
 import { Spinner } from '@/components/ui/primitives/Spinner';
 import type { ViewType } from '@/types/ui.types';
 import { Chat as ChatComponent } from '@/components/chat/chat-window/Chat';
-import { ChatSessionOrchestrator } from '@/components/chat/ChatSessionOrchestrator';
+import { ChatSessionOrchestrator } from '@/components/chat/chat-window/ChatSessionOrchestrator';
 import { useEditorState } from '@/hooks/useEditorState';
 import { useChatData } from '@/hooks/useChatData';
 import { useSandboxFiles } from '@/hooks/useSandboxFiles';
