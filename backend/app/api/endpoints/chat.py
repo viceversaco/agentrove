@@ -14,7 +14,6 @@ from fastapi import (
     UploadFile,
     status,
 )
-from app.utils.cache import CacheError
 from sqlalchemy.exc import SQLAlchemyError
 from sse_starlette.sse import EventSourceResponse
 
@@ -49,9 +48,7 @@ from app.models.schemas import (
     RestoreRequest,
 )
 from app.services.chat import ChatService
-from app.services.streaming.cancellation import CancellationHandler
 from app.services.claude_agent import ClaudeAgentService
-from app.services.streaming.runtime import ChatStreamRuntime
 from app.services.exceptions import (
     ChatException,
     ClaudeAgentException,
@@ -60,7 +57,9 @@ from app.services.exceptions import (
 )
 from app.services.permission_manager import PermissionManager
 from app.services.queue import QueueService
-from app.utils.cache import cache_connection
+from app.services.streaming.cancellation import CancellationHandler
+from app.services.streaming.runtime import ChatStreamRuntime
+from app.utils.cache import CacheError, cache_connection
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -177,12 +176,6 @@ async def enhance_prompt(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),
-        )
-    except Exception as e:
-        logger.error("Unexpected error enhancing prompt: %s", e)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to enhance prompt",
         )
 
 
@@ -397,19 +390,10 @@ async def get_stream_status(
             await chat_service.message_service.get_latest_assistant_message(chat_id)
         )
 
-        if latest_assistant_message:
-            if latest_assistant_message.stream_status in [
-                MessageStreamStatus.COMPLETED,
-                MessageStreamStatus.FAILED,
-                MessageStreamStatus.INTERRUPTED,
-            ]:
-                return INACTIVE_TASK_RESPONSE.copy()
-            if (
-                latest_assistant_message.stream_status
-                != MessageStreamStatus.IN_PROGRESS
-            ):
-                return INACTIVE_TASK_RESPONSE.copy()
-        else:
+        if (
+            not latest_assistant_message
+            or latest_assistant_message.stream_status != MessageStreamStatus.IN_PROGRESS
+        ):
             return INACTIVE_TASK_RESPONSE.copy()
 
         if not ChatStreamRuntime.has_active_chat(str(chat_id)):
@@ -417,15 +401,9 @@ async def get_stream_status(
 
         return {
             "has_active_task": True,
-            "message_id": latest_assistant_message.id
-            if latest_assistant_message
-            else None,
-            "stream_id": latest_assistant_message.active_stream_id
-            if latest_assistant_message
-            else None,
-            "last_seq": latest_assistant_message.last_seq
-            if latest_assistant_message
-            else 0,
+            "message_id": latest_assistant_message.id,
+            "stream_id": latest_assistant_message.active_stream_id,
+            "last_seq": latest_assistant_message.last_seq,
         }
     except SQLAlchemyError as e:
         logger.error(

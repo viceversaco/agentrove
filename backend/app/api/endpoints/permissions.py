@@ -5,7 +5,6 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import ValidationError
-from app.utils.cache import CacheError
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.constants import REDIS_KEY_CHAT_STREAM_LIVE
@@ -20,7 +19,7 @@ from app.models.schemas import (
 from app.services.chat import ChatService
 from app.services.permission_manager import PermissionManager
 from app.services.streaming.types import StreamEnvelope
-from app.utils.cache import cache_connection
+from app.utils.cache import CacheError, cache_connection
 
 router = APIRouter()
 settings = get_settings()

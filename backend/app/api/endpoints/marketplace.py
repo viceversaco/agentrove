@@ -13,9 +13,6 @@ from app.core.deps import (
     get_skill_service,
     get_user_service,
 )
-from app.services.agent import AgentService
-from app.services.command import CommandService
-from app.services.skill import SkillService
 from app.core.security import get_current_user
 from app.models.db_models import User
 from app.models.schemas.marketplace import (
@@ -35,6 +32,8 @@ from app.models.types import (
     CustomSlashCommandDict,
     InstalledPluginDict,
 )
+from app.services.agent import AgentService
+from app.services.command import CommandService
 from app.services.exceptions import (
     MarketplaceException,
     ServiceException,
@@ -42,6 +41,7 @@ from app.services.exceptions import (
 )
 from app.services.marketplace import MarketplaceService
 from app.services.plugin_installer import PluginInstallerService
+from app.services.skill import SkillService
 from app.services.user import UserService
 
 router = APIRouter()
