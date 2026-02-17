@@ -6,6 +6,7 @@ import React, {
   useLayoutEffect,
   memo,
   useMemo,
+  type ReactNode,
 } from 'react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { isBrowserObjectUrl } from '@/utils/attachmentUrl';
@@ -115,6 +116,8 @@ export const Chat = memo(function Chat() {
   const [firstItemIndex, setFirstItemIndex] = useState(INITIAL_FIRST_ITEM_INDEX);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [scrollerElement, setScrollerElement] = useState<HTMLElement | null>(null);
+  const listHeaderRef = useRef<ReactNode>(null);
+  const listFooterRef = useRef<ReactNode>(null);
 
   useEffect(() => {
     hasScrolledToBottom.current = false;
@@ -185,6 +188,12 @@ export const Chat = memo(function Chat() {
     if (!container) return;
 
     const { scrollTop, scrollHeight, clientHeight } = container;
+
+    if (!hasScrolledToBottom.current) {
+      lastScrollTopRef.current = scrollTop;
+      return;
+    }
+
     const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
     const thresholdPixels = (clientHeight * SCROLL_THRESHOLD_PERCENT) / 100;
     const isAtBottom = distanceFromBottom <= thresholdPixels;
@@ -458,13 +467,13 @@ export const Chat = memo(function Chat() {
     showThinking,
   ]);
 
-  const virtuosoComponents = useMemo(
-    () => ({
-      Header: () => listHeader,
-      Footer: () => listFooter,
-    }),
-    [listFooter, listHeader],
-  );
+  listHeaderRef.current = listHeader;
+  listFooterRef.current = listFooter;
+
+  const virtuosoComponents = useRef({
+    Header: () => <>{listHeaderRef.current}</>,
+    Footer: () => <>{listFooterRef.current}</>,
+  }).current;
 
   return (
     <div className="relative flex min-w-0 flex-1 flex-col">
