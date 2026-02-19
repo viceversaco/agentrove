@@ -33,6 +33,7 @@ class ChatSession:
     max_thinking_tokens: int | None
     config_fingerprint: str
     active_generation_task: asyncio.Task[Any] | None = None
+    cancel_event: asyncio.Event = field(default_factory=asyncio.Event)
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     last_used_at: float = field(default_factory=time.monotonic)
 
@@ -40,6 +41,7 @@ class ChatSession:
 class SessionRegistry:
     def __init__(self) -> None:
         self._sessions: dict[str, ChatSession] = {}
+        self._pending_cancels: set[str] = set()
         self._lock = asyncio.Lock()
 
     async def get_or_create(
@@ -83,11 +85,22 @@ class SessionRegistry:
             session.last_used_at = time.monotonic()
             return session
 
-    async def interrupt_generation(self, chat_id: str) -> None:
+    async def cancel_generation(self, chat_id: str) -> None:
+        self._pending_cancels.add(chat_id)
         session = self._sessions.get(chat_id)
         if session is None:
             return
-        await session.client.interrupt()
+        session.cancel_event.set()
+        try:
+            await session.client.interrupt()
+        except Exception as exc:
+            logger.debug("Interrupt failed for chat %s: %s", chat_id, exc)
+
+    def consume_pending_cancel(self, chat_id: str) -> bool:
+        if chat_id in self._pending_cancels:
+            self._pending_cancels.discard(chat_id)
+            return True
+        return False
 
     async def terminate(self, chat_id: str) -> None:
         async with self._lock:

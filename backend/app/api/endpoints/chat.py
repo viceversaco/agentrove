@@ -57,7 +57,7 @@ from app.services.exceptions import (
 )
 from app.services.permission_manager import PermissionManager
 from app.services.queue import QueueService
-from app.services.streaming.cancellation import CancellationHandler
+from app.services.claude_session_registry import session_registry
 from app.services.streaming.runtime import ChatStreamRuntime
 from app.utils.cache import CacheError, cache_connection
 
@@ -442,7 +442,7 @@ async def cancel_stream(
     if not ChatStreamRuntime.has_active_chat(str(chat_id)):
         return
 
-    CancellationHandler.request_cancel(str(chat_id))
+    await session_registry.cancel_generation(str(chat_id))
 
 
 @router.post(

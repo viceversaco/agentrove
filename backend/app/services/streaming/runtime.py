@@ -30,7 +30,6 @@ from app.services.exceptions import ClaudeAgentException
 from app.services.message import MessageService
 from app.services.queue import QueueService
 from app.services.sandbox import SandboxService
-from app.services.streaming.cancellation import CancellationHandler
 from app.services.streaming.types import (
     ChatStreamRequest,
     StreamEnvelope,
@@ -221,9 +220,6 @@ class ChatStreamRuntime:
             if not (self._cancel_event and self._cancel_event.is_set()):
                 raise
             self._cancelled = True
-
-        if self._cancelled:
-            await CancellationHandler.cancel_stream(self.chat_id)
 
     @staticmethod
     def _cancel_task_if_running(
@@ -604,8 +600,6 @@ class ChatStreamRuntime:
 
     @classmethod
     def has_active_chat(cls, chat_id: str) -> bool:
-        if CancellationHandler.get_event(chat_id) is not None:
-            return True
         cls._prune_done_tasks()
         return chat_id in cls._background_task_chat_ids.values()
 
@@ -699,11 +693,9 @@ class ChatStreamRuntime:
             sandbox_service=sandbox_service,
             session_factory=session_factory,
         )
-        cancel_event = CancellationHandler.register(runtime.chat_id)
         try:
             async with cache_connection() as cache:
                 runtime.cache = cache
-                runtime._cancel_event = cancel_event
 
                 ai_service = ClaudeAgentService(session_factory=runtime.session_factory)
                 user = User(id=runtime.chat.user_id)
@@ -737,7 +729,12 @@ class ChatStreamRuntime:
                 )
 
                 async with session.lock:
+                    session.cancel_event.clear()
+                    if session_registry.consume_pending_cancel(runtime.chat_id):
+                        session.cancel_event.set()
+                    runtime._cancel_event = session.cancel_event
                     session.active_generation_task = asyncio.current_task()
+                    stream: AsyncIterator[StreamEvent] | None = None
                     try:
                         if params.options.model:
                             await session.client.set_model(params.options.model)
@@ -767,6 +764,19 @@ class ChatStreamRuntime:
                         await session_registry.terminate(runtime.chat_id)
                         raise
                     finally:
+                        if stream is not None and hasattr(stream, "aclose"):
+                            await stream.aclose()
+                        if runtime._cancelled:
+                            # After interrupt, the CLI sends remaining messages
+                            # (including ResultMessage) into the client buffer.
+                            # Drain them so the next query on this reused session
+                            # doesn't read stale data.
+                            try:
+                                async with asyncio.timeout(5.0):
+                                    async for _ in session.client.receive_response():
+                                        pass
+                            except Exception:
+                                pass
                         session.active_generation_task = None
                         session.last_used_at = time.monotonic()
 
@@ -777,8 +787,6 @@ class ChatStreamRuntime:
                 stream_status=MessageStreamStatus.INTERRUPTED,
             )
             raise
-        finally:
-            CancellationHandler.unregister(runtime.chat_id, cancel_event)
 
     @classmethod
     async def _bootstrap_and_execute(
@@ -806,6 +814,7 @@ class ChatStreamRuntime:
                 stream_status=MessageStreamStatus.FAILED,
             )
             raise
+        chat_id = str(request.chat_data["id"])
         try:
             return await cls.execute_chat(
                 request=request,
@@ -813,4 +822,5 @@ class ChatStreamRuntime:
                 session_factory=session_factory,
             )
         finally:
+            session_registry.consume_pending_cancel(chat_id)
             await sandbox_service.cleanup()
