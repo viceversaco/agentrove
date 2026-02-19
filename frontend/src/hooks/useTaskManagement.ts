@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
+import toast from 'react-hot-toast';
 import type { RecurrenceType, ScheduledTask } from '@/types/scheduler.types';
 import {
   useCreateScheduledTaskMutation,
@@ -119,8 +120,10 @@ export const useTaskManagement = (defaultModelId: string) => {
           taskId: editingTaskId,
           data: taskData,
         });
+        toast.success('Task updated');
       } else {
         await createTask.mutateAsync(taskData);
+        toast.success('Task created');
       }
       handleTaskDialogClose();
     } catch (error) {

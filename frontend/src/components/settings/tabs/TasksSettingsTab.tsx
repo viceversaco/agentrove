@@ -56,7 +56,8 @@ export const TasksSettingsTab: React.FC<TasksSettingsTabProps> = ({ onAddTask, o
     async (task: ScheduledTask) => {
       setTogglingTaskId(task.id);
       try {
-        await toggleTask.mutateAsync(task.id);
+        const result = await toggleTask.mutateAsync(task.id);
+        toast.success(`Task ${result.enabled ? 'resumed' : 'paused'}`);
       } catch (error) {
         logger.error('Failed to toggle task', 'TasksSettingsTab', error);
         toast.error('Failed to toggle task status');
@@ -81,6 +82,7 @@ export const TasksSettingsTab: React.FC<TasksSettingsTabProps> = ({ onAddTask, o
     setDeletingTaskId(targetTask.id);
     try {
       await deleteTask.mutateAsync(targetTask.id);
+      toast.success('Task deleted');
       setTaskPendingDelete(null);
     } catch (error) {
       logger.error('Failed to delete task', 'TasksSettingsTab', error);
