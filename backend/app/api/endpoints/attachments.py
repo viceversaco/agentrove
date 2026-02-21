@@ -71,11 +71,7 @@ def _build_file_response(
     safe_filename = filename or file_path.name or "file"
     disposition = "inline" if inline else "attachment"
 
-    # Create ASCII-safe fallback filename by removing non-ASCII characters
     ascii_filename = safe_filename.encode("ascii", "ignore").decode("ascii") or "file"
-
-    # Use RFC 5987 encoding for Unicode filenames
-    # Format: filename*=UTF-8''percent-encoded-name
     encoded_filename = quote(safe_filename, safe="")
 
     headers = {

@@ -16,16 +16,11 @@ from app.services.sandbox_providers.types import (
     SecretEntry,
 )
 
-create_docker_config = SandboxProviderFactory.create_docker_config
-create_sandbox_provider = SandboxProviderFactory.create
-
 __all__ = [
     "SandboxProvider",
     "SandboxProviderFactory",
     "LocalDockerProvider",
     "LocalHostProvider",
-    "create_docker_config",
-    "create_sandbox_provider",
     "SandboxProviderType",
     "CommandResult",
     "FileMetadata",

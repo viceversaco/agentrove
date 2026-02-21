@@ -45,7 +45,7 @@ async def upload_agent(
     flag_modified(user_settings, "custom_agents")
 
     try:
-        await user_service.commit_settings_with_cleanup(
+        await user_service.save_settings_or_rollback(
             user_settings,
             db,
             current_user.id,
@@ -104,7 +104,7 @@ async def update_agent(
     flag_modified(user_settings, "custom_agents")
 
     try:
-        await user_service.commit_settings_with_cleanup(
+        await user_service.save_settings_or_rollback(
             user_settings,
             db,
             current_user.id,
@@ -154,7 +154,7 @@ async def delete_agent(
         flag_modified(user_settings, "installed_plugins")
 
     try:
-        await user_service.commit_settings_with_cleanup(
+        await user_service.save_settings_or_rollback(
             user_settings,
             db,
             current_user.id,

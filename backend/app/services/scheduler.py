@@ -29,7 +29,7 @@ from app.models.db_models import (
     UserSettings,
 )
 from app.models.schemas import (
-    PaginatedTaskExecutions,
+    PaginatedResponse,
     PaginationParams,
     ScheduledTaskBase,
     ScheduledTaskUpdate,
@@ -40,7 +40,8 @@ from app.prompts.system_prompt import build_system_prompt_for_chat
 from app.services.db import BaseDbService, SessionFactoryType
 from app.services.exceptions import SchedulerException
 from app.services.sandbox import SandboxService
-from app.services.sandbox_providers import SandboxProviderType, create_sandbox_provider
+from app.services.sandbox_providers import SandboxProviderType
+from app.services.sandbox_providers.factory import SandboxProviderFactory
 from app.services.streaming.runtime import ChatStreamRuntime
 from app.services.streaming.types import ChatStreamRequest
 from app.services.user import UserService
@@ -69,7 +70,7 @@ class SchedulerService(BaseDbService[ScheduledTask]):
                 await scheduled_task
         self._scheduled_tasks = {}
 
-    def _purge_and_count_active(self) -> int:
+    def _active_task_count(self) -> int:
         self._scheduled_tasks = {
             eid: task for eid, task in self._scheduled_tasks.items() if not task.done()
         }
@@ -327,7 +328,7 @@ class SchedulerService(BaseDbService[ScheduledTask]):
         user_id: UUID,
         pagination: PaginationParams,
         db: AsyncSession,
-    ) -> PaginatedTaskExecutions:
+    ) -> PaginatedResponse[TaskExecutionResponse]:
         await self._get_user_task(task_id, user_id, db)
 
         count_result = await db.execute(
@@ -345,7 +346,7 @@ class SchedulerService(BaseDbService[ScheduledTask]):
         )
         executions = result.scalars().all()
 
-        return PaginatedTaskExecutions(
+        return PaginatedResponse[TaskExecutionResponse](
             items=[TaskExecutionResponse.model_validate(e) for e in executions],
             page=pagination.page,
             per_page=pagination.per_page,
@@ -485,7 +486,7 @@ class SchedulerService(BaseDbService[ScheduledTask]):
             self._finalize_task(scheduled_task, success=False)
             await db.commit()
 
-    def _create_sandbox(
+    def _create_sandbox_service(
         self,
         user_settings: UserSettings,
         session_factory: SessionFactoryType,
@@ -496,7 +497,7 @@ class SchedulerService(BaseDbService[ScheduledTask]):
         elif user_settings.sandbox_provider == SandboxProviderType.MODAL.value:
             api_key = user_settings.modal_api_key
 
-        provider = create_sandbox_provider(
+        provider = SandboxProviderFactory.create(
             provider_type=user_settings.sandbox_provider,
             api_key=api_key,
         )
@@ -525,7 +526,7 @@ class SchedulerService(BaseDbService[ScheduledTask]):
         self,
         limit: int = 100,
     ) -> dict[str, Any]:
-        active_count = self._purge_and_count_active()
+        active_count = self._active_task_count()
         available_slots = self._max_concurrent_executions - active_count
         if available_slots <= 0:
             return {"tasks_triggered": 0}
@@ -602,7 +603,9 @@ class SchedulerService(BaseDbService[ScheduledTask]):
                     await db.commit()
                     return {"error": str(e)}
 
-            sandbox_service = self._create_sandbox(user_settings, self.session_factory)
+            sandbox_service = self._create_sandbox_service(
+                user_settings, self.session_factory
+            )
             sandbox_id = await sandbox_service.create_sandbox()
 
             await sandbox_service.initialize_sandbox(

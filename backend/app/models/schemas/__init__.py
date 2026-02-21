@@ -17,15 +17,12 @@ from .chat import (
     ChatStatusResponse,
     ChatUpdate,
     ContextUsage,
-    CursorPaginatedMessages,
     EnhancePromptResponse,
     ForkChatRequest,
     ForkChatResponse,
     Message,
     MessageAttachment,
     MessageEvent,
-    PaginatedChats,
-    PaginatedMessages,
     PermissionRespondResponse,
     PortPreviewLink,
     PreviewLinksResponse,
@@ -53,7 +50,6 @@ from .sandbox import (
     VNCUrlResponse,
 )
 from .scheduler import (
-    PaginatedTaskExecutions,
     ScheduledTaskBase,
     ScheduledTaskResponse,
     ScheduledTaskUpdate,
@@ -87,7 +83,6 @@ from .queue import (
 )
 
 __all__ = [
-    # auth
     "LogoutRequest",
     "RefreshTokenRequest",
     "Token",
@@ -97,7 +92,6 @@ __all__ = [
     "UserRead",
     "UserOut",
     "UserUsage",
-    # chat
     "Chat",
     "ChatCompletionResponse",
     "ChatCreate",
@@ -111,23 +105,17 @@ __all__ = [
     "Message",
     "MessageAttachment",
     "MessageEvent",
-    "CursorPaginatedMessages",
-    "PaginatedChats",
-    "PaginatedMessages",
     "PermissionRespondResponse",
     "PortPreviewLink",
     "PreviewLinksResponse",
     "RestoreRequest",
-    # pagination
     "CursorPaginatedResponse",
     "CursorPaginationParams",
     "PaginatedResponse",
     "PaginationParams",
-    # permissions
     "PermissionRequest",
     "PermissionRequestResponse",
     "PermissionResult",
-    # sandbox
     "AddSecretRequest",
     "BrowserStatusResponse",
     "FileContentResponse",
@@ -140,18 +128,14 @@ __all__ = [
     "UpdateIDEThemeRequest",
     "UpdateSecretRequest",
     "VNCUrlResponse",
-    # scheduler
-    "PaginatedTaskExecutions",
     "ScheduledTaskBase",
     "ScheduledTaskResponse",
     "ScheduledTaskUpdate",
     "TaskExecutionResponse",
     "TaskToggleResponse",
-    # secrets
     "MessageResponse",
     "SecretResponse",
     "SecretsListResponse",
-    # settings
     "CustomAgent",
     "CustomEnvVar",
     "CustomMcp",
@@ -159,27 +143,20 @@ __all__ = [
     "ProviderType",
     "UserSettingsBase",
     "UserSettingsResponse",
-    # skills
     "SkillResponse",
     "SkillDeleteResponse",
-    # commands
     "CommandResponse",
     "CommandDeleteResponse",
     "CommandUpdateRequest",
-    # agents
     "AgentResponse",
     "AgentDeleteResponse",
     "AgentUpdateRequest",
-    # mcps
     "McpCreateRequest",
     "McpDeleteResponse",
     "McpResponse",
     "McpUpdateRequest",
-    # ai_model
     "AIModelResponse",
-    # errors
     "HTTPErrorResponse",
-    # queue
     "QueuedMessage",
     "QueueMessageUpdate",
     "QueueAddResponse",

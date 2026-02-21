@@ -3,7 +3,7 @@ from datetime import datetime
 from uuid import UUID
 
 from fastapi_users.db import SQLAlchemyBaseUserTableUUID
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, JSON, String, Text
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 
 from app.models.types import (
@@ -55,7 +55,6 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     reset_token_expires: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    daily_message_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
     chats = relationship("Chat", back_populates="user", cascade="all, delete-orphan")
     settings = relationship(
         "UserSettings",

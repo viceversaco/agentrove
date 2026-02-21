@@ -9,11 +9,12 @@ from app.core.deps import get_scheduler_service
 from app.core.security import get_current_user, get_db
 from app.models.db_models import ScheduledTask, User
 from app.models.schemas import (
-    PaginatedTaskExecutions,
+    PaginatedResponse,
     PaginationParams,
     ScheduledTaskBase,
     ScheduledTaskResponse,
     ScheduledTaskUpdate,
+    TaskExecutionResponse,
     TaskToggleResponse,
 )
 from app.services.exceptions import SchedulerException
@@ -108,14 +109,16 @@ async def toggle_scheduled_task(
         raise HTTPException(status_code=e.status_code, detail=str(e))
 
 
-@router.get("/tasks/{task_id}/history", response_model=PaginatedTaskExecutions)
+@router.get(
+    "/tasks/{task_id}/history", response_model=PaginatedResponse[TaskExecutionResponse]
+)
 async def get_task_execution_history(
     task_id: UUID,
     pagination: PaginationParams = Depends(),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     scheduler_service: SchedulerService = Depends(get_scheduler_service),
-) -> PaginatedTaskExecutions:
+) -> PaginatedResponse[TaskExecutionResponse]:
     try:
         return await scheduler_service.get_execution_history(
             task_id, current_user.id, pagination, db

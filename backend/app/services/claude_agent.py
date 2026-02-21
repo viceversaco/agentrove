@@ -16,10 +16,11 @@ from app.core.security import create_chat_scoped_token
 from app.db.session import SessionLocal
 from app.models.db_models import Chat, MessageRole, User, UserSettings
 from app.models.schemas.settings import ProviderType
-from app.prompts.enhance_prompt import get_enhance_prompt
+from app.prompts.enhance_prompt import ENHANCE_PROMPT
 from app.services.exceptions import ClaudeAgentException
 from app.services.provider import ProviderService
-from app.services.sandbox_providers import SandboxProviderType, create_docker_config
+from app.services.sandbox_providers import SandboxProviderType
+from app.services.sandbox_providers.factory import SandboxProviderFactory
 from app.services.streaming.processor import StreamProcessor
 from app.services.streaming.types import StreamEvent
 from app.services.tool_handler import ToolHandlerRegistry
@@ -122,7 +123,7 @@ class ClaudeAgentService:
             or sandbox_provider == SandboxProviderType.DOCKER.value
             or not sandbox_provider
         ):
-            docker_config = create_docker_config()
+            docker_config = SandboxProviderFactory.create_docker_config()
             return DockerSandboxTransport(
                 sandbox_id=sandbox_id,
                 docker_config=docker_config,
@@ -329,7 +330,7 @@ class ClaudeAgentService:
         env, _ = self._build_auth_env(model_id, user_settings)
 
         options = ClaudeAgentOptions(
-            system_prompt=get_enhance_prompt(),
+            system_prompt=ENHANCE_PROMPT,
             permission_mode="bypassPermissions",
             model=actual_model_id,
             max_turns=1,

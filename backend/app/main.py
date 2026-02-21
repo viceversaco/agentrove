@@ -28,11 +28,21 @@ from app.api.endpoints import settings as settings_router
 from app.api.endpoints import skills, websocket
 from app.core.config import get_settings
 from app.core.middleware import setup_middleware
+from app.db.base_class import Base
 from app.db.session import SessionLocal, engine
+from app.models.db_models import chat as chat_model
+from app.models.db_models import refresh_token, scheduled_tasks, user
 from app.services.claude_session_registry import session_registry
 from app.services.maintenance import MaintenanceService
 from app.services.streaming.runtime import ChatStreamRuntime
 from app.utils.cache import cache_connection
+
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator
+
+    _instrumentator_available = True
+except ImportError:
+    _instrumentator_available = False
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -54,10 +64,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 async def _create_sqlite_tables() -> None:
-    from app.db.base_class import Base
-    from app.models.db_models import chat, refresh_token, scheduled_tasks, user
-
-    _ = (chat, refresh_token, scheduled_tasks, user)
+    _ = (chat_model, refresh_token, scheduled_tasks, user)
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -105,13 +112,13 @@ def create_application() -> FastAPI:
 
     try:
         application.mount("/static", StaticFiles(directory="static"), name="static")
-    except Exception as e:
+    except RuntimeError as e:
         logger.debug("Static files directory not found, skipping mount: %s", e)
 
     try:
         storage_path = Path(settings.STORAGE_PATH)
         storage_path.mkdir(exist_ok=True)
-    except Exception as e:
+    except OSError as e:
         logger.warning(
             "Failed to create storage directory at %s: %s", settings.STORAGE_PATH, e
         )
@@ -189,36 +196,39 @@ def create_application() -> FastAPI:
 
     _mount_admin(application)
 
-    @application.get("/health")
-    async def health_check() -> dict[str, str]:
-        return {"status": "healthy"}
-
-    @application.get(f"{settings.API_V1_STR}/readyz")
-    async def readyz(response: Response) -> dict[str, Any]:
-        db_ok, db_error = await _check_database_ready()
-
-        checks: dict[str, dict[str, str | bool]] = {
-            "database": {"ok": db_ok},
-        }
-        if db_error:
-            checks["database"]["error"] = db_error
-
-        all_ok = db_ok
-
-        if not settings.DESKTOP_MODE:
-            redis_ok, redis_error = await _check_redis_ready()
-            checks["redis"] = {"ok": redis_ok}
-            if redis_error:
-                checks["redis"]["error"] = redis_error
-            all_ok = all_ok and redis_ok
-
-        if all_ok:
-            return {"status": "ready", "checks": checks}
-
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        return {"status": "not_ready", "checks": checks}
+    application.add_api_route("/health", health_check, methods=["GET"])
+    application.add_api_route(f"{settings.API_V1_STR}/readyz", readyz, methods=["GET"])
 
     return application
+
+
+async def health_check() -> dict[str, str]:
+    return {"status": "healthy"}
+
+
+async def readyz(response: Response) -> dict[str, Any]:
+    db_ok, db_error = await _check_database_ready()
+
+    checks: dict[str, dict[str, str | bool]] = {
+        "database": {"ok": db_ok},
+    }
+    if db_error:
+        checks["database"]["error"] = db_error
+
+    all_ok = db_ok
+
+    if not settings.DESKTOP_MODE:
+        redis_ok, redis_error = await _check_redis_ready()
+        checks["redis"] = {"ok": redis_ok}
+        if redis_error:
+            checks["redis"]["error"] = redis_error
+        all_ok = all_ok and redis_ok
+
+    if all_ok:
+        return {"status": "ready", "checks": checks}
+
+    response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    return {"status": "not_ready", "checks": checks}
 
 
 def _mount_admin(application: FastAPI) -> None:
@@ -242,9 +252,8 @@ def _mount_admin(application: FastAPI) -> None:
 
 
 def _mount_instrumentator(application: FastAPI) -> None:
-    if settings.DESKTOP_MODE:
+    if settings.DESKTOP_MODE or not _instrumentator_available:
         return
-    from prometheus_fastapi_instrumentator import Instrumentator
 
     Instrumentator().instrument(application).expose(application)
 

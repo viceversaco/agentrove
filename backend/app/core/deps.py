@@ -15,7 +15,8 @@ from app.services.command import CommandService
 from app.services.exceptions import UserException
 from app.services.refresh_token import RefreshTokenService
 from app.services.sandbox import SandboxService
-from app.services.sandbox_providers import SandboxProviderType, create_sandbox_provider
+from app.services.sandbox_providers import SandboxProviderType
+from app.services.sandbox_providers.factory import SandboxProviderFactory
 from app.services.scheduler import SchedulerService
 from app.services.marketplace import MarketplaceService
 from app.services.plugin_installer import PluginInstallerService
@@ -152,7 +153,7 @@ async def get_sandbox_service(
     elif provider_type == SandboxProviderType.MODAL:
         api_key = modal_api_key
 
-    provider = create_sandbox_provider(
+    provider = SandboxProviderFactory.create(
         provider_type=provider_type,
         api_key=api_key,
     )

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowLeft, Command, LogOut, Moon, Settings, Sun } from 'lucide-react';
+import { ArrowLeft, Command, LogOut, Moon, Settings, Sun } from 'lucide-react';
 import { useNavigate, useMatch } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useUIStore } from '@/store/uiStore';
@@ -49,38 +49,8 @@ function useClickOutside<T extends HTMLElement>(
 function buildUsageMeta(usage?: UserUsage) {
   if (!usage) return null;
 
-  const isWarning = usage.daily_message_limit !== null && usage.messages_remaining === 1;
-  const isAtLimit = usage.daily_message_limit !== null && usage.messages_remaining === 0;
-
-  const emphasisClass = cn(
-    'text-text-tertiary dark:text-text-dark-tertiary font-medium',
-    isWarning && 'text-warning-600 dark:text-warning-400',
-    isAtLimit && 'text-error-600 dark:text-error-400',
-  );
-
-  const barClass = cn(
-    'h-full transition-all duration-300 ease-out rounded-full',
-    !isWarning && !isAtLimit && 'bg-text-quaternary dark:bg-text-dark-quaternary',
-    isWarning && 'bg-warning-500 dark:bg-warning-400',
-    isAtLimit && 'bg-error-500 dark:bg-error-400',
-  );
-
-  const width =
-    usage.daily_message_limit === null
-      ? '0%'
-      : usage.daily_message_limit > 0
-        ? `${Math.min(
-            Math.max((usage.messages_used_today / usage.daily_message_limit) * 100, 2),
-            100,
-          )}%`
-        : '0%';
-
-  const icon =
-    isWarning || isAtLimit ? (
-      <AlertTriangle className="h-3 w-3 text-warning-500 dark:text-warning-400" />
-    ) : null;
-
-  return { emphasisClass, barClass, width, icon };
+  const emphasisClass = 'text-text-tertiary dark:text-text-dark-tertiary font-medium';
+  return { emphasisClass };
 }
 
 function ThemeToggleButton({ theme, onToggle }: { theme: string; onToggle: () => void }) {
@@ -197,19 +167,13 @@ function UserMenu({
                 </p>
               </div>
             </div>
-            {usageMeta && usage && usage.daily_message_limit !== null && (
+            {usageMeta && usage && (
               <div className="mt-2.5 space-y-1">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    {usageMeta.icon}
-                    <span className={cn('text-2xs', usageMeta.emphasisClass)}>Messages</span>
-                  </div>
+                  <span className={cn('text-2xs', usageMeta.emphasisClass)}>Messages</span>
                   <span className={cn('text-2xs tabular-nums', usageMeta.emphasisClass)}>
-                    {usage.messages_used_today}/{usage.daily_message_limit}
+                    {usage.messages_used_today}
                   </span>
-                </div>
-                <div className="h-1 overflow-hidden rounded-full bg-surface-hover dark:bg-surface-dark-hover">
-                  <div className={usageMeta.barClass} style={{ width: usageMeta.width }} />
                 </div>
               </div>
             )}

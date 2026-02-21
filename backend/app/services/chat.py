@@ -27,11 +27,12 @@ from app.models.schemas import (
     ChatCreate,
     ChatRequest,
     ChatUpdate,
-    CursorPaginatedMessages,
-    PaginatedChats,
+    CursorPaginatedResponse,
+    PaginatedResponse,
     PaginationParams,
     ProviderType,
 )
+from app.models.schemas.chat import Chat as ChatSchema, Message as MessageSchema
 from app.models.types import ChatCompletionResult, MessageAttachmentDict
 from app.prompts.system_prompt import build_system_prompt_for_chat
 from app.services.db import BaseDbService, SessionFactoryType
@@ -42,8 +43,8 @@ from app.services.sandbox import SandboxService
 from app.services.sandbox_providers import (
     LocalDockerProvider,
     SandboxProviderType,
-    create_docker_config,
 )
+from app.services.sandbox_providers.factory import SandboxProviderFactory
 from app.services.streaming.runtime import ChatStreamRuntime
 from app.services.streaming.types import ChatStreamRequest
 from app.services.claude_session_registry import session_registry
@@ -89,7 +90,7 @@ class ChatService(BaseDbService[Chat]):
 
     async def get_user_chats(
         self, user: User, pagination: PaginationParams | None = None
-    ) -> PaginatedChats:
+    ) -> PaginatedResponse[ChatSchema]:
         if pagination is None:
             pagination = PaginationParams()
 
@@ -112,7 +113,7 @@ class ChatService(BaseDbService[Chat]):
             result = await db.execute(query)
             chats = result.scalars().all()
 
-            return PaginatedChats(
+            return PaginatedResponse[ChatSchema](
                 items=chats,
                 page=pagination.page,
                 per_page=pagination.per_page,
@@ -121,8 +122,6 @@ class ChatService(BaseDbService[Chat]):
             )
 
     async def create_chat(self, user: User, chat_data: ChatCreate) -> Chat:
-        await self._check_message_limit(user.id)
-
         user_settings = await self.user_service.get_user_settings(user.id)
         self._validate_api_keys(user_settings, chat_data.model_id)
 
@@ -343,7 +342,7 @@ class ChatService(BaseDbService[Chat]):
 
     async def get_chat_messages(
         self, chat_id: UUID, user: User, cursor: str | None = None, limit: int = 20
-    ) -> CursorPaginatedMessages:
+    ) -> CursorPaginatedResponse[MessageSchema]:
         has_access = await self._verify_chat_access(chat_id, user.id)
         if not has_access:
             raise ChatException(
@@ -617,8 +616,6 @@ class ChatService(BaseDbService[Chat]):
                 status_code=400,
             )
 
-        await self._check_message_limit(current_user.id)
-
         user_settings = await self.user_service.get_user_settings(current_user.id)
         self._validate_api_keys(user_settings, request.model_id)
 
@@ -774,7 +771,9 @@ class ChatService(BaseDbService[Chat]):
                 status_code=400,
             )
 
-        provider = LocalDockerProvider(config=create_docker_config())
+        provider = LocalDockerProvider(
+            config=SandboxProviderFactory.create_docker_config()
+        )
         fork_sandbox_service = SandboxService(provider)
 
         try:
@@ -873,16 +872,6 @@ class ChatService(BaseDbService[Chat]):
         if len(title) <= CHAT_TITLE_MAX_LENGTH:
             return title
         return title[:CHAT_TITLE_MAX_LENGTH] + "..."
-
-    async def _check_message_limit(self, user_id: UUID) -> None:
-        can_continue = await self.user_service.check_message_limit(user_id)
-        if not can_continue:
-            raise ChatException(
-                "Daily message limit exceeded. You have reached your daily message limit.",
-                error_code=ErrorCode.CHAT_DAILY_LIMIT_EXCEEDED,
-                details={"user_id": str(user_id)},
-                status_code=429,
-            )
 
     def _validate_api_keys(self, user_settings: UserSettings, model_id: str) -> None:
         try:

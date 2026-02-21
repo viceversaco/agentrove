@@ -11,7 +11,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.constants import REDIS_KEY_USER_SETTINGS
 from app.core.config import get_settings
-from app.models.db_models import Chat, Message, MessageRole, User, UserSettings
+from app.models.db_models import Chat, Message, MessageRole, UserSettings
 from app.models.schemas import UserSettingsResponse
 from app.models.types import InstalledPluginDict, JSONValue
 from app.services.db import BaseDbService, SessionFactoryType
@@ -129,7 +129,7 @@ class UserService(BaseDbService[UserSettings]):
 
         return user_settings
 
-    async def commit_settings_and_invalidate_cache(
+    async def save_settings(
         self, user_settings: UserSettings, db: AsyncSession, user_id: UUID
     ) -> None:
         await db.commit()
@@ -137,7 +137,7 @@ class UserService(BaseDbService[UserSettings]):
         async with cache_connection() as cache:
             await self.invalidate_settings_cache(cache, user_id)
 
-    async def commit_settings_with_cleanup(
+    async def save_settings_or_rollback(
         self,
         user_settings: UserSettings,
         db: AsyncSession,
@@ -146,7 +146,7 @@ class UserService(BaseDbService[UserSettings]):
         rollback_side_effect: Callable[[], Awaitable[None]] | None = None,
     ) -> None:
         try:
-            await self.commit_settings_and_invalidate_cache(user_settings, db, user_id)
+            await self.save_settings(user_settings, db, user_id)
         except Exception as exc:
             if rollback_side_effect is not None:
                 await rollback_side_effect()
@@ -199,22 +199,3 @@ class UserService(BaseDbService[UserSettings]):
             )
             result = await db.execute(query)
             return result.scalar() or 0
-
-    async def get_remaining_messages(self, user_id: UUID) -> int:
-        async with self.session_factory() as db:
-            user_result = await db.execute(
-                select(User.daily_message_limit).where(User.id == user_id)
-            )
-            daily_limit: int | None = user_result.scalar_one_or_none()
-            if daily_limit is None:
-                return -1
-
-            if daily_limit <= 0:
-                return 0
-
-            used_messages = await self.get_user_daily_message_count(user_id)
-            return max(0, daily_limit - used_messages)
-
-    async def check_message_limit(self, user_id: UUID) -> bool:
-        remaining = await self.get_remaining_messages(user_id)
-        return remaining == -1 or remaining > 0

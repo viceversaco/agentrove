@@ -16,7 +16,8 @@ from app.models.db_models import (
     MessageRole,
     MessageStreamStatus,
 )
-from app.models.schemas import CursorPaginatedMessages
+from app.models.schemas import CursorPaginatedResponse
+from app.models.schemas.chat import Message as MessageSchema
 from app.models.types import MessageAttachmentDict
 from app.services.db import BaseDbService, SessionFactoryType
 from app.services.exceptions import MessageException, ErrorCode
@@ -288,7 +289,7 @@ class MessageService(BaseDbService[Message]):
 
     async def get_chat_messages(
         self, chat_id: UUID, cursor: str | None = None, limit: int = 20
-    ) -> CursorPaginatedMessages:
+    ) -> CursorPaginatedResponse[MessageSchema]:
         async with self.session_factory() as db:
             query = (
                 select(Message)
@@ -325,7 +326,7 @@ class MessageService(BaseDbService[Message]):
                 last = items[-1]
                 next_cursor = Cursor.encode(last.created_at, last.id)
 
-            return CursorPaginatedMessages(
+            return CursorPaginatedResponse[MessageSchema](
                 items=items,
                 next_cursor=next_cursor,
                 has_more=has_more,

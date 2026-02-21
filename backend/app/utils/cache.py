@@ -11,12 +11,13 @@ from app.core.config import get_settings
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
+_RedisError: type[Exception]
 try:
-    from redis.exceptions import RedisError as CacheError
+    from redis.exceptions import RedisError as _RedisError
 except ModuleNotFoundError:
+    _RedisError = OSError
 
-    class CacheError(OSError):  # type: ignore[no-redef]  # mypy can't resolve conditional try/except class definitions
-        pass
+CacheError = _RedisError
 
 
 class CachePubSub(Protocol):

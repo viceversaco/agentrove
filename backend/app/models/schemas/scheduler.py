@@ -4,7 +4,6 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from app.models.db_models import RecurrenceType, TaskExecutionStatus, TaskStatus
-from app.models.schemas.pagination import PaginatedResponse
 
 
 TIME_PATTERN = r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$"
@@ -59,10 +58,6 @@ class TaskExecutionResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-class PaginatedTaskExecutions(PaginatedResponse[TaskExecutionResponse]):
-    pass
 
 
 class TaskToggleResponse(BaseModel):

@@ -2,13 +2,15 @@ import asyncio
 import logging
 import shlex
 from dataclasses import dataclass
+from functools import partial
 from typing import Any, Callable
 
 from fastapi import WebSocket
 
 from app.constants import PTY_INPUT_QUEUE_SIZE
 from app.services.sandbox import SandboxService
-from app.services.sandbox_providers import SandboxProviderType, create_sandbox_provider
+from app.services.sandbox_providers import SandboxProviderType
+from app.services.sandbox_providers.factory import SandboxProviderFactory
 from app.utils.queue import drain_queue, put_with_overflow
 
 logger = logging.getLogger(__name__)
@@ -177,7 +179,7 @@ class TerminalSessionRegistry:
             if existing:
                 return existing
 
-            provider = create_sandbox_provider(provider_type, api_key)
+            provider = SandboxProviderFactory.create(provider_type, api_key)
             service = SandboxService(provider)
 
             record = TerminalSessionRecord(
@@ -185,7 +187,7 @@ class TerminalSessionRegistry:
                 sandbox_id=sandbox_id,
                 terminal_id=terminal_id,
                 sandbox_service=service,
-                on_close=lambda: self._remove(key),
+                on_close=partial(self._remove, key),
             )
             self._sessions[key] = record
             return record

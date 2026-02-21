@@ -147,12 +147,9 @@ async def get_user_usage(
     user_service: UserService = Depends(get_user_service),
 ) -> UserUsage:
     messages_used = await user_service.get_user_daily_message_count(current_user.id)
-    messages_remaining = await user_service.get_remaining_messages(current_user.id)
 
     return UserUsage(
         messages_used_today=messages_used,
-        daily_message_limit=current_user.daily_message_limit,
-        messages_remaining=messages_remaining,
     )
 
 

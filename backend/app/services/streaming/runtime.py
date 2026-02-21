@@ -128,7 +128,6 @@ class SessionUpdateCallback:
 
 
 class ChatStreamRuntime:
-    _background_tasks: set[asyncio.Task[str]] = set()
     _background_task_chat_ids: dict[asyncio.Task[str], str] = {}
 
     def __init__(
@@ -715,11 +714,13 @@ class ChatStreamRuntime:
 
     @classmethod
     async def stop_background_chats(cls) -> None:
-        if not cls._background_tasks:
+        if not cls._background_task_chat_ids:
             return
 
         timeout = max(settings.BACKGROUND_CHAT_SHUTDOWN_TIMEOUT_SECONDS, 0.0)
-        running_tasks = [task for task in cls._background_tasks if not task.done()]
+        running_tasks = [
+            task for task in cls._background_task_chat_ids if not task.done()
+        ]
 
         if not running_tasks:
             return
@@ -744,9 +745,6 @@ class ChatStreamRuntime:
 
     @classmethod
     def _prune_done_tasks(cls) -> None:
-        cls._background_tasks = {
-            task for task in cls._background_tasks if not task.done()
-        }
         finished_tasks = [
             task for task in list(cls._background_task_chat_ids) if task.done()
         ]
@@ -789,7 +787,6 @@ class ChatStreamRuntime:
                     exc_info=error,
                 )
         finally:
-            cls._background_tasks.discard(task)
             cls._background_task_chat_ids.pop(task, None)
 
     @classmethod
@@ -804,7 +801,6 @@ class ChatStreamRuntime:
                 request=request,
             )
         )
-        cls._background_tasks.add(background_task)
         cls._background_task_chat_ids[background_task] = chat_id
         background_task.add_done_callback(
             partial(cls._on_background_task_done, resolved_task_id)

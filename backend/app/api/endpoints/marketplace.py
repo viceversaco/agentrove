@@ -181,9 +181,7 @@ async def install_plugin_components(
         flag_modified(user_settings, "custom_mcps")
         flag_modified(user_settings, "installed_plugins")
 
-        await user_service.commit_settings_and_invalidate_cache(
-            user_settings, db, current_user.id
-        )
+        await user_service.save_settings(user_settings, db, current_user.id)
 
     return InstallResponse(
         plugin_name=request.plugin_name,
@@ -365,9 +363,7 @@ async def uninstall_plugin_components(
         flag_modified(user_settings, "custom_mcps")
         flag_modified(user_settings, "installed_plugins")
 
-        await user_service.commit_settings_and_invalidate_cache(
-            user_settings, db, current_user.id
-        )
+        await user_service.save_settings(user_settings, db, current_user.id)
 
     return UninstallResponse(
         plugin_name=request.plugin_name,
