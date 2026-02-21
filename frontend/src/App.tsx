@@ -13,6 +13,7 @@ import { authService } from '@/services/authService';
 import { toasterConfig } from '@/config/toaster';
 import { AuthRoute } from '@/components/routes/AuthRoute';
 import { API_BASE_URL } from '@/lib/api';
+import { isTauri } from '@tauri-apps/api/core';
 import { check } from '@tauri-apps/plugin-updater';
 import { authStorage } from '@/utils/storage';
 
@@ -34,9 +35,6 @@ const ResetPasswordPage = lazy(() =>
   import('@/pages/ResetPasswordPage').then((m) => ({ default: m.ResetPasswordPage })),
 );
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
-
-const isTauriRuntime = (): boolean =>
-  typeof window !== 'undefined' && ('__TAURI__' in window || window.location.protocol === 'tauri:');
 
 async function checkDesktopUpdate(): Promise<void> {
   const update = await check();
@@ -210,7 +208,7 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
-    if (!isTauriRuntime()) return;
+    if (!isTauri()) return;
 
     let interval: number | undefined;
     let cancelled = false;
@@ -242,7 +240,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (import.meta.env.DEV || !isTauriRuntime()) return;
+    if (import.meta.env.DEV || !isTauri()) return;
 
     checkDesktopUpdate().catch((error) => {
       console.error('Desktop updater check failed:', error);

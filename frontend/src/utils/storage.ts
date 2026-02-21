@@ -1,4 +1,5 @@
 import { logger } from '@/utils/logger';
+import { isTauri } from '@tauri-apps/api/core';
 
 const AUTH_TOKEN_KEY = 'auth_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
@@ -26,9 +27,6 @@ const getStorage = (): Storage | null => {
     return null;
   }
 };
-
-const isTauriRuntime = (): boolean =>
-  typeof window !== 'undefined' && ('__TAURI__' in window || window.location.protocol === 'tauri:');
 
 export const safeGetItem = (key: string): string | null => {
   const storageInstance = getStorage();
@@ -73,7 +71,7 @@ const safeRemoveItem = (key: string): void => {
 let desktopStorePromise: Promise<AuthStoreBackend | null> | null = null;
 
 async function getDesktopAuthStore(): Promise<AuthStoreBackend | null> {
-  if (!isTauriRuntime()) {
+  if (!isTauri()) {
     return null;
   }
   if (desktopStorePromise) {
@@ -142,7 +140,7 @@ export const authStorage = {
       return;
     }
 
-    if (!isTauriRuntime()) {
+    if (!isTauri()) {
       initTokenCacheFromLocalStorage();
       return;
     }
@@ -163,7 +161,7 @@ export const authStorage = {
     tokenCacheInitialized = true;
   },
   getToken: (): string | null => {
-    if (!tokenCacheInitialized && !isTauriRuntime()) {
+    if (!tokenCacheInitialized && !isTauri()) {
       initTokenCacheFromLocalStorage();
     }
     return cachedToken;
@@ -172,7 +170,7 @@ export const authStorage = {
     cachedToken = token;
     tokenCacheInitialized = true;
 
-    if (isTauriRuntime()) {
+    if (isTauri()) {
       void persistDesktopAuthState();
       safeRemoveItem(AUTH_TOKEN_KEY);
       return;
@@ -181,7 +179,7 @@ export const authStorage = {
     safeSetItem(AUTH_TOKEN_KEY, token);
   },
   getRefreshToken: (): string | null => {
-    if (!tokenCacheInitialized && !isTauriRuntime()) {
+    if (!tokenCacheInitialized && !isTauri()) {
       initTokenCacheFromLocalStorage();
     }
     return cachedRefreshToken;
@@ -190,7 +188,7 @@ export const authStorage = {
     cachedRefreshToken = token;
     tokenCacheInitialized = true;
 
-    if (isTauriRuntime()) {
+    if (isTauri()) {
       void persistDesktopAuthState();
       safeRemoveItem(REFRESH_TOKEN_KEY);
       return;
@@ -202,7 +200,7 @@ export const authStorage = {
     cachedRefreshToken = null;
     tokenCacheInitialized = true;
 
-    if (isTauriRuntime()) {
+    if (isTauri()) {
       void persistDesktopAuthState();
       safeRemoveItem(REFRESH_TOKEN_KEY);
       return;
@@ -215,7 +213,7 @@ export const authStorage = {
     cachedRefreshToken = null;
     tokenCacheInitialized = true;
 
-    if (isTauriRuntime()) {
+    if (isTauri()) {
       void persistDesktopAuthState();
       safeRemoveItem(AUTH_TOKEN_KEY);
       safeRemoveItem(REFRESH_TOKEN_KEY);
