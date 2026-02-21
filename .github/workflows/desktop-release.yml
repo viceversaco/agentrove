@@ -38,6 +38,7 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           cd frontend/src-tauri
           jq --arg v "$VERSION" '.version = $v' tauri.conf.json > tmp.json && mv tmp.json tauri.conf.json
+          sed -i '' "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
 
       - name: Build Tauri bundles
         run: |
