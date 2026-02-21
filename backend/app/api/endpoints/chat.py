@@ -33,13 +33,14 @@ from app.models.schemas import (
     ChatUpdate,
     ChatRequest,
     ContextUsage,
-    CursorPaginatedMessages,
+    CursorPaginatedResponse,
     CursorPaginationParams,
     EnhancePromptResponse,
     ForkChatRequest,
     ForkChatResponse,
+    Message as MessageSchema,
     MessageEvent,
-    PaginatedChats,
+    PaginatedResponse,
     PaginationParams,
     PermissionRespondResponse,
     QueueAddResponse,
@@ -179,12 +180,12 @@ async def enhance_prompt(
         )
 
 
-@router.get("/chats", response_model=PaginatedChats)
+@router.get("/chats", response_model=PaginatedResponse[ChatSchema])
 async def get_chats(
     pagination: PaginationParams = Depends(),
     current_user: User = Depends(get_current_user),
     chat_service: ChatService = Depends(get_chat_service),
-) -> PaginatedChats:
+) -> PaginatedResponse[ChatSchema]:
     return await chat_service.get_user_chats(current_user, pagination)
 
 
@@ -284,13 +285,15 @@ async def delete_chat(
     await chat_service.delete_chat(chat_id, current_user)
 
 
-@router.get("/chats/{chat_id}/messages", response_model=CursorPaginatedMessages)
+@router.get(
+    "/chats/{chat_id}/messages", response_model=CursorPaginatedResponse[MessageSchema]
+)
 async def get_chat_messages(
     chat_id: UUID,
     pagination: CursorPaginationParams = Depends(),
     current_user: User = Depends(get_current_user),
     chat_service: ChatService = Depends(get_chat_service),
-) -> CursorPaginatedMessages:
+) -> CursorPaginatedResponse[MessageSchema]:
     return await chat_service.get_chat_messages(
         chat_id, current_user, pagination.cursor, pagination.limit
     )
@@ -590,18 +593,18 @@ async def update_queued_message(
             result = await queue_service.update_message(
                 str(chat_id), str(message_id), update.content
             )
-            if result is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Queued message not found",
-                )
-            return result
     except CacheError as e:
         logger.error("Redis error updating queued message: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Service temporarily unavailable",
         )
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Queued message not found",
+        )
+    return result
 
 
 @router.delete(
@@ -620,16 +623,16 @@ async def delete_queued_message(
         async with cache_connection() as cache:
             queue_service = QueueService(cache)
             found = await queue_service.delete_message(str(chat_id), str(message_id))
-            if not found:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Queued message not found",
-                )
     except CacheError as e:
         logger.error("Redis error deleting queued message: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Service temporarily unavailable",
+        )
+    if not found:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Queued message not found",
         )
 
 
@@ -649,16 +652,16 @@ async def send_now_queued_message(
         async with cache_connection() as cache:
             queue_service = QueueService(cache)
             found = await queue_service.mark_send_now(str(chat_id), str(message_id))
-            if not found:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Queued message not found",
-                )
     except CacheError as e:
         logger.error("Redis error marking send-now: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Service temporarily unavailable",
+        )
+    if not found:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Queued message not found",
         )
 
     if not ChatStreamRuntime.is_chat_streaming(str(chat_id)):
@@ -666,6 +669,8 @@ async def send_now_queued_message(
             await ChatStreamRuntime.process_send_now_idle(
                 str(chat_id), chat_service.session_factory
             )
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             logger.error("Failed to start idle send-now for chat %s: %s", chat_id, e)
             raise HTTPException(

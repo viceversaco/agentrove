@@ -51,7 +51,7 @@ async def upload_command(
     flag_modified(user_settings, "custom_slash_commands")
 
     try:
-        await user_service.commit_settings_with_cleanup(
+        await user_service.save_settings_or_rollback(
             user_settings,
             db,
             current_user.id,
@@ -114,7 +114,7 @@ async def update_command(
     flag_modified(user_settings, "custom_slash_commands")
 
     try:
-        await user_service.commit_settings_with_cleanup(
+        await user_service.save_settings_or_rollback(
             user_settings,
             db,
             current_user.id,
@@ -168,7 +168,7 @@ async def delete_command(
         flag_modified(user_settings, "installed_plugins")
 
     try:
-        await user_service.commit_settings_with_cleanup(
+        await user_service.save_settings_or_rollback(
             user_settings,
             db,
             current_user.id,

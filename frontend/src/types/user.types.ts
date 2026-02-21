@@ -4,13 +4,10 @@ export interface User {
   username: string;
   is_verified: boolean;
   email_verification_required: boolean;
-  daily_message_limit: number | null;
 }
 
 export interface UserUsage {
   messages_used_today: number;
-  daily_message_limit: number | null;
-  messages_remaining: number;
 }
 
 export interface AuthResponse {

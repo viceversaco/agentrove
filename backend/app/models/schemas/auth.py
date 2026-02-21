@@ -8,11 +8,8 @@ from app.core.config import get_settings
 
 class UserRead(schemas.BaseUser[UUID]):
     username: str
-    daily_message_limit: int | None
 
-    # mypy does not support stacking decorators on @property (prop-decorator)
-    @computed_field  # type: ignore[prop-decorator]
-    @property
+    @computed_field
     def email_verification_required(self) -> bool:
         return get_settings().REQUIRE_EMAIL_VERIFICATION
 
@@ -47,7 +44,6 @@ class UserBase(BaseModel):
 class UserOut(UserBase):
     id: UUID
     is_verified: bool
-    daily_message_limit: int | None
 
     class Config:
         from_attributes = True
@@ -73,5 +69,3 @@ class LogoutRequest(BaseModel):
 
 class UserUsage(BaseModel):
     messages_used_today: int
-    daily_message_limit: int | None
-    messages_remaining: int

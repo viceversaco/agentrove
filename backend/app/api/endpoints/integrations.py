@@ -1,8 +1,7 @@
-import json
 import html
+import json
 import logging
 from datetime import datetime, timedelta, timezone
-
 from typing import Any
 from urllib.parse import urlparse
 
@@ -65,9 +64,7 @@ async def upload_oauth_client(
     flag_modified(user_settings, "gmail_oauth_client")
     flag_modified(user_settings, "gmail_oauth_tokens")
 
-    await user_service.commit_settings_and_invalidate_cache(
-        user_settings, db, current_user.id
-    )
+    await user_service.save_settings(user_settings, db, current_user.id)
 
     return OAuthClientResponse(success=True, message="OAuth client configuration saved")
 
@@ -90,9 +87,7 @@ async def delete_oauth_client(
     flag_modified(user_settings, "gmail_oauth_client")
     flag_modified(user_settings, "gmail_oauth_tokens")
 
-    await user_service.commit_settings_and_invalidate_cache(
-        user_settings, db, current_user.id
-    )
+    await user_service.save_settings(user_settings, db, current_user.id)
 
     return OAuthClientResponse(
         success=True, message="OAuth client configuration removed"
@@ -123,6 +118,52 @@ async def get_oauth_url(
     url = GmailOAuthService.build_authorization_url(client_id, state)
 
     return OAuthUrlResponse(url=url)
+
+
+def _callback_html(error: str | None, email: str | None = None) -> str:
+    frontend_origin = settings.FRONTEND_URL.strip()
+    parsed_origin = urlparse(frontend_origin)
+    safe_origin = ""
+    if parsed_origin.scheme in {"http", "https"} and parsed_origin.netloc:
+        safe_origin = f"{parsed_origin.scheme}://{parsed_origin.netloc}"
+
+    escaped_error = html.escape(error) if error else None
+    escaped_email = html.escape(email) if email else None
+    origin_js = json.dumps(safe_origin)
+
+    if error:
+        return f"""
+<!DOCTYPE html>
+<html>
+<head><title>Gmail Connection Failed</title></head>
+<body style="font-family: system-ui; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #1a1a1a; color: #fff;">
+    <div style="text-align: center;">
+        <h2 style="color: #ef4444;">Connection Failed</h2>
+        <p>{escaped_error}</p>
+        <p style="color: #888;">You can close this window.</p>
+    </div>
+    <script>setTimeout(() => window.close(), 3000);</script>
+</body>
+</html>
+"""
+    return f"""
+<!DOCTYPE html>
+<html>
+<head><title>Gmail Connected</title></head>
+<body style="font-family: system-ui; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #1a1a1a; color: #fff;">
+    <div style="text-align: center;">
+        <h2 style="color: #22c55e;">Gmail Connected</h2>
+        <p>Successfully connected{f" as {escaped_email}" if escaped_email else ""}.</p>
+        <p style="color: #888;">This window will close automatically.</p>
+    </div>
+    <script>
+        const targetOrigin = {origin_js};
+        if (window.opener && targetOrigin) window.opener.postMessage('gmail-connected', targetOrigin);
+        setTimeout(() => window.close(), 2000);
+    </script>
+</body>
+</html>
+"""
 
 
 @router.get("/gmail/callback", response_class=HTMLResponse)
@@ -183,7 +224,7 @@ async def oauth_callback(
     user_settings.gmail_email = email
     flag_modified(user_settings, "gmail_oauth_tokens")
 
-    await user_service.commit_settings_and_invalidate_cache(user_settings, db, user_id)
+    await user_service.save_settings(user_settings, db, user_id)
 
     return HTMLResponse(content=_callback_html(None, email))
 
@@ -228,9 +269,7 @@ async def disconnect_gmail(
     user_settings.gmail_email = None
     flag_modified(user_settings, "gmail_oauth_tokens")
 
-    await user_service.commit_settings_and_invalidate_cache(
-        user_settings, db, current_user.id
-    )
+    await user_service.save_settings(user_settings, db, current_user.id)
 
     return OAuthClientResponse(success=True, message="Gmail disconnected")
 
@@ -347,49 +386,3 @@ async def poll_openai_token(
         status_code=400,
         detail=f"OpenAI authorization failed (status {status_code})",
     )
-
-
-def _callback_html(error: str | None, email: str | None = None) -> str:
-    frontend_origin = settings.FRONTEND_URL.strip()
-    parsed_origin = urlparse(frontend_origin)
-    safe_origin = ""
-    if parsed_origin.scheme in {"http", "https"} and parsed_origin.netloc:
-        safe_origin = f"{parsed_origin.scheme}://{parsed_origin.netloc}"
-
-    escaped_error = html.escape(error) if error else None
-    escaped_email = html.escape(email) if email else None
-    origin_js = json.dumps(safe_origin)
-
-    if error:
-        return f"""
-<!DOCTYPE html>
-<html>
-<head><title>Gmail Connection Failed</title></head>
-<body style="font-family: system-ui; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #1a1a1a; color: #fff;">
-    <div style="text-align: center;">
-        <h2 style="color: #ef4444;">Connection Failed</h2>
-        <p>{escaped_error}</p>
-        <p style="color: #888;">You can close this window.</p>
-    </div>
-    <script>setTimeout(() => window.close(), 3000);</script>
-</body>
-</html>
-"""
-    return f"""
-<!DOCTYPE html>
-<html>
-<head><title>Gmail Connected</title></head>
-<body style="font-family: system-ui; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #1a1a1a; color: #fff;">
-    <div style="text-align: center;">
-        <h2 style="color: #22c55e;">Gmail Connected</h2>
-        <p>Successfully connected{f" as {escaped_email}" if escaped_email else ""}.</p>
-        <p style="color: #888;">This window will close automatically.</p>
-    </div>
-    <script>
-        const targetOrigin = {origin_js};
-        if (window.opener && targetOrigin) window.opener.postMessage('gmail-connected', targetOrigin);
-        setTimeout(() => window.close(), 2000);
-    </script>
-</body>
-</html>
-"""

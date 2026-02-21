@@ -1,6 +1,5 @@
 from typing import Final
 
-# Resource limits
 MAX_RESOURCE_NAME_LENGTH: Final[int] = 50
 MIN_RESOURCE_NAME_LENGTH: Final[int] = 2
 MAX_RESOURCES_PER_USER: Final[int] = 10
@@ -172,7 +171,6 @@ SANDBOX_BINARY_EXTENSIONS: Final[set[str]] = {
     "pyd",
 }
 
-# Sandbox paths
 SANDBOX_HOME_DIR: Final[str] = "/home/user"
 SANDBOX_CLAUDE_DIR: Final[str] = "/home/user/.claude"
 SANDBOX_CLAUDE_JSON_PATH: Final[str] = "/home/user/.claude.json"
@@ -183,7 +181,6 @@ SANDBOX_IDE_SETTINGS_PATH: Final[str] = (
 )
 SANDBOX_IDE_TOKEN_PATH: Final[str] = "/home/user/.ide_connection_token"
 
-# WebSocket message types
 WS_MSG_AUTH: Final[str] = "auth"
 WS_MSG_INIT: Final[str] = "init"
 WS_MSG_RESIZE: Final[str] = "resize"
@@ -191,24 +188,18 @@ WS_MSG_CLOSE: Final[str] = "close"
 WS_MSG_PING: Final[str] = "ping"
 WS_MSG_DETACH: Final[str] = "detach"
 
-# WebSocket close codes
 WS_CLOSE_AUTH_FAILED: Final[int] = 4001
 WS_CLOSE_API_KEY_REQUIRED: Final[int] = 4003
 WS_CLOSE_SANDBOX_NOT_FOUND: Final[int] = 4004
 
-# Anthropic bridge
 ANTHROPIC_BRIDGE_PORT: Final[int] = 3456
 ANTHROPIC_BRIDGE_HOST: Final[str] = "0.0.0.0"
 
-# Terminal
 TERMINAL_TYPE: Final[str] = "xterm-256color"
 DEFAULT_PTY_ROWS: Final[int] = 24
 DEFAULT_PTY_COLS: Final[int] = 80
-# Docker container status
 DOCKER_STATUS_RUNNING: Final[str] = "running"
 
-# Additional sandbox paths
 SANDBOX_BASHRC_PATH: Final[str] = "/home/user/.bashrc"
 
-# Stream status
 STREAM_STATUS_CANCELLED: Final[str] = "cancelled"

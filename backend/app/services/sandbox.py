@@ -9,6 +9,7 @@ import secrets
 import shlex
 import uuid
 import zipfile
+from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Coroutine
 
@@ -40,11 +41,12 @@ from app.services.exceptions import SandboxException, UserException
 from app.services.sandbox_providers import (
     PtySize,
     SandboxProvider,
-    create_sandbox_provider,
 )
+from app.services.sandbox_providers.factory import SandboxProviderFactory
 from app.services.sandbox_providers.types import CommandResult
 from app.services.sandbox_providers.types import SandboxProviderType
 from app.services.skill import SkillService
+from app.services.user import UserService
 from app.utils.queue import drain_queue, put_with_overflow
 
 logger = logging.getLogger(__name__)
@@ -101,8 +103,6 @@ class SandboxService:
         user_id: uuid.UUID,
         session_factory: SessionFactoryType,
     ) -> SandboxService:
-        from app.services.user import UserService
-
         user_service = UserService(session_factory=session_factory)
         async with session_factory() as db:
             try:
@@ -119,7 +119,7 @@ class SandboxService:
                 key = user_settings.modal_api_key
                 api_key = key if isinstance(key, str) else None
 
-            provider = create_sandbox_provider(
+            provider = SandboxProviderFactory.create(
                 provider_type=provider_type,
                 api_key=api_key,
             )
@@ -249,7 +249,7 @@ class SandboxService:
             rows,
             cols,
             tmux_session,
-            on_data=lambda data: self._enqueue_pty_output(data, output_queue),
+            on_data=partial(self._enqueue_pty_output, output_queue=output_queue),
         )
 
         if sandbox_id not in self._active_pty_sessions:
@@ -456,7 +456,7 @@ class SandboxService:
         zip_buffer.seek(0)
         return zip_buffer.read()
 
-    async def _copy_all_resources_to_sandbox(
+    async def _deploy_resources(
         self,
         sandbox_id: str,
         user_id: str,
@@ -762,7 +762,7 @@ class SandboxService:
             ) and user_id
             if has_resources and user_id:
                 tasks.append(
-                    self._copy_all_resources_to_sandbox(
+                    self._deploy_resources(
                         sandbox_id,
                         user_id,
                         custom_skills,

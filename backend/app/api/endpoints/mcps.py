@@ -74,9 +74,7 @@ async def create_mcp(
     user_settings.custom_mcps = current_mcps
     flag_modified(user_settings, "custom_mcps")
 
-    await user_service.commit_settings_and_invalidate_cache(
-        user_settings, db, current_user.id
-    )
+    await user_service.save_settings(user_settings, db, current_user.id)
 
     return mcp_data
 
@@ -136,9 +134,7 @@ async def update_mcp(
     user_settings.custom_mcps = current_mcps
     flag_modified(user_settings, "custom_mcps")
 
-    await user_service.commit_settings_and_invalidate_cache(
-        user_settings, db, current_user.id
-    )
+    await user_service.save_settings(user_settings, db, current_user.id)
 
     return mcp
 
@@ -177,8 +173,6 @@ async def delete_mcp(
     if user_service.remove_installed_component(user_settings, f"mcp:{mcp_name}"):
         flag_modified(user_settings, "installed_plugins")
 
-    await user_service.commit_settings_and_invalidate_cache(
-        user_settings, db, current_user.id
-    )
+    await user_service.save_settings(user_settings, db, current_user.id)
 
     return McpDeleteResponse(status=DeleteResponseStatus.DELETED.value)

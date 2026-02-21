@@ -17,9 +17,6 @@ from app.models.db_models.enums import (
 )
 from markupsafe import Markup
 from app.core.security import get_password_hash
-from datetime import datetime, timezone
-from sqlalchemy import Select, select
-from sqlalchemy.orm import selectinload
 from starlette.requests import Request
 
 
@@ -36,42 +33,11 @@ class EnumCoercer:
         return str(value)
 
 
-def _calculate_remaining_messages(user: User) -> str | int:
-    if user.daily_message_limit is None:
-        return "Unlimited"
-
-    limit: int = user.daily_message_limit
-    if not hasattr(user, "chats"):
-        return limit
-
-    today_start = datetime.now(timezone.utc).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
-    today_end = datetime.now(timezone.utc).replace(
-        hour=23, minute=59, second=59, microsecond=999999
-    )
-
-    total_messages_today = 0
-    for chat in user.chats:
-        for message in chat.messages:
-            if (
-                message.created_at
-                and message.created_at >= today_start
-                and message.created_at <= today_end
-                and message.role.value == "user"
-            ):
-                total_messages_today += 1
-
-    return max(0, limit - total_messages_today)
-
-
 class UserAdmin(ModelView, model=User):
     column_list = [
         "id",
         "email",
         "is_superuser",
-        "daily_message_limit",
-        "remaining_messages_today",
         "created_at",
         "updated_at",
     ]
@@ -80,8 +46,6 @@ class UserAdmin(ModelView, model=User):
         "id",
         "email",
         "is_superuser",
-        "daily_message_limit",
-        "remaining_messages_today",
         "created_at",
         "updated_at",
     ]
@@ -94,10 +58,6 @@ class UserAdmin(ModelView, model=User):
         "updated_at": lambda m, _: (
             m.updated_at.strftime("%Y-%m-%d %H:%M:%S") if m.updated_at else ""
         ),
-        "daily_message_limit": lambda m, _: (
-            "Unlimited" if m.daily_message_limit is None else f"{m.daily_message_limit}"
-        ),
-        "remaining_messages_today": lambda m, _: f"{_calculate_remaining_messages(m)}",
     }
 
     form_excluded_columns = ["chats", "settings", "hashed_password"]
@@ -111,11 +71,6 @@ class UserAdmin(ModelView, model=User):
             data["hashed_password"] = get_password_hash(data["password"])
             del data["password"]
         await super().on_model_change(data, model, is_created, request)
-
-    def list_query(self, request: Request) -> Select[tuple[User]]:
-        return select(User).options(
-            selectinload(User.chats).selectinload(Chat.messages)
-        )
 
     name = "User"
     name_plural = "Users"

@@ -22,6 +22,7 @@ settings = get_settings()
 logger = logging.getLogger(__name__)
 
 
+# Named subclass required: exported as a stable public type and imported by auth.py for Depends injection.
 class UserDatabase(SQLAlchemyUserDatabase[User, uuid.UUID]):
     pass
 

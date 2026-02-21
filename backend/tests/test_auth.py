@@ -255,15 +255,7 @@ class TestUserUsage:
         assert response.status_code == 200
         data = response.json()
         assert "messages_used_today" in data
-        assert "daily_message_limit" in data
-        assert "messages_remaining" in data
         assert isinstance(data["messages_used_today"], int)
-        assert data["daily_message_limit"] is None or isinstance(
-            data["daily_message_limit"], int
-        )
-        assert data["messages_remaining"] is None or isinstance(
-            data["messages_remaining"], int
-        )
 
 
 class TestUnauthorizedAccess:
