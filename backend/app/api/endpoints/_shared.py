@@ -1,5 +1,5 @@
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, NoReturn
+from typing import Any, NoReturn, TypeVar
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -34,15 +34,16 @@ async def load_settings_list_or_404(
     return user_settings, list(items or [])
 
 
+NamedItemT = TypeVar("NamedItemT", bound=Mapping[str, object])
+
+
 def find_named_item_index(
     items: Sequence[Mapping[str, object]], name: str
 ) -> int | None:
     return next((i for i, item in enumerate(items) if item.get("name") == name), None)
 
 
-def append_named_item_if_missing(
-    items: list[dict[str, Any]], item: dict[str, Any]
-) -> None:
+def append_named_item_if_missing(items: list[NamedItemT], item: NamedItemT) -> None:
     if find_named_item_index(items, str(item.get("name"))) is None:
         items.append(item)
 

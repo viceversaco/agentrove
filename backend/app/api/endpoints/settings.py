@@ -1,3 +1,5 @@
+from typing import cast
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -53,4 +55,7 @@ async def update_user_settings(
         )
     async with cache_connection() as cache:
         await user_service.invalidate_settings_cache(cache, current_user.id)
-    return UserSettingsResponse.model_validate(user_settings)
+    response = cast(
+        UserSettingsResponse, UserSettingsResponse.model_validate(user_settings)
+    )
+    return response

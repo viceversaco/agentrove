@@ -81,7 +81,7 @@ async def _authenticate_user(
                 modal_api_key = None
                 sandbox_provider = SandboxProviderType.DOCKER.value
 
-        return user, e2b_api_key, modal_api_key, sandbox_provider
+        return AuthResult(user, e2b_api_key, modal_api_key, sandbox_provider)
     except Exception as e:
         logger.warning("WebSocket authentication failed: %s", e)
         return NO_AUTH_RESULT

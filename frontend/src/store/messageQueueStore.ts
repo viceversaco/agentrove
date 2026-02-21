@@ -201,7 +201,6 @@ export const useMessageQueueStore = create<MessageQueueState>((set, get) => ({
     try {
       await queueService.sendNow(chatId, messageId);
       clearTimeout(timeout);
-      resetSendingNow();
       return true;
     } catch (error) {
       console.error('Failed to send now:', error);

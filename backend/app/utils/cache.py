@@ -17,11 +17,6 @@ try:
 except ModuleNotFoundError:
     _RedisError = OSError
 
-try:
-    from redis.asyncio import Redis as RedisClient
-except ModuleNotFoundError:
-    RedisClient = None
-
 CacheError = _RedisError
 
 
@@ -172,11 +167,14 @@ async def cache_connection() -> AsyncIterator[CacheStore]:
     if settings.DESKTOP_MODE:
         yield MemoryStore.get_instance()
         return
-    if RedisClient is None:
+    try:
+        import redis.asyncio as redis_asyncio
+    except ModuleNotFoundError:
         raise CacheError("Redis client is not available")
 
     store = cast(
-        CacheStore, RedisClient.from_url(settings.REDIS_URL, decode_responses=True)
+        CacheStore,
+        redis_asyncio.Redis.from_url(settings.REDIS_URL, decode_responses=True),
     )
     try:
         yield store

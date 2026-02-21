@@ -88,7 +88,7 @@ class StorageService:
             try:
                 sandbox_file_path = f"/home/user/{unique_filename}"
                 await self.sandbox_service.provider.write_file(
-                    sandbox_id=sandbox_id, file_path=sandbox_file_path, content=contents
+                    sandbox_id=sandbox_id, path=sandbox_file_path, content=contents
                 )
 
             except Exception as e:

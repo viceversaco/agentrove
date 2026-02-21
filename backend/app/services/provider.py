@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from app.models.db_models.user import UserSettings
@@ -44,7 +44,7 @@ class ProviderService:
     ) -> dict[str, Any] | None:
         for provider in list(user_settings.custom_providers or []):
             if provider.get("id") == provider_id:
-                return provider
+                return cast(dict[str, Any], provider)
         return None
 
     def get_provider_for_model(

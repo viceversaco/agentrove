@@ -3,7 +3,7 @@ import json
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, Literal
+from typing import Any, Literal, NoReturn
 from uuid import UUID
 
 from fastapi import (
@@ -108,11 +108,11 @@ def _parse_non_negative_seq(value: str | None) -> int:
     return parsed if parsed >= 0 else 0
 
 
-def _raise_chat_http_exception(exc: ChatException) -> None:
+def _raise_chat_http_exception(exc: ChatException) -> NoReturn:
     raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
 
-def _raise_database_http_exception(exc: SQLAlchemyError, action: str) -> None:
+def _raise_database_http_exception(exc: SQLAlchemyError, action: str) -> NoReturn:
     logger.error("Database error %s: %s", action, exc, exc_info=True)
     raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -120,7 +120,7 @@ def _raise_database_http_exception(exc: SQLAlchemyError, action: str) -> None:
     ) from exc
 
 
-def _raise_cache_http_exception(exc: CacheError, action: str) -> None:
+def _raise_cache_http_exception(exc: Exception, action: str) -> NoReturn:
     logger.error("Redis error %s: %s", action, exc, exc_info=True)
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

@@ -716,10 +716,8 @@ class SandboxService:
             if custom_env_vars:
                 tasks.append(self._add_env_vars_parallel(sandbox_id, custom_env_vars))
 
-            has_resources = (
-                custom_skills or custom_slash_commands or custom_agents
-            ) and user_id
-            if has_resources:
+            has_resources = custom_skills or custom_slash_commands or custom_agents
+            if has_resources and user_id is not None:
                 tasks.append(
                     self._deploy_resources(
                         sandbox_id,
