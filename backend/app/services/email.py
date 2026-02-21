@@ -35,9 +35,6 @@ class EmailService:
         self.template_env = Environment(loader=FileSystemLoader(str(template_dir)))
 
     async def fetch_disposable_domains(self) -> set[str]:
-        # Cached fetch with graceful degradation: returns fresh data if cache expired,
-        # otherwise returns cached data. On network failure, returns stale cache rather
-        # than failing, ensuring email validation continues working during outages.
         now = datetime.now(timezone.utc)
         if (
             EmailService._disposable_domains_cache
@@ -61,8 +58,8 @@ class EmailService:
                     EmailService._disposable_domains_cache = domains
                     EmailService._disposable_domains_cache_time = now
                     return domains
-        except Exception:
-            pass
+        except httpx.HTTPError as exc:
+            logger.warning("Failed to fetch disposable domains list: %s", exc)
 
         if EmailService._disposable_domains_cache:
             return EmailService._disposable_domains_cache
@@ -77,12 +74,10 @@ class EmailService:
 
     async def is_disposable_email(self, email: str) -> bool:
         disposable_domains = await self.fetch_disposable_domains()
-
-        try:
-            domain = email.lower().split("@")[1]
-            return domain in disposable_domains
-        except (IndexError, AttributeError):
+        local_part, separator, domain = email.lower().rpartition("@")
+        if not separator or not local_part or not domain:
             return False
+        return domain in disposable_domains
 
     def generate_verification_data(self) -> tuple[str, datetime]:
         token = secrets.token_urlsafe(32)
@@ -111,7 +106,7 @@ class EmailService:
                 use_tls=self.use_ssl,
             )
             return True
-        except Exception:
+        except (aiosmtplib.SMTPException, OSError):
             return False
 
     async def send_verification_email(

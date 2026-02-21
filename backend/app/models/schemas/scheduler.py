@@ -1,9 +1,9 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.db_models import RecurrenceType, TaskExecutionStatus, TaskStatus
+from app.models.db_models.enums import RecurrenceType, TaskExecutionStatus, TaskStatus
 
 
 TIME_PATTERN = r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$"
@@ -29,6 +29,8 @@ class ScheduledTaskUpdate(BaseModel):
 
 
 class ScheduledTaskResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     user_id: UUID
     task_name: str
@@ -42,11 +44,10 @@ class ScheduledTaskResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
-
 
 class TaskExecutionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     task_id: UUID
     executed_at: datetime
@@ -55,9 +56,6 @@ class TaskExecutionResponse(BaseModel):
     chat_id: UUID | None
     error_message: str | None
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class TaskToggleResponse(BaseModel):

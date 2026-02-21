@@ -4,7 +4,7 @@ import io
 
 from httpx import AsyncClient
 
-from app.models.db_models import User
+from app.models.db_models.user import User
 
 
 class TestUploadCommand:

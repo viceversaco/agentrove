@@ -5,7 +5,7 @@ from urllib.parse import urlencode, urlparse
 from uuid import UUID
 
 import httpx
-from jose import jwt
+from jose import JWTError, jwt
 
 from app.core.config import get_settings
 
@@ -112,7 +112,7 @@ class GmailOAuthService:
             if not user_id_str:
                 return None
             return UUID(user_id_str)
-        except Exception as e:
+        except (JWTError, ValueError) as e:
             logger.warning("OAuth state verification failed: %s", e)
             return None
 

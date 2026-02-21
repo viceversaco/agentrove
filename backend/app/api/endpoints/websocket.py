@@ -2,6 +2,7 @@ import asyncio
 import errno
 import json
 import logging
+from typing import NamedTuple
 
 from fastapi import APIRouter, WebSocket
 from sqlalchemy import select
@@ -23,17 +24,29 @@ from app.constants import (
 from app.core.config import get_settings
 from app.core.security import get_user_from_token
 from app.db.session import SessionLocal
-from app.models.db_models import Chat, User
+from app.models.db_models.chat import Chat
+from app.models.db_models.user import User
 from app.services.exceptions import UserException
 from app.services.sandbox_providers import (
     SandboxProviderType,
 )
+from app.services.sandbox_providers.factory import SandboxProviderFactory
 from app.services.terminal import terminal_session_registry
 from app.services.user import UserService
 
 settings = get_settings()
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+class AuthResult(NamedTuple):
+    user: User | None
+    e2b_api_key: str | None
+    modal_api_key: str | None
+    sandbox_provider: str
+
+
+NO_AUTH_RESULT = AuthResult(None, None, None, SandboxProviderType.DOCKER.value)
 
 
 def _parse_dimension(
@@ -50,12 +63,12 @@ def _parse_dimension(
 
 async def _authenticate_user(
     token: str,
-) -> tuple[User | None, str | None, str | None, str]:
+) -> AuthResult:
     try:
         async with SessionLocal() as db:
             user = await get_user_from_token(token, db)
             if not user:
-                return None, None, None, SandboxProviderType.DOCKER.value
+                return NO_AUTH_RESULT
 
             user_service = UserService(session_factory=SessionLocal)
             try:
@@ -71,26 +84,23 @@ async def _authenticate_user(
         return user, e2b_api_key, modal_api_key, sandbox_provider
     except Exception as e:
         logger.warning("WebSocket authentication failed: %s", e)
-        return None, None, None, SandboxProviderType.DOCKER.value
+        return NO_AUTH_RESULT
 
 
-async def _wait_for_auth(
-    websocket: WebSocket, timeout: float = 10.0
-) -> tuple[User | None, str | None, str | None, str]:
-    no_user = (None, None, None, SandboxProviderType.DOCKER.value)
+async def _wait_for_auth(websocket: WebSocket, timeout: float = 10.0) -> AuthResult:
 
     try:
         message = await asyncio.wait_for(websocket.receive(), timeout=timeout)
         data = json.loads(message["text"])
     except (asyncio.TimeoutError, json.JSONDecodeError, KeyError):
-        return no_user
+        return NO_AUTH_RESULT
 
     if not isinstance(data, dict) or data.get("type") != WS_MSG_AUTH:
-        return no_user
+        return NO_AUTH_RESULT
 
     token = data.get("token")
     if not isinstance(token, str) or not token:
-        return no_user
+        return NO_AUTH_RESULT
 
     return await _authenticate_user(token)
 
@@ -145,11 +155,11 @@ async def terminal_websocket(
         )
         return
 
-    api_key = None
-    if provider_type == SandboxProviderType.E2B:
-        api_key = e2b_api_key
-    elif provider_type == SandboxProviderType.MODAL:
-        api_key = modal_api_key
+    api_key = SandboxProviderFactory.resolve_api_key(
+        provider_type=provider_type,
+        e2b_api_key=e2b_api_key,
+        modal_api_key=modal_api_key,
+    )
 
     terminal_id = websocket.query_params.get("terminalId") or "terminal-1"
     session = await terminal_session_registry.get_or_create(
@@ -175,12 +185,8 @@ async def terminal_websocket(
             if "text" not in message:
                 continue
 
-            text_payload = message["text"]
-            if not isinstance(text_payload, str):
-                continue
-
             try:
-                data = json.loads(text_payload)
+                data = json.loads(message["text"])
             except json.JSONDecodeError:
                 continue
 
@@ -188,7 +194,7 @@ async def terminal_websocket(
                 continue
 
             data_type = data.get("type")
-            if not isinstance(data_type, str):
+            if not data_type:
                 continue
 
             if data_type == WS_MSG_INIT:
@@ -243,8 +249,6 @@ async def terminal_websocket(
                 break
     except WebSocketDisconnect:
         await session.detach()
-    except Exception as e:
-        logger.error("Error in terminal websocket: %s", e, exc_info=True)
     finally:
         if session.active_websocket is websocket and session.pty_id:
             await session.detach()

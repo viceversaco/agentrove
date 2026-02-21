@@ -7,7 +7,8 @@ from httpx import AsyncClient
 from redis.asyncio import Redis
 
 from app.core.security import create_chat_scoped_token
-from app.models.db_models import Chat, User
+from app.models.db_models.chat import Chat
+from app.models.db_models.user import User
 from app.services.permission_manager import PermissionManager
 from app.services.sandbox import SandboxService
 

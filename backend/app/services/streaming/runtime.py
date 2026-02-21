@@ -10,6 +10,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.constants import (
     REDIS_KEY_CHAT_CONTEXT_USAGE,
@@ -19,15 +20,11 @@ from claude_agent_sdk import ClaudeSDKClient
 
 from app.services.transports import SandboxTransport
 from app.core.config import get_settings
-from app.utils.cache import CacheStore, cache_connection
+from app.utils.cache import CacheError, CacheStore, cache_connection
 from app.db.session import SessionLocal
-from app.models.db_models import (
-    Chat,
-    Message,
-    MessageRole,
-    MessageStreamStatus,
-    User,
-)
+from app.models.db_models.chat import Chat, Message
+from app.models.db_models.enums import MessageRole, MessageStreamStatus
+from app.models.db_models.user import User, UserSettings
 from app.prompts.system_prompt import build_system_prompt_for_chat
 from claude_agent_sdk import CLIConnectionError, CLIJSONDecodeError
 from app.services.claude_agent import (
@@ -123,7 +120,7 @@ class SessionUpdateCallback:
                         db.add(message)
 
                 await db.commit()
-        except Exception as exc:
+        except (SQLAlchemyError, ValueError) as exc:
             logger.error("Failed to update session_id: %s", exc)
 
 
@@ -141,16 +138,13 @@ class ChatStreamRuntime:
         self.chat = chat
         self.chat_id = str(chat.id)
         self.stream_id = uuid4()
-        self.sandbox_id = str(chat.sandbox_id) if chat.sandbox_id else ""
         self.session_container: dict[str, Any] = {"session_id": request.session_id}
         self.assistant_message_id = request.assistant_message_id
-        self.user_id = str(chat.user_id)
         self.model_id = request.model_id
         self.custom_instructions = request.custom_instructions
         self.sandbox_service = sandbox_service
         self.session_factory = session_factory
 
-        self.event_count: int = 0
         self.snapshot = StreamSnapshotAccumulator()
         self.last_seq: int = 0
         self.pending_since_flush: int = 0
@@ -189,7 +183,7 @@ class ChatStreamRuntime:
                     ai_service, MessageStreamStatus.INTERRUPTED
                 )
 
-            if self.event_count == 0:
+            if self.last_seq <= start_seq:
                 raise ClaudeAgentException("Stream completed without any events")
 
             return await self._complete_stream(
@@ -225,7 +219,6 @@ class ChatStreamRuntime:
                     if await self._write_send_now(ai_service):
                         continue
 
-                self.event_count += 1
                 kind = str(event.get("type") or "system")
                 payload = {k: v for k, v in event.items() if k != "type"}
                 await self.emit_event(kind, payload)
@@ -334,7 +327,7 @@ class ChatStreamRuntime:
                 REDIS_KEY_CHAT_STREAM_LIVE.format(chat_id=self.chat_id),
                 "flush",
             )
-        except Exception as exc:
+        except CacheError as exc:
             logger.warning(
                 "Failed to publish Redis signal for chat %s: %s",
                 self.chat_id,
@@ -393,7 +386,7 @@ class ChatStreamRuntime:
             try:
                 queue_service = QueueService(self.cache)
                 await queue_service.clear_send_now(self.chat_id)
-            except Exception as exc:
+            except CacheError as exc:
                 logger.debug("Failed to clear send-now flag: %s", exc)
 
         if status == MessageStreamStatus.COMPLETED:
@@ -578,15 +571,23 @@ class ChatStreamRuntime:
             logger.warning("Failed to create checkpoint: %s", exc)
 
     async def _process_next_queued(self) -> bool:
+        next_msg: dict[str, Any] | None = None
         try:
             async with cache_connection() as cache:
                 queue_service = QueueService(cache)
                 next_msg = await queue_service.pop_send_now_message(self.chat_id)
                 if not next_msg:
                     next_msg = await queue_service.pop_next_message(self.chat_id)
-            if not next_msg:
-                return False
+        except CacheError as exc:
+            logger.error(
+                "Failed to read queued messages for chat %s: %s", self.chat_id, exc
+            )
+            return False
 
+        if not next_msg:
+            return False
+
+        try:
             user_message = await self.message_service.create_message(
                 UUID(self.chat_id),
                 next_msg["content"],
@@ -620,46 +621,33 @@ class ChatStreamRuntime:
             user_settings = await user_service.get_user_settings(
                 self.chat.user_id, db=None
             )
-
-            system_prompt = build_system_prompt_for_chat(
-                self.chat.sandbox_id or "",
-                user_settings,
-            )
-
             ChatStreamRuntime.start_background_chat(
-                ChatStreamRequest(
-                    prompt=next_msg["content"],
-                    system_prompt=system_prompt,
-                    custom_instructions=(
-                        user_settings.custom_instructions if user_settings else None
-                    ),
-                    chat_data={
-                        "id": self.chat_id,
-                        "user_id": str(self.chat.user_id),
-                        "title": self.chat.title,
-                        "sandbox_id": self.chat.sandbox_id,
-                        "session_id": self.chat.session_id,
-                    },
-                    permission_mode=next_msg.get("permission_mode", "auto"),
-                    model_id=next_msg["model_id"],
-                    session_id=self.chat.session_id,
+                self._build_queued_stream_request(
+                    chat=self.chat,
+                    queued_msg=next_msg,
+                    user_settings=user_settings,
                     assistant_message_id=str(assistant_message.id),
-                    thinking_mode=next_msg.get("thinking_mode"),
-                    attachments=next_msg.get("attachments"),
-                    is_custom_prompt=False,
                 )
             )
-
-            logger.info(
-                "Queued message %s for chat %s has been processed",
-                next_msg["id"],
-                self.chat_id,
-            )
-            return True
-
         except Exception as exc:
             logger.error("Failed to process queued message: %s", exc)
+            await self._requeue_next_message(next_msg)
             return False
+
+        logger.info(
+            "Queued message %s for chat %s has been processed",
+            next_msg["id"],
+            self.chat_id,
+        )
+        return True
+
+    async def _requeue_next_message(self, queued_msg: dict[str, Any]) -> None:
+        try:
+            async with cache_connection() as cache:
+                queue_service = QueueService(cache)
+                await queue_service.requeue_message(self.chat_id, queued_msg)
+        except Exception as requeue_exc:
+            logger.error("Failed to re-queue message: %s", requeue_exc)
 
     async def _emit_context_usage(self, ai_service: ClaudeAgentService) -> None:
         usage = ai_service.get_usage()
@@ -707,7 +695,7 @@ class ChatStreamRuntime:
                     {"context_usage": context_data, "chat_id": self.chat_id},
                     apply_snapshot=False,
                 )
-        except Exception as exc:
+        except (SQLAlchemyError, CacheError) as exc:
             logger.debug(
                 "Context usage update failed for chat %s: %s", self.chat_id, exc
             )
@@ -815,6 +803,38 @@ class ChatStreamRuntime:
             if not task.done()
         )
 
+    @staticmethod
+    def _build_queued_stream_request(
+        *,
+        chat: Chat,
+        queued_msg: dict[str, Any],
+        user_settings: UserSettings,
+        assistant_message_id: str,
+    ) -> ChatStreamRequest:
+        system_prompt = build_system_prompt_for_chat(
+            chat.sandbox_id or "",
+            user_settings,
+        )
+        return ChatStreamRequest(
+            prompt=queued_msg["content"],
+            system_prompt=system_prompt,
+            custom_instructions=user_settings.custom_instructions,
+            chat_data={
+                "id": str(chat.id),
+                "user_id": str(chat.user_id),
+                "title": chat.title,
+                "sandbox_id": chat.sandbox_id,
+                "session_id": chat.session_id,
+            },
+            permission_mode=queued_msg.get("permission_mode", "auto"),
+            model_id=queued_msg["model_id"],
+            session_id=chat.session_id,
+            assistant_message_id=assistant_message_id,
+            thinking_mode=queued_msg.get("thinking_mode"),
+            attachments=queued_msg.get("attachments"),
+            is_custom_prompt=False,
+        )
+
     @classmethod
     async def process_send_now_idle(
         cls,
@@ -855,33 +875,12 @@ class ChatStreamRuntime:
 
             user_service = UserService(session_factory=session_factory)
             user_settings = await user_service.get_user_settings(chat.user_id, db=None)
-
-            system_prompt = build_system_prompt_for_chat(
-                chat.sandbox_id or "",
-                user_settings,
-            )
-
             cls.start_background_chat(
-                ChatStreamRequest(
-                    prompt=queued_msg["content"],
-                    system_prompt=system_prompt,
-                    custom_instructions=(
-                        user_settings.custom_instructions if user_settings else None
-                    ),
-                    chat_data={
-                        "id": chat_id,
-                        "user_id": str(chat.user_id),
-                        "title": chat.title,
-                        "sandbox_id": chat.sandbox_id,
-                        "session_id": chat.session_id,
-                    },
-                    permission_mode=queued_msg.get("permission_mode", "auto"),
-                    model_id=queued_msg["model_id"],
-                    session_id=chat.session_id,
+                cls._build_queued_stream_request(
+                    chat=chat,
+                    queued_msg=queued_msg,
+                    user_settings=user_settings,
                     assistant_message_id=str(assistant_message.id),
-                    thinking_mode=queued_msg.get("thinking_mode"),
-                    attachments=queued_msg.get("attachments"),
-                    is_custom_prompt=False,
                 )
             )
 
@@ -893,17 +892,21 @@ class ChatStreamRuntime:
             return True
 
         except Exception:
-            try:
-                async with cache_connection() as cache:
-                    queue_service = QueueService(cache)
-                    await queue_service.requeue_message(chat_id, queued_msg)
-                    logger.info(
-                        "Re-queued message %s after idle send-now failure",
-                        queued_msg["id"],
-                    )
-            except Exception as requeue_exc:
-                logger.error("Failed to re-queue message: %s", requeue_exc)
+            await cls._requeue_idle_message(chat_id=chat_id, queued_msg=queued_msg)
             raise
+
+    @staticmethod
+    async def _requeue_idle_message(chat_id: str, queued_msg: dict[str, Any]) -> None:
+        try:
+            async with cache_connection() as cache:
+                queue_service = QueueService(cache)
+                await queue_service.requeue_message(chat_id, queued_msg)
+                logger.info(
+                    "Re-queued message %s after idle send-now failure",
+                    queued_msg["id"],
+                )
+        except Exception as requeue_exc:
+            logger.error("Failed to re-queue message: %s", requeue_exc)
 
     @staticmethod
     async def _mark_message_failed(
@@ -1029,10 +1032,6 @@ class ChatStreamRuntime:
                         if stream is not None and hasattr(stream, "aclose"):
                             await stream.aclose()
                         if runtime._cancelled:
-                            # After interrupt, the CLI sends remaining messages
-                            # (including ResultMessage) into the client buffer.
-                            # Drain them so the next query on this reused session
-                            # doesn't read stale data.
                             try:
                                 async with asyncio.timeout(5.0):
                                     async for _ in session.client.receive_response():

@@ -11,7 +11,7 @@ from app.constants import REDIS_KEY_CHAT_STREAM_LIVE
 from app.core.config import get_settings
 from app.core.deps import get_chat_service
 from app.core.security import validate_chat_scoped_token
-from app.models.schemas import (
+from app.models.schemas.permissions import (
     PermissionRequest,
     PermissionRequestResponse,
     PermissionResult,
@@ -62,8 +62,8 @@ async def create_permission_request(
     }
     PermissionManager.create_request(request_id, request_data)
 
+    message_service = chat_service.message_service
     try:
-        message_service = chat_service.message_service
         latest_assistant = await message_service.get_latest_assistant_message(chat_id)
         if latest_assistant and latest_assistant.active_stream_id:
             render_payload = {

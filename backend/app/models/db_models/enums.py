@@ -58,10 +58,3 @@ class StreamEventKind(str, enum.Enum):
 class DeleteResponseStatus(str, enum.Enum):
     DELETED = "deleted"
     NOT_FOUND = "not_found"
-
-
-class ComponentType(str, enum.Enum):
-    AGENT = "agent"
-    COMMAND = "command"
-    SKILL = "skill"
-    MCP = "mcp"

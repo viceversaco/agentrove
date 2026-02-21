@@ -39,9 +39,6 @@ class StorageService:
             raise StorageException("Filename is required")
 
         content_type = file.content_type
-        if not content_type:
-            raise StorageException("Content type is required")
-
         contents = await file.read()
 
         if len(contents) > settings.MAX_UPLOAD_SIZE:
@@ -87,12 +84,10 @@ class StorageService:
         else:
             file_url = AttachmentURL.build_temp_preview_url(relative_file_path)
 
-        # Dual-write: file stored locally (for preview API) AND uploaded to sandbox (for AI access).
-        # Sandbox upload failure is logged but not raised - local copy ensures preview still works.
         if sandbox_id:
             try:
                 sandbox_file_path = f"/home/user/{unique_filename}"
-                await self.sandbox_service.write_file(
+                await self.sandbox_service.provider.write_file(
                     sandbox_id=sandbox_id, file_path=sandbox_file_path, content=contents
                 )
 

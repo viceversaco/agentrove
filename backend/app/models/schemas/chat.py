@@ -3,9 +3,9 @@ from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import UploadFile
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.db_models import AttachmentType, MessageRole, MessageStreamStatus
+from app.models.db_models.enums import AttachmentType, MessageRole, MessageStreamStatus
 
 
 class MessageAttachmentBase(BaseModel):
@@ -15,15 +15,16 @@ class MessageAttachmentBase(BaseModel):
 
 
 class MessageAttachment(MessageAttachmentBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     message_id: UUID
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-
 
 class ChatRequest(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     prompt: str = Field(..., min_length=1, max_length=100000)
     chat_id: UUID | None = None
     model_id: str = Field(..., min_length=1, max_length=255)
@@ -31,9 +32,6 @@ class ChatRequest(BaseModel):
     permission_mode: Literal["plan", "ask", "auto"] = "auto"
     thinking_mode: str | None = Field(None, max_length=50)
     selected_prompt_name: str | None = Field(None, max_length=100)
-
-    class Config:
-        arbitrary_types_allowed = True
 
 
 class MessageBase(BaseModel):
@@ -45,16 +43,14 @@ class MessageBase(BaseModel):
 
 
 class Message(MessageBase):
+    model_config = ConfigDict(from_attributes=True, arbitrary_types_allowed=True)
+
     id: UUID
     chat_id: UUID
     created_at: datetime
     model_id: str | None = None
     stream_status: MessageStreamStatus | None = None
     attachments: list[MessageAttachment] = Field(default_factory=list)
-
-    class Config:
-        from_attributes = True
-        arbitrary_types_allowed = True
 
 
 class ChatBase(BaseModel):
@@ -71,6 +67,8 @@ class ChatUpdate(BaseModel):
 
 
 class Chat(ChatBase):
+    model_config = ConfigDict(from_attributes=True, arbitrary_types_allowed=True)
+
     id: UUID
     user_id: UUID
     created_at: datetime
@@ -78,10 +76,6 @@ class Chat(ChatBase):
     sandbox_id: str | None = None
     context_token_usage: int | None = None
     pinned_at: datetime | None = None
-
-    class Config:
-        from_attributes = True
-        arbitrary_types_allowed = True
 
 
 class ContextUsage(BaseModel):
@@ -130,6 +124,8 @@ class ChatStatusResponse(BaseModel):
 
 
 class MessageEvent(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     message_id: UUID
     chat_id: UUID
@@ -139,9 +135,6 @@ class MessageEvent(BaseModel):
     render_payload: dict[str, Any]
     audit_payload: dict[str, Any] | None = None
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class PermissionRespondResponse(BaseModel):

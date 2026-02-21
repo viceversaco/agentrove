@@ -18,6 +18,7 @@ from app.models.types import (
 )
 from app.services.agent import AgentService
 from app.services.command import CommandService
+from app.services.exceptions import ServiceException
 from app.services.marketplace import MarketplaceService
 from app.services.skill import SkillService
 
@@ -134,7 +135,7 @@ class PluginInstallerService:
                             error=f"Unknown component type: {comp_type}",
                         )
                     )
-            except Exception as e:
+            except (ServiceException, OSError) as e:
                 logger.error(f"Failed to install {component}: {e}")
                 failed.append(
                     InstallComponentResult(
@@ -169,7 +170,7 @@ class PluginInstallerService:
         elif comp_type == "mcp":
             if comp_name not in available.get("mcp_servers", []):
                 return f"MCP server '{comp_name}' not found in plugin"
-        elif comp_type not in ("agent", "command", "skill", "mcp"):
+        else:
             return f"Unknown component type: {comp_type}"
         return None
 
@@ -222,7 +223,7 @@ class PluginInstallerService:
             return None
 
         if any(m.get("name") == mcp_name for m in current_mcps):
-            raise Exception(f"MCP server '{mcp_name}' already exists")
+            raise ServiceException(f"MCP server '{mcp_name}' already exists")
 
         return self._convert_mcp_config(mcp_name, server_config)
 
@@ -247,7 +248,6 @@ class PluginInstallerService:
 
         for arg in args:
             if arg == "-y":
-                # build_mcp_config already applies -y for npx; drop redundant -y from marketplace configs
                 continue
             if package is None and (arg.startswith("@") or not arg.startswith("-")):
                 package = arg

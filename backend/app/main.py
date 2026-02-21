@@ -1,6 +1,7 @@
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -192,7 +193,7 @@ def create_application() -> FastAPI:
         prefix=f"{settings.API_V1_STR}/integrations",
         tags=["Integrations"],
     )
-    application.openapi = lambda: custom_openapi(application)
+    application.openapi = partial(custom_openapi, application)
 
     _mount_admin(application)
 
@@ -251,15 +252,9 @@ def _mount_admin(application: FastAPI) -> None:
     admin.add_view(UserSettingsAdmin)
 
 
-def _mount_instrumentator(application: FastAPI) -> None:
-    if settings.DESKTOP_MODE or not _instrumentator_available:
-        return
-
-    Instrumentator().instrument(application).expose(application)
-
-
 app = create_application()
-_mount_instrumentator(app)
+if not settings.DESKTOP_MODE and _instrumentator_available:
+    Instrumentator().instrument(app).expose(app)
 
 if not settings.DISABLE_PROXY_HEADERS:
     app = wrap_asgi_with_proxy_headers(app, trusted_hosts=settings.TRUSTED_PROXY_HOSTS)

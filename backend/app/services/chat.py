@@ -11,33 +11,23 @@ from sqlalchemy import exists, func, select, update
 from sqlalchemy.orm import selectinload
 
 from app.constants import REDIS_KEY_CHAT_STREAM_LIVE
-from app.models.db_models import StreamEventKind
 from app.core.config import get_settings
-from app.models.db_models import (
-    Chat,
-    Message,
-    MessageAttachment,
-    MessageEvent,
-    MessageRole,
-    MessageStreamStatus,
-    User,
-    UserSettings,
-)
-from app.models.schemas import (
-    ChatCreate,
-    ChatRequest,
-    ChatUpdate,
+from app.models.db_models.chat import Chat, Message, MessageAttachment
+from app.models.db_models.enums import MessageRole, MessageStreamStatus, StreamEventKind
+from app.models.db_models.user import User, UserSettings
+from app.models.schemas.chat import ChatCreate, ChatRequest, ChatUpdate
+from app.models.schemas.pagination import (
     CursorPaginatedResponse,
     PaginatedResponse,
     PaginationParams,
-    ProviderType,
 )
+from app.models.schemas.settings import ProviderType
 from app.models.schemas.chat import Chat as ChatSchema, Message as MessageSchema
 from app.models.types import ChatCompletionResult, MessageAttachmentDict
 from app.prompts.system_prompt import build_system_prompt_for_chat
 from app.services.db import BaseDbService, SessionFactoryType
 from app.services.provider import ProviderService
-from app.services.exceptions import ChatException, ErrorCode
+from app.services.exceptions import ChatException, ErrorCode, SandboxException
 from app.services.message import MessageService
 from app.services.sandbox import SandboxService
 from app.services.sandbox_providers import (
@@ -52,7 +42,6 @@ from app.services.storage import StorageService
 from app.services.user import UserService
 
 from app.utils.cache import CachePubSub
-from app.utils.message_events import MessageEventParser
 from app.utils.cache import cache_connection, cache_pubsub
 from app.utils.attachment_urls import AttachmentURL
 from app.utils.validators import APIKeyValidationError, validate_model_api_keys
@@ -125,32 +114,21 @@ class ChatService(BaseDbService[Chat]):
         user_settings = await self.user_service.get_user_settings(user.id)
         self._validate_api_keys(user_settings, chat_data.model_id)
 
-        sandbox_id = await self.sandbox_service.create_sandbox()
-
-        github_token = user_settings.github_personal_access_token
-        custom_env_vars = user_settings.custom_env_vars
-        custom_skills = user_settings.custom_skills
-        custom_slash_commands = user_settings.custom_slash_commands
-        custom_agents = user_settings.custom_agents
-        auto_compact_disabled = user_settings.auto_compact_disabled
-        attribution_disabled = user_settings.attribution_disabled
-        custom_providers = user_settings.custom_providers
-        gmail_oauth_client = user_settings.gmail_oauth_client
-        gmail_oauth_tokens = user_settings.gmail_oauth_tokens
+        sandbox_id = await self.sandbox_service.provider.create_sandbox()
 
         await self.sandbox_service.initialize_sandbox(
             sandbox_id=sandbox_id,
-            github_token=github_token,
-            custom_env_vars=custom_env_vars,
-            custom_skills=custom_skills,
-            custom_slash_commands=custom_slash_commands,
-            custom_agents=custom_agents,
+            github_token=user_settings.github_personal_access_token,
+            custom_env_vars=user_settings.custom_env_vars,
+            custom_skills=user_settings.custom_skills,
+            custom_slash_commands=user_settings.custom_slash_commands,
+            custom_agents=user_settings.custom_agents,
             user_id=str(user.id),
-            auto_compact_disabled=auto_compact_disabled,
-            attribution_disabled=attribution_disabled,
-            custom_providers=custom_providers,
-            gmail_oauth_client=gmail_oauth_client,
-            gmail_oauth_tokens=gmail_oauth_tokens,
+            auto_compact_disabled=user_settings.auto_compact_disabled,
+            attribution_disabled=user_settings.attribution_disabled,
+            custom_providers=user_settings.custom_providers,
+            gmail_oauth_client=user_settings.gmail_oauth_client,
+            gmail_oauth_tokens=user_settings.gmail_oauth_tokens,
         )
 
         async with self.session_factory() as db:
@@ -404,18 +382,6 @@ class ChatService(BaseDbService[Chat]):
                 return
 
     @staticmethod
-    def _to_stream_sse_event(event: MessageEvent) -> dict[str, Any]:
-        return ChatService._build_stream_sse_event(
-            chat_id=event.chat_id,
-            message_id=event.message_id,
-            stream_id=event.stream_id,
-            seq=int(event.seq),
-            kind=event.event_type,
-            payload=event.render_payload,
-            ts=event.created_at.isoformat() if event.created_at else None,
-        )
-
-    @staticmethod
     def _build_stream_sse_event(
         *,
         chat_id: UUID,
@@ -528,7 +494,15 @@ class ChatService(BaseDbService[Chat]):
                 limit=5000,
             )
             for event in live_events:
-                yield self._to_stream_sse_event(event)
+                yield self._build_stream_sse_event(
+                    chat_id=event.chat_id,
+                    message_id=event.message_id,
+                    stream_id=event.stream_id,
+                    seq=int(event.seq),
+                    kind=event.event_type,
+                    payload=event.render_payload,
+                    ts=event.created_at.isoformat() if event.created_at else None,
+                )
                 last_seq = int(event.seq)
 
                 if event.event_type in TERMINAL_STREAM_EVENT_TYPES:
@@ -565,14 +539,8 @@ class ChatService(BaseDbService[Chat]):
                 async with cache_pubsub(cache, channel) as live_pubsub:
                     async for item in self._replay_stream_backlog(chat_id, after_seq):
                         yield item
-                        try:
-                            last_seq = int(item["id"])
-                        except Exception:
-                            pass
-                        try:
-                            envelope = json.loads(item.get("data", "{}"))
-                        except Exception:
-                            envelope = {}
+                        last_seq = int(item["id"])
+                        envelope = json.loads(item["data"])
                         if envelope.get("kind") in TERMINAL_STREAM_EVENT_TYPES:
                             return
 
@@ -582,13 +550,10 @@ class ChatService(BaseDbService[Chat]):
                         live_pubsub,
                     ):
                         yield event
-                        try:
-                            event_seq = int(event.get("id", last_seq))
-                            if event_seq > last_seq:
-                                last_seq = event_seq
-                        except Exception:
-                            pass
-                        envelope = json.loads(event.get("data", "{}"))
+                        event_seq = int(event["id"])
+                        if event_seq > last_seq:
+                            last_seq = event_seq
+                        envelope = json.loads(event["data"])
                         if envelope.get("kind") in TERMINAL_STREAM_EVENT_TYPES:
                             return
 
@@ -638,13 +603,8 @@ class ChatService(BaseDbService[Chat]):
                 )
             )
 
-        try:
-            user_prompt = MessageEventParser.extract_user_prompt(request.prompt)
-            ai_prompt = user_prompt
-        except (ValueError, KeyError, TypeError, AttributeError) as e:
-            logger.error("Failed to parse message events: %s", e)
-            user_prompt = request.prompt or ""
-            ai_prompt = user_prompt
+        user_prompt = self._extract_user_prompt(request.prompt)
+        ai_prompt = user_prompt
 
         await self.message_service.create_message(
             chat_id,
@@ -653,11 +613,6 @@ class ChatService(BaseDbService[Chat]):
             attachments=attachments,
         )
 
-        # When switching from OpenRouter to Claude, we need to clean thinking blocks from the session.
-        # OpenRouter models (via anthropic-bridge) generate thinking blocks with empty signatures.
-        # Claude API validates signatures and rejects invalid ones with:
-        # "Invalid signature in thinking block"
-        # We strip these invalid thinking blocks while preserving the rest of the conversation context.
         session_id = chat.session_id
         if session_id and chat.sandbox_id:
             if await self._needs_session_cleaning(
@@ -776,83 +731,85 @@ class ChatService(BaseDbService[Chat]):
         )
         fork_sandbox_service = SandboxService(provider)
 
+        new_sandbox_id: str | None = None
         try:
-            new_sandbox_id = await fork_sandbox_service.clone_sandbox(
+            new_sandbox_id = await fork_sandbox_service.provider.clone_sandbox(
                 source_chat.sandbox_id,
                 checkpoint_id=target_message.checkpoint_id,
             )
 
-            try:
-                await fork_sandbox_service.initialize_sandbox(
+            await fork_sandbox_service.initialize_sandbox(
+                sandbox_id=new_sandbox_id,
+                custom_providers=user_settings.custom_providers,
+                is_fork=True,
+            )
+
+            async with self.session_factory() as db:
+                new_chat = Chat(
+                    title=self._truncate_title(f"Fork of {source_chat.title}"),
+                    user_id=user.id,
                     sandbox_id=new_sandbox_id,
-                    custom_providers=user_settings.custom_providers,
-                    is_fork=True,
+                    sandbox_provider=SandboxProviderType.DOCKER.value,
+                    session_id=target_message.session_id,
                 )
+                db.add(new_chat)
+                await db.flush()
 
-                async with self.session_factory() as db:
-                    new_chat = Chat(
-                        title=self._truncate_title(f"Fork of {source_chat.title}"),
-                        user_id=user.id,
-                        sandbox_id=new_sandbox_id,
-                        sandbox_provider=SandboxProviderType.DOCKER.value,
-                        session_id=target_message.session_id,
+                new_messages: list[Message] = []
+                msg_to_attachments: list[tuple[Message, list[MessageAttachment]]] = []
+                for msg in messages:
+                    new_message = Message(
+                        chat_id=new_chat.id,
+                        content_text=msg.content_text,
+                        content_render=msg.content_render,
+                        last_seq=0,
+                        active_stream_id=None,
+                        role=msg.role,
+                        model_id=msg.model_id,
+                        session_id=msg.session_id,
+                        checkpoint_id=msg.checkpoint_id,
+                        stream_status=msg.stream_status,
+                        total_cost_usd=msg.total_cost_usd,
                     )
-                    db.add(new_chat)
-                    await db.flush()
+                    new_messages.append(new_message)
+                    msg_to_attachments.append((new_message, list(msg.attachments)))
 
-                    new_messages: list[Message] = []
-                    msg_to_attachments: list[
-                        tuple[Message, list[MessageAttachment]]
-                    ] = []
-                    for msg in messages:
-                        new_message = Message(
-                            chat_id=new_chat.id,
-                            content_text=msg.content_text,
-                            content_render=msg.content_render,
-                            last_seq=0,
-                            active_stream_id=None,
-                            role=msg.role,
-                            model_id=msg.model_id,
-                            session_id=msg.session_id,
-                            checkpoint_id=msg.checkpoint_id,
-                            stream_status=msg.stream_status,
-                            total_cost_usd=msg.total_cost_usd,
+                db.add_all(new_messages)
+                await db.flush()
+
+                all_attachments: list[MessageAttachment] = []
+                for new_message, orig_attachments in msg_to_attachments:
+                    for att in orig_attachments:
+                        new_attachment = MessageAttachment(
+                            message_id=new_message.id,
+                            file_url="",
+                            file_path=att.file_path,
+                            file_type=att.file_type,
+                            filename=att.filename,
                         )
-                        new_messages.append(new_message)
-                        msg_to_attachments.append((new_message, list(msg.attachments)))
+                        all_attachments.append(new_attachment)
 
-                    db.add_all(new_messages)
+                if all_attachments:
+                    db.add_all(all_attachments)
                     await db.flush()
+                    for att in all_attachments:
+                        att.file_url = AttachmentURL.build_preview_url(att.id)
 
-                    all_attachments: list[MessageAttachment] = []
-                    for new_message, orig_attachments in msg_to_attachments:
-                        for att in orig_attachments:
-                            new_attachment = MessageAttachment(
-                                message_id=new_message.id,
-                                file_url="",
-                                file_path=att.file_path,
-                                file_type=att.file_type,
-                                filename=att.filename,
-                            )
-                            all_attachments.append(new_attachment)
+                await db.commit()
+                await db.refresh(new_chat)
 
-                    if all_attachments:
-                        db.add_all(all_attachments)
-                        await db.flush()
-                        for att in all_attachments:
-                            att.file_url = AttachmentURL.build_preview_url(att.id)
-
-                    await db.commit()
-                    await db.refresh(new_chat)
-
-                return (new_chat, len(messages))
-
-            except Exception:
+            return (new_chat, len(messages))
+        except Exception:
+            if new_sandbox_id:
                 try:
                     await fork_sandbox_service.delete_sandbox(new_sandbox_id)
-                except Exception:
-                    pass
-                raise
+                except Exception as cleanup_exc:
+                    logger.warning(
+                        "Failed to cleanup fork sandbox %s after error: %s",
+                        new_sandbox_id,
+                        cleanup_exc,
+                    )
+            raise
         finally:
             await provider.cleanup()
 
@@ -933,11 +890,15 @@ class ChatService(BaseDbService[Chat]):
         try:
             sandbox_id = await self.get_chat_sandbox_id(chat_id, user)
             if sandbox_id:
-                await self.sandbox_service.get_or_connect_sandbox(sandbox_id)
-        except ChatException:
-            pass
-        except Exception as e:
+                await self.sandbox_service.provider.connect_sandbox(sandbox_id)
+        except (ChatException, SandboxException) as e:
             logger.warning("Failed to resume sandbox for chat %s: %s", chat_id, e)
+
+    @staticmethod
+    def _extract_user_prompt(message_content: str | None) -> str:
+        if not message_content:
+            return ""
+        return MessageService.extract_user_text_content(message_content)
 
     async def _needs_session_cleaning(
         self, chat_id: UUID, new_model_id: str, user_id: UUID

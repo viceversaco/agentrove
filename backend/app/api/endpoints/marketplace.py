@@ -1,9 +1,14 @@
-from typing import Any
-
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
+from typing import Any, cast
+
+from app.api.endpoints._shared import (
+    append_named_item_if_missing,
+    find_named_item_index,
+    load_user_settings_or_404,
+)
 from app.core.deps import (
     get_agent_service,
     get_command_service,
@@ -14,7 +19,7 @@ from app.core.deps import (
     get_user_service,
 )
 from app.core.security import get_current_user
-from app.models.db_models import User
+from app.models.db_models.user import User
 from app.models.schemas.marketplace import (
     InstallComponentRequest,
     InstallComponentResult,
@@ -37,7 +42,6 @@ from app.services.command import CommandService
 from app.services.exceptions import (
     MarketplaceException,
     ServiceException,
-    UserException,
 )
 from app.services.marketplace import MarketplaceService
 from app.services.plugin_installer import PluginInstallerService
@@ -45,14 +49,6 @@ from app.services.skill import SkillService
 from app.services.user import UserService
 
 router = APIRouter()
-
-
-def _append_if_not_exists(
-    items: list[Any],
-    new_item: Any,
-) -> None:
-    if not any(item.get("name") == new_item.get("name") for item in items):
-        items.append(new_item)
 
 
 @router.get("/catalog", response_model=list[MarketplacePlugin])
@@ -88,23 +84,19 @@ async def install_plugin_components(
     installer_service: PluginInstallerService = Depends(get_plugin_installer_service),
     user_service: UserService = Depends(get_user_service),
 ) -> InstallResponse:
-    try:
-        user_settings_readonly = await user_service.get_user_settings(
-            current_user.id, db=db
-        )
-    except UserException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    user_settings = await load_user_settings_or_404(user_service, current_user.id, db)
 
-    current_agents: list[CustomAgentDict] = list(
-        user_settings_readonly.custom_agents or []
+    current_agents = cast(
+        list[CustomAgentDict], list(user_settings.custom_agents or [])
     )
-    current_commands: list[CustomSlashCommandDict] = list(
-        user_settings_readonly.custom_slash_commands or []
+    current_commands = cast(
+        list[CustomSlashCommandDict],
+        list(user_settings.custom_slash_commands or []),
     )
-    current_skills: list[CustomSkillDict] = list(
-        user_settings_readonly.custom_skills or []
+    current_skills = cast(
+        list[CustomSkillDict], list(user_settings.custom_skills or [])
     )
-    current_mcps: list[CustomMcpDict] = list(user_settings_readonly.custom_mcps or [])
+    current_mcps = cast(list[CustomMcpDict], list(user_settings.custom_mcps or []))
 
     try:
         details = await marketplace_service.get_plugin_details(request.plugin_name)
@@ -125,42 +117,30 @@ async def install_plugin_components(
         raise HTTPException(status_code=e.status_code, detail=str(e))
 
     if result.installed:
-        try:
-            user_settings = await user_service.get_user_settings(current_user.id, db=db)
-        except UserException as e:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-
         if user_settings.custom_agents is None:
             user_settings.custom_agents = []
         for agent in result.new_agents:
-            _append_if_not_exists(user_settings.custom_agents, agent)
+            append_named_item_if_missing(user_settings.custom_agents, agent)
 
         if user_settings.custom_slash_commands is None:
             user_settings.custom_slash_commands = []
         for cmd in result.new_commands:
-            _append_if_not_exists(user_settings.custom_slash_commands, cmd)
+            append_named_item_if_missing(user_settings.custom_slash_commands, cmd)
 
         if user_settings.custom_skills is None:
             user_settings.custom_skills = []
         for skill in result.new_skills:
-            _append_if_not_exists(user_settings.custom_skills, skill)
+            append_named_item_if_missing(user_settings.custom_skills, skill)
 
         if user_settings.custom_mcps is None:
             user_settings.custom_mcps = []
         for mcp in result.new_mcps:
-            _append_if_not_exists(user_settings.custom_mcps, mcp)
+            append_named_item_if_missing(user_settings.custom_mcps, mcp)
 
         installed_plugins: list[InstalledPluginDict] = list(
             user_settings.installed_plugins or []
         )
-        existing_idx = next(
-            (
-                i
-                for i, p in enumerate(installed_plugins)
-                if p["name"] == request.plugin_name
-            ),
-            None,
-        )
+        existing_idx = find_named_item_index(installed_plugins, request.plugin_name)
         record = installer_service.create_installed_record(
             request.plugin_name,
             details.get("version"),
@@ -197,10 +177,7 @@ async def get_installed_plugins(
     db: AsyncSession = Depends(get_db),
     user_service: UserService = Depends(get_user_service),
 ) -> list[InstalledPlugin]:
-    try:
-        user_settings = await user_service.get_user_settings(current_user.id, db=db)
-    except UserException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    user_settings = await load_user_settings_or_404(user_service, current_user.id, db)
 
     installed: list[InstalledPluginDict] = list(user_settings.installed_plugins or [])
     return [InstalledPlugin(**p) for p in installed]
@@ -216,10 +193,7 @@ async def uninstall_plugin_components(
     command_service: CommandService = Depends(get_command_service),
     skill_service: SkillService = Depends(get_skill_service),
 ) -> UninstallResponse:
-    try:
-        user_settings = await user_service.get_user_settings(current_user.id, db=db)
-    except UserException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    user_settings = await load_user_settings_or_404(user_service, current_user.id, db)
 
     uninstalled: list[str] = []
     failed: list[InstallComponentResult] = []
@@ -228,6 +202,13 @@ async def uninstall_plugin_components(
     installed_plugins: list[InstalledPluginDict] = list(
         user_settings.installed_plugins or []
     )
+
+    component_dispatch: dict[str, tuple[str, Any | None]] = {
+        "agent": ("custom_agents", agent_service),
+        "command": ("custom_slash_commands", command_service),
+        "skill": ("custom_skills", skill_service),
+        "mcp": ("custom_mcps", None),
+    }
 
     for component_id in request.components:
         if ":" not in component_id:
@@ -242,92 +223,36 @@ async def uninstall_plugin_components(
 
         comp_type, comp_name = component_id.split(":", 1)
 
+        if comp_type not in component_dispatch:
+            failed.append(
+                InstallComponentResult(
+                    component=component_id,
+                    success=False,
+                    error=f"Unknown component type: {comp_type}",
+                )
+            )
+            continue
+
+        field_name, service = component_dispatch[comp_type]
+        items = list(getattr(user_settings, field_name) or [])
+        idx = find_named_item_index(items, comp_name)
+
+        if idx is None:
+            failed.append(
+                InstallComponentResult(
+                    component=component_id,
+                    success=False,
+                    error=f"{comp_type.title()} not found",
+                )
+            )
+            continue
+
         try:
-            if comp_type == "agent":
-                agents = list(user_settings.custom_agents or [])
-                idx = next(
-                    (i for i, a in enumerate(agents) if a.get("name") == comp_name),
-                    None,
-                )
-                if idx is not None:
-                    await agent_service.delete(user_id, comp_name)
-                    agents.pop(idx)
-                    user_settings.custom_agents = agents if agents else None
-                    uninstalled.append(component_id)
-                else:
-                    failed.append(
-                        InstallComponentResult(
-                            component=component_id,
-                            success=False,
-                            error="Agent not found",
-                        )
-                    )
-
-            elif comp_type == "command":
-                commands = list(user_settings.custom_slash_commands or [])
-                idx = next(
-                    (i for i, c in enumerate(commands) if c.get("name") == comp_name),
-                    None,
-                )
-                if idx is not None:
-                    await command_service.delete(user_id, comp_name)
-                    commands.pop(idx)
-                    user_settings.custom_slash_commands = commands if commands else None
-                    uninstalled.append(component_id)
-                else:
-                    failed.append(
-                        InstallComponentResult(
-                            component=component_id,
-                            success=False,
-                            error="Command not found",
-                        )
-                    )
-
-            elif comp_type == "skill":
-                skills = list(user_settings.custom_skills or [])
-                idx = next(
-                    (i for i, s in enumerate(skills) if s.get("name") == comp_name),
-                    None,
-                )
-                if idx is not None:
-                    await skill_service.delete(user_id, comp_name)
-                    skills.pop(idx)
-                    user_settings.custom_skills = skills if skills else None
-                    uninstalled.append(component_id)
-                else:
-                    failed.append(
-                        InstallComponentResult(
-                            component=component_id,
-                            success=False,
-                            error="Skill not found",
-                        )
-                    )
-
-            elif comp_type == "mcp":
-                mcps = list(user_settings.custom_mcps or [])
-                idx = next(
-                    (i for i, m in enumerate(mcps) if m.get("name") == comp_name), None
-                )
-                if idx is not None:
-                    mcps.pop(idx)
-                    user_settings.custom_mcps = mcps if mcps else None
-                    uninstalled.append(component_id)
-                else:
-                    failed.append(
-                        InstallComponentResult(
-                            component=component_id, success=False, error="MCP not found"
-                        )
-                    )
-
-            else:
-                failed.append(
-                    InstallComponentResult(
-                        component=component_id,
-                        success=False,
-                        error=f"Unknown component type: {comp_type}",
-                    )
-                )
-
+            if service is not None:
+                await service.delete(user_id, comp_name)
+            items.pop(idx)
+            setattr(user_settings, field_name, items if items else None)
+            uninstalled.append(component_id)
         except (ServiceException, OSError) as e:
             failed.append(
                 InstallComponentResult(
@@ -336,14 +261,7 @@ async def uninstall_plugin_components(
             )
 
     if uninstalled:
-        plugin_idx = next(
-            (
-                i
-                for i, p in enumerate(installed_plugins)
-                if p.get("name") == request.plugin_name
-            ),
-            None,
-        )
+        plugin_idx = find_named_item_index(installed_plugins, request.plugin_name)
         if plugin_idx is not None:
             plugin = installed_plugins[plugin_idx]
             remaining = [

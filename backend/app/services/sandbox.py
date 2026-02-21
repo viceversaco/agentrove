@@ -44,7 +44,6 @@ from app.services.sandbox_providers import (
 )
 from app.services.sandbox_providers.factory import SandboxProviderFactory
 from app.services.sandbox_providers.types import CommandResult
-from app.services.sandbox_providers.types import SandboxProviderType
 from app.services.skill import SkillService
 from app.services.user import UserService
 from app.utils.queue import drain_queue, put_with_overflow
@@ -52,6 +51,7 @@ from app.utils.queue import drain_queue, put_with_overflow
 logger = logging.getLogger(__name__)
 
 OPENVSCODE_PORT = 8765
+MIN_SIGNATURE_LENGTH = 100
 OPENVSCODE_DEFAULT_SETTINGS: dict[str, object] = {
     "workbench.colorTheme": "Default Dark Modern",
     "window.autoDetectColorScheme": True,
@@ -111,22 +111,19 @@ class SandboxService:
                 raise UserException("User settings not found")
 
             provider_type = user_settings.sandbox_provider
-            api_key: str | None = None
-            if provider_type == SandboxProviderType.E2B.value:
-                key = user_settings.e2b_api_key
-                api_key = key if isinstance(key, str) else None
-            elif provider_type == SandboxProviderType.MODAL.value:
-                key = user_settings.modal_api_key
-                api_key = key if isinstance(key, str) else None
+            e2b_api_key = user_settings.e2b_api_key
+            modal_api_key = user_settings.modal_api_key
+            api_key = SandboxProviderFactory.resolve_api_key(
+                provider_type=provider_type,
+                e2b_api_key=e2b_api_key,
+                modal_api_key=modal_api_key,
+            )
 
             provider = SandboxProviderFactory.create(
                 provider_type=provider_type,
                 api_key=api_key,
             )
         return cls(provider=provider, session_factory=session_factory)
-
-    async def create_sandbox(self) -> str:
-        return await self.provider.create_sandbox()
 
     async def delete_sandbox(self, sandbox_id: str) -> None:
         if not sandbox_id:
@@ -143,9 +140,6 @@ class SandboxService:
                 extra={"sandbox_id": sandbox_id},
             )
 
-    async def get_or_connect_sandbox(self, sandbox_id: str) -> bool:
-        return await self.provider.connect_sandbox(sandbox_id)
-
     async def execute_command(
         self,
         sandbox_id: str,
@@ -158,9 +152,6 @@ class SandboxService:
         return await self.provider.execute_command(
             sandbox_id, command, background=background, envs=envs
         )
-
-    async def write_file(self, sandbox_id: str, file_path: str, content: str) -> None:
-        await self.provider.write_file(sandbox_id, file_path, content)
 
     async def get_preview_links(self, sandbox_id: str) -> list[dict[str, str | int]]:
         links = await self.provider.get_preview_links(sandbox_id)
@@ -191,9 +182,6 @@ class SandboxService:
             logger.warning("Failed to read IDE token for sandbox %s: %s", sandbox_id, e)
         return None
 
-    async def get_vnc_url(self, sandbox_id: str) -> str | None:
-        return await self.provider.get_vnc_url(sandbox_id)
-
     async def start_browser(
         self, sandbox_id: str, url: str = "about:blank"
     ) -> dict[str, str]:
@@ -218,8 +206,12 @@ class SandboxService:
             await self.execute_command(
                 sandbox_id, "pkill -9 -f chromium", background=True
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "Failed to cleanup browser resources for sandbox %s: %s",
+                sandbox_id,
+                exc,
+            )
 
     async def stop_browser(self, sandbox_id: str) -> dict[str, str]:
         await self.execute_command(sandbox_id, "pkill -f chromium", background=True)
@@ -368,31 +360,19 @@ class SandboxService:
         except Exception as e:
             raise SandboxException(f"Failed to read file {file_path}: {str(e)}")
 
-    async def add_secret(
-        self,
-        sandbox_id: str,
-        key: str,
-        value: str,
-    ) -> None:
-        await self.provider.add_secret(sandbox_id, key, value)
-
     async def update_secret(
         self,
         sandbox_id: str,
         key: str,
         value: str,
     ) -> None:
-        existing_value: str | None = None
         try:
             sandbox_secrets = await self.provider.get_secrets(sandbox_id)
-            for secret in sandbox_secrets:
-                if secret.key == key:
-                    existing_value = secret.value
-                    break
+            secret_exists = any(secret.key == key for secret in sandbox_secrets)
         except Exception as e:
             raise SandboxException(f"Failed to read secrets for update: {str(e)}")
 
-        if existing_value is None:
+        if not secret_exists:
             await self.provider.add_secret(sandbox_id, key, value)
             return
 
@@ -400,24 +380,7 @@ class SandboxService:
             await self.provider.delete_secret(sandbox_id, key)
             await self.provider.add_secret(sandbox_id, key, value)
         except Exception as e:
-            if existing_value is not None:
-                try:
-                    await self.provider.add_secret(sandbox_id, key, existing_value)
-                except Exception as restore_error:
-                    logger.warning(
-                        "Failed to restore secret %s for sandbox %s: %s",
-                        key,
-                        sandbox_id,
-                        restore_error,
-                    )
             raise SandboxException(f"Failed to update secret {key}: {str(e)}")
-
-    async def delete_secret(
-        self,
-        sandbox_id: str,
-        key: str,
-    ) -> None:
-        await self.provider.delete_secret(sandbox_id, key)
 
     async def get_secrets(
         self,
@@ -534,7 +497,7 @@ class SandboxService:
         temp_b64_path = f"{remote_zip_path}.b64tmp"
 
         try:
-            await self.write_file(sandbox_id, temp_b64_path, encoded_content)
+            await self.provider.write_file(sandbox_id, temp_b64_path, encoded_content)
             decode_and_extract_cmd = (
                 f"base64 -d {shlex.quote(temp_b64_path)} > {shlex.quote(remote_zip_path)} && "
                 f"unzip -q -o {shlex.quote(remote_zip_path)} -d {SANDBOX_HOME_DIR} && "
@@ -552,13 +515,6 @@ class SandboxService:
             )
         except Exception as e:
             logger.error("Failed to copy resources to sandbox %s: %s", sandbox_id, e)
-            cleanup_cmd = (
-                f"rm -f {shlex.quote(remote_zip_path)} {shlex.quote(temp_b64_path)}"
-            )
-            try:
-                await self.execute_command(sandbox_id, cleanup_cmd)
-            except Exception:
-                pass
             raise SandboxException(f"Failed to copy resources to sandbox: {e}") from e
 
     async def _add_env_vars_parallel(
@@ -618,7 +574,9 @@ class SandboxService:
         connection_token = secrets.token_urlsafe(32)
         self._ide_tokens[sandbox_id] = connection_token
 
-        await self.write_file(sandbox_id, SANDBOX_IDE_TOKEN_PATH, connection_token)
+        await self.provider.write_file(
+            sandbox_id, SANDBOX_IDE_TOKEN_PATH, connection_token
+        )
 
         settings_content = json.dumps(OPENVSCODE_DEFAULT_SETTINGS, indent=2)
         escaped_settings = settings_content.replace("'", "'\"'\"'")
@@ -641,7 +599,9 @@ class SandboxService:
             "window.autoDetectColorScheme": False,
         }
         settings_content = json.dumps(settings, indent=2)
-        await self.write_file(sandbox_id, SANDBOX_IDE_SETTINGS_PATH, settings_content)
+        await self.provider.write_file(
+            sandbox_id, SANDBOX_IDE_SETTINGS_PATH, settings_content
+        )
         logger.info("IDE theme updated to: %s", vscode_theme)
 
     async def _setup_claude_config(
@@ -664,7 +624,7 @@ class SandboxService:
             except Exception:
                 pass
             config["autoCompactEnabled"] = False
-            await self.write_file(
+            await self.provider.write_file(
                 sandbox_id, SANDBOX_CLAUDE_JSON_PATH, json.dumps(config, indent=2)
             )
 
@@ -679,14 +639,16 @@ class SandboxService:
             except Exception:
                 pass
             settings["attribution"] = {"commit": "", "pr": ""}
-            await self.write_file(
+            await self.provider.write_file(
                 sandbox_id, settings_path, json.dumps(settings, indent=2)
             )
 
     async def _setup_openai_auth(self, sandbox_id: str, openai_auth_json: str) -> None:
         openai_dir = f"{SANDBOX_HOME_DIR}/.codex"
         await self.execute_command(sandbox_id, f"mkdir -p {openai_dir}")
-        await self.write_file(sandbox_id, f"{openai_dir}/auth.json", openai_auth_json)
+        await self.provider.write_file(
+            sandbox_id, f"{openai_dir}/auth.json", openai_auth_json
+        )
         await self.execute_command(sandbox_id, f"sudo chown -R user:user {openai_dir}")
 
     async def _setup_gmail_mcp(
@@ -699,11 +661,10 @@ class SandboxService:
         await self.execute_command(sandbox_id, f"mkdir -p {gmail_dir}")
 
         oauth_client_content = json.dumps(gmail_oauth_client, indent=2)
-        await self.write_file(
+        await self.provider.write_file(
             sandbox_id, f"{gmail_dir}/gcp-oauth.keys.json", oauth_client_content
         )
 
-        # Build credentials.json in the format Google's OAuth library expects
         client_data = gmail_oauth_client.get("installed") or gmail_oauth_client.get(
             "web", {}
         )
@@ -718,7 +679,7 @@ class SandboxService:
         if gmail_oauth_tokens.get("expiry"):
             credentials["expiry"] = gmail_oauth_tokens["expiry"]
         credentials_content = json.dumps(credentials, indent=2)
-        await self.write_file(
+        await self.provider.write_file(
             sandbox_id, f"{gmail_dir}/credentials.json", credentials_content
         )
 
@@ -745,8 +706,6 @@ class SandboxService:
             self._start_openvscode_server(sandbox_id),
         ]
 
-        # Forks skip filesystem-based setup (env vars in .bashrc, config files, skills/commands/agents)
-        # since these are preserved when cloning the container. Only processes need restarting.
         if not is_fork:
             tasks.append(
                 self._setup_claude_config(
@@ -760,7 +719,7 @@ class SandboxService:
             has_resources = (
                 custom_skills or custom_slash_commands or custom_agents
             ) and user_id
-            if has_resources and user_id:
+            if has_resources:
                 tasks.append(
                     self._deploy_resources(
                         sandbox_id,
@@ -874,18 +833,9 @@ class SandboxService:
             for c in checkpoints
         ]
 
-    async def clone_sandbox(
-        self, source_sandbox_id: str, checkpoint_id: str | None = None
-    ) -> str:
-        return await self.provider.clone_sandbox(source_sandbox_id, checkpoint_id)
-
     async def _enqueue_pty_output(
         self, data: bytes, output_queue: "asyncio.Queue[str]"
     ) -> None:
-        # Handles PTY output with backpressure management.
-        # When the queue is full (consumer not keeping up), we drop the oldest item
-        # rather than blocking or losing the newest data. This prevents the PTY from
-        # stalling while ensuring the most recent output is always available.
         try:
             decoded = data.decode("utf-8", errors="replace")
             put_with_overflow(output_queue, decoded)
@@ -903,14 +853,9 @@ class SandboxService:
         session_file = f"{SANDBOX_CLAUDE_DIR}/projects/-home-user/{session_id}.jsonl"
         temp_file = f"{session_file}.tmp"
 
-        # Valid Anthropic signatures are base64-encoded encrypted content, typically 200+ characters.
-        # OpenRouter generates empty signatures (length 0).
-        # ZAI generates short/fake signatures that pass basic checks but fail Anthropic validation.
-        # Using 100 as threshold filters out both while keeping valid Anthropic signatures.
-        min_signature_length = 100
         jq_filter = (
             'if .message.content and (.message.content | type) == "array" then '
-            f'.message.content |= [.[] | select((.type | IN("thinking", "redacted_thinking") | not) or ((.signature // "") | length) >= {min_signature_length})] '
+            f'.message.content |= [.[] | select((.type | IN("thinking", "redacted_thinking") | not) or ((.signature // "") | length) >= {MIN_SIGNATURE_LENGTH})] '
             "else . end"
         )
 

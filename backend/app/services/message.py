@@ -8,15 +8,9 @@ from sqlalchemy import case, select, delete, update, or_, and_, insert
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.db_models import (
-    Message,
-    Chat,
-    MessageAttachment,
-    MessageEvent,
-    MessageRole,
-    MessageStreamStatus,
-)
-from app.models.schemas import CursorPaginatedResponse
+from app.models.db_models.chat import Chat, Message, MessageAttachment, MessageEvent
+from app.models.db_models.enums import MessageRole, MessageStreamStatus
+from app.models.schemas.pagination import CursorPaginatedResponse
 from app.models.schemas.chat import Message as MessageSchema
 from app.models.types import MessageAttachmentDict
 from app.services.db import BaseDbService, SessionFactoryType
@@ -32,11 +26,11 @@ class MessageService(BaseDbService[Message]):
         super().__init__(session_factory)
 
     @staticmethod
-    def _extract_user_text_content(content: str) -> str:
+    def extract_user_text_content(content: str) -> str:
         stripped = content.strip()
         if not stripped:
             return ""
-        if not (stripped.startswith("[") or stripped.startswith("{")):
+        if not stripped.startswith("["):
             return content
 
         try:
@@ -44,15 +38,11 @@ class MessageService(BaseDbService[Message]):
         except json.JSONDecodeError:
             return content
 
-        if isinstance(parsed, list):
-            items = parsed
-        elif isinstance(parsed, dict):
-            items = [parsed]
-        else:
+        if not isinstance(parsed, list):
             return content
 
         parts: list[str] = []
-        for item in items:
+        for item in parsed:
             if not isinstance(item, dict):
                 continue
             if str(item.get("type") or "").lower() != "user_text":
@@ -98,7 +88,7 @@ class MessageService(BaseDbService[Message]):
             content_text = ""
             content_render: dict[str, Any] = {"events": []}
             if not is_assistant:
-                content_text = self._extract_user_text_content(content)
+                content_text = self.extract_user_text_content(content)
                 if content_text:
                     content_render = {
                         "events": [{"type": "user_text", "text": content_text}],
@@ -347,32 +337,6 @@ class MessageService(BaseDbService[Message]):
             result = await db.execute(query)
             return cast(Message | None, result.scalar_one_or_none())
 
-    async def append_events(self, events: list[dict[str, Any]]) -> None:
-        if not events:
-            return
-
-        now = datetime.now(timezone.utc)
-        rows: list[dict[str, Any]] = []
-        for event in events:
-            rows.append(
-                {
-                    "id": uuid4(),
-                    "chat_id": event["chat_id"],
-                    "message_id": event["message_id"],
-                    "stream_id": event["stream_id"],
-                    "seq": event["seq"],
-                    "event_type": event["event_type"],
-                    "render_payload": event["render_payload"],
-                    "audit_payload": event.get("audit_payload"),
-                    "created_at": now,
-                    "updated_at": now,
-                }
-            )
-
-        async with self.session_factory() as db:
-            await db.execute(insert(MessageEvent), rows)
-            await db.commit()
-
     async def get_chat_events_after_seq(
         self,
         chat_id: UUID,
@@ -458,7 +422,6 @@ class MessageService(BaseDbService[Message]):
                     status_code=404,
                 )
 
-            # Use (created_at, id) for stable cutoff to handle same-timestamp messages
             query = (
                 select(Message)
                 .options(selectinload(Message.attachments))

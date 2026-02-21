@@ -201,7 +201,6 @@ class MarketplaceService:
 
         source_raw = raw.get("source", "")
         if isinstance(source_raw, dict):
-            # external plugins have source as {"source": "url", "url": "..."} - prefix with "external:"
             source = f"external:{source_raw.get('url', '')}"
         else:
             source = source_raw

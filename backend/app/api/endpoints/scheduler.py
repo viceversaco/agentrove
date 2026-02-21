@@ -7,10 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_scheduler_service
 from app.core.security import get_current_user, get_db
-from app.models.db_models import ScheduledTask, User
-from app.models.schemas import (
-    PaginatedResponse,
-    PaginationParams,
+from app.models.db_models.scheduled_tasks import ScheduledTask
+from app.models.db_models.user import User
+from app.models.schemas.pagination import PaginatedResponse, PaginationParams
+from app.models.schemas.scheduler import (
     ScheduledTaskBase,
     ScheduledTaskResponse,
     ScheduledTaskUpdate,
@@ -58,7 +58,7 @@ async def get_scheduled_task(
     scheduler_service: SchedulerService = Depends(get_scheduler_service),
 ) -> ScheduledTask:
     try:
-        return await scheduler_service.get_task(task_id, current_user.id, db)
+        return await scheduler_service.get_user_task(task_id, current_user.id, db)
     except SchedulerException as e:
         raise HTTPException(status_code=e.status_code, detail=str(e))
 

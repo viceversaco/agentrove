@@ -258,11 +258,6 @@ class BaseSandboxTransport(Transport, ABC):
         return shlex.join(cmd)
 
     def _parse_json_buffer(self, buffer: str) -> tuple[str, list[Any]]:
-        # Parses concatenated JSON objects from a buffer, returning unparsed remainder.
-        # Uses raw_decode instead of json.loads because the buffer may contain multiple
-        # JSON objects back-to-back (e.g., '{"a":1}{"b":2}'). json.loads would fail on this,
-        # but raw_decode returns the offset where parsing stopped, allowing us to extract
-        # each object one at a time and preserve any incomplete trailing data for the next chunk.
         messages: list[Any] = []
         working = buffer
 

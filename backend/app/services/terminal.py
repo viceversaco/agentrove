@@ -16,10 +16,6 @@ from app.utils.queue import drain_queue, put_with_overflow
 logger = logging.getLogger(__name__)
 
 
-def build_terminal_session_key(user_id: str, sandbox_id: str, terminal_id: str) -> str:
-    return f"{user_id}:{sandbox_id}:{terminal_id}"
-
-
 @dataclass
 class TerminalSessionRecord:
     user_id: str
@@ -139,15 +135,12 @@ class TerminalSessionRecord:
         if self.input_queue is None:
             return
 
-        try:
-            while True:
-                buffer = await drain_queue(self.input_queue)
-                payload = b"".join(buffer)
-                await self.sandbox_service.send_pty_input(
-                    self.sandbox_id, session_id, payload
-                )
-        except asyncio.CancelledError:
-            raise
+        while True:
+            buffer = await drain_queue(self.input_queue)
+            payload = b"".join(buffer)
+            await self.sandbox_service.send_pty_input(
+                self.sandbox_id, session_id, payload
+            )
 
     @staticmethod
     def _handle_input_task_done(task: asyncio.Task[None]) -> None:
@@ -164,6 +157,10 @@ class TerminalSessionRegistry:
         self._sessions: dict[str, TerminalSessionRecord] = {}
         self._lock = asyncio.Lock()
 
+    @staticmethod
+    def build_session_key(user_id: str, sandbox_id: str, terminal_id: str) -> str:
+        return f"{user_id}:{sandbox_id}:{terminal_id}"
+
     async def get_or_create(
         self,
         *,
@@ -173,7 +170,7 @@ class TerminalSessionRegistry:
         provider_type: SandboxProviderType,
         api_key: str | None,
     ) -> TerminalSessionRecord:
-        key = build_terminal_session_key(user_id, sandbox_id, terminal_id)
+        key = self.build_session_key(user_id, sandbox_id, terminal_id)
         async with self._lock:
             existing = self._sessions.get(key)
             if existing:

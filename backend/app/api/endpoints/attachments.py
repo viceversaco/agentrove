@@ -11,7 +11,8 @@ from app.core.config import get_settings
 from app.core.security import get_current_user
 from app.core.deps import get_chat_service
 from app.db.session import get_db
-from app.models.db_models import MessageAttachment, User
+from app.models.db_models.chat import MessageAttachment
+from app.models.db_models.user import User
 from app.services.chat import ChatService
 
 router = APIRouter()
@@ -29,6 +30,28 @@ def _is_within_base_path(path: Path, base: Path) -> bool:
 def _get_mime_type(file_path: Path) -> str:
     mime_type, _ = mimetypes.guess_type(str(file_path))
     return mime_type or "application/octet-stream"
+
+
+def _build_file_response(
+    file_path: Path, filename: str | None, *, inline: bool
+) -> FileResponse:
+    safe_filename = filename or file_path.name or "file"
+    disposition = "inline" if inline else "attachment"
+
+    ascii_filename = safe_filename.encode("ascii", "ignore").decode("ascii") or "file"
+    encoded_filename = quote(safe_filename, safe="")
+
+    headers = {
+        "Content-Disposition": f"{disposition}; filename=\"{ascii_filename}\"; filename*=UTF-8''{encoded_filename}",
+    }
+    if inline:
+        headers["Cache-Control"] = "private, max-age=3600"
+
+    return FileResponse(
+        path=file_path,
+        media_type=_get_mime_type(file_path),
+        headers=headers,
+    )
 
 
 async def _get_attachment_with_path(
@@ -63,28 +86,6 @@ async def _get_attachment_with_path(
         )
 
     return attachment, file_path
-
-
-def _build_file_response(
-    file_path: Path, filename: str | None, *, inline: bool
-) -> FileResponse:
-    safe_filename = filename or file_path.name or "file"
-    disposition = "inline" if inline else "attachment"
-
-    ascii_filename = safe_filename.encode("ascii", "ignore").decode("ascii") or "file"
-    encoded_filename = quote(safe_filename, safe="")
-
-    headers = {
-        "Content-Disposition": f"{disposition}; filename=\"{ascii_filename}\"; filename*=UTF-8''{encoded_filename}",
-    }
-    if inline:
-        headers["Cache-Control"] = "private, max-age=3600"
-
-    return FileResponse(
-        path=file_path,
-        media_type=_get_mime_type(file_path),
-        headers=headers,
-    )
 
 
 @router.get("/attachments/temp/preview")

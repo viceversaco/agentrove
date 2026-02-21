@@ -4,7 +4,7 @@ from sqladmin import Admin
 from sqladmin.authentication import AuthenticationBackend
 from starlette.requests import Request
 from app.core.security import verify_password
-from app.models.db_models import User
+from app.models.db_models.user import User
 from sqlalchemy import select
 from app.core.config import get_settings
 

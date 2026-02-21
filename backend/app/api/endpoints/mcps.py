@@ -1,28 +1,32 @@
 import re
 
-from typing import Literal, cast
+from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm.attributes import flag_modified
 
+from app.api.endpoints._shared import (
+    find_named_item_index,
+    load_settings_list_or_404,
+    save_settings_list,
+)
 from app.core.deps import get_db, get_user_service
 from app.core.security import get_current_user
-from app.models.db_models import DeleteResponseStatus, User
-from app.models.schemas import (
+from app.models.db_models.enums import DeleteResponseStatus
+from app.models.db_models.user import User
+from app.models.schemas.mcps import (
     McpCreateRequest,
     McpDeleteResponse,
     McpResponse,
     McpUpdateRequest,
 )
 from app.models.types import CustomMcpDict
-from app.services.exceptions import UserException
 from app.services.user import UserService
-
-router = APIRouter()
 
 SAFE_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_\-\.]+$")
 MAX_MCPS_PER_USER = 20
+
+router = APIRouter()
 
 
 @router.post("/", response_model=McpResponse, status_code=status.HTTP_201_CREATED)
@@ -38,14 +42,13 @@ async def create_mcp(
             detail="Invalid MCP name format",
         )
 
-    try:
-        user_settings = await user_service.get_user_settings(current_user.id, db=db)
-    except UserException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-
-    current_mcps: list[CustomMcpDict] = cast(
-        list[CustomMcpDict], user_settings.custom_mcps or []
+    user_settings, raw_mcps = await load_settings_list_or_404(
+        user_service=user_service,
+        user_id=current_user.id,
+        db=db,
+        field_name="custom_mcps",
     )
+    current_mcps = cast(list[CustomMcpDict], raw_mcps)
 
     if len(current_mcps) >= MAX_MCPS_PER_USER:
         raise HTTPException(
@@ -71,10 +74,14 @@ async def create_mcp(
     }
 
     current_mcps.append(mcp_data)
-    user_settings.custom_mcps = current_mcps
-    flag_modified(user_settings, "custom_mcps")
-
-    await user_service.save_settings(user_settings, db, current_user.id)
+    await save_settings_list(
+        user_service=user_service,
+        user_settings=user_settings,
+        db=db,
+        user_id=current_user.id,
+        field_name="custom_mcps",
+        items=current_mcps,
+    )
 
     return mcp_data
 
@@ -93,18 +100,14 @@ async def update_mcp(
             detail="Invalid MCP name format",
         )
 
-    try:
-        user_settings = await user_service.get_user_settings(current_user.id, db=db)
-    except UserException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-
-    current_mcps: list[CustomMcpDict] = cast(
-        list[CustomMcpDict], user_settings.custom_mcps or []
+    user_settings, raw_mcps = await load_settings_list_or_404(
+        user_service=user_service,
+        user_id=current_user.id,
+        db=db,
+        field_name="custom_mcps",
     )
-    mcp_index = next(
-        (i for i, m in enumerate(current_mcps) if m.get("name") == mcp_name),
-        None,
-    )
+    current_mcps = cast(list[CustomMcpDict], raw_mcps)
+    mcp_index = find_named_item_index(current_mcps, mcp_name)
 
     if mcp_index is None:
         raise HTTPException(
@@ -114,27 +117,16 @@ async def update_mcp(
 
     mcp = current_mcps[mcp_index]
     update_data = request.model_dump(exclude_unset=True)
-    if "description" in update_data:
-        mcp["description"] = cast(str, update_data["description"])
-    if "command_type" in update_data:
-        mcp["command_type"] = cast(
-            Literal["npx", "bunx", "uvx", "http"], update_data["command_type"]
-        )
-    if "package" in update_data:
-        mcp["package"] = cast(str | None, update_data["package"])
-    if "url" in update_data:
-        mcp["url"] = cast(str | None, update_data["url"])
-    if "env_vars" in update_data:
-        mcp["env_vars"] = cast(dict[str, str] | None, update_data["env_vars"])
-    if "args" in update_data:
-        mcp["args"] = cast(list[str] | None, update_data["args"])
-    if "enabled" in update_data:
-        mcp["enabled"] = cast(bool, update_data["enabled"])
+    mcp.update(update_data)
 
-    user_settings.custom_mcps = current_mcps
-    flag_modified(user_settings, "custom_mcps")
-
-    await user_service.save_settings(user_settings, db, current_user.id)
+    await save_settings_list(
+        user_service=user_service,
+        user_settings=user_settings,
+        db=db,
+        user_id=current_user.id,
+        field_name="custom_mcps",
+        items=current_mcps,
+    )
 
     return mcp
 
@@ -152,27 +144,27 @@ async def delete_mcp(
             detail="Invalid MCP name format",
         )
 
-    try:
-        user_settings = await user_service.get_user_settings(current_user.id, db=db)
-    except UserException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-
-    current_mcps = user_settings.custom_mcps or []
-    mcp_index = next(
-        (i for i, m in enumerate(current_mcps) if m.get("name") == mcp_name),
-        None,
+    user_settings, raw_mcps = await load_settings_list_or_404(
+        user_service=user_service,
+        user_id=current_user.id,
+        db=db,
+        field_name="custom_mcps",
     )
+    current_mcps = cast(list[CustomMcpDict], raw_mcps)
+    mcp_index = find_named_item_index(current_mcps, mcp_name)
 
     if mcp_index is None:
         return McpDeleteResponse(status=DeleteResponseStatus.NOT_FOUND.value)
 
     current_mcps.pop(mcp_index)
-    user_settings.custom_mcps = current_mcps
-    flag_modified(user_settings, "custom_mcps")
-
-    if user_service.remove_installed_component(user_settings, f"mcp:{mcp_name}"):
-        flag_modified(user_settings, "installed_plugins")
-
-    await user_service.save_settings(user_settings, db, current_user.id)
+    await save_settings_list(
+        user_service=user_service,
+        user_settings=user_settings,
+        db=db,
+        user_id=current_user.id,
+        field_name="custom_mcps",
+        items=current_mcps,
+        installed_component=f"mcp:{mcp_name}",
+    )
 
     return McpDeleteResponse(status=DeleteResponseStatus.DELETED.value)

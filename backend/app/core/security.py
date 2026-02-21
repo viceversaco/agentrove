@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.session import get_db
-from ..models.db_models import User
+from ..models.db_models.user import User
 from .config import get_settings
 from .user_manager import optional_current_active_user
 

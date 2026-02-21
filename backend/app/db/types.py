@@ -1,5 +1,6 @@
 import json
 import uuid as uuid_module
+from enum import Enum
 from typing import Any
 
 from cryptography.fernet import InvalidToken
@@ -7,6 +8,10 @@ from sqlalchemy import CHAR, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.engine.interfaces import Dialect
 from sqlalchemy.types import TypeDecorator
+
+
+def enum_values(enum_class: type[Enum]) -> list[str]:
+    return [entry.value for entry in enum_class]
 
 
 class GUID(TypeDecorator[uuid_module.UUID]):
@@ -40,7 +45,6 @@ class EncryptedString(TypeDecorator[str]):
     cache_ok = True
 
     def process_bind_param(self, value: str | None, _dialect: Dialect) -> str | None:
-        # Local import to avoid circular import
         from app.core.security import encrypt_value
 
         if value is None:
@@ -48,7 +52,6 @@ class EncryptedString(TypeDecorator[str]):
         return encrypt_value(value)
 
     def process_result_value(self, value: str | None, _dialect: Dialect) -> str | None:
-        # Local import to avoid circular import
         from app.core.security import decrypt_value
 
         if value is None:
@@ -64,7 +67,6 @@ class EncryptedJSON(TypeDecorator[Any]):
     cache_ok = True
 
     def process_bind_param(self, value: Any, _dialect: Dialect) -> Any:
-        # Local import to avoid circular import
         from app.core.security import encrypt_value
 
         if value is None:
@@ -76,7 +78,6 @@ class EncryptedJSON(TypeDecorator[Any]):
         return encrypt_value(serialized)
 
     def process_result_value(self, value: Any, _dialect: Dialect) -> Any:
-        # Local import to avoid circular import
         from app.core.security import decrypt_value
 
         if value is None:

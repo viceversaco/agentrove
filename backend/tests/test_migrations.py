@@ -10,7 +10,8 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.pool import NullPool
 
 from app.core.config import get_settings
-from app.db.base import Base
+from app.db.base_class import Base
+from app.models.db_models import chat, refresh_token, scheduled_tasks, user  # noqa: F401
 
 settings = get_settings()
 

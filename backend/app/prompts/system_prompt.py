@@ -5,13 +5,15 @@ from app.constants import DOCKER_AVAILABLE_PORTS
 from app.services.sandbox_providers import SandboxProviderType
 
 if TYPE_CHECKING:
-    from app.models.db_models import UserSettings
+    from app.models.db_models.user import UserSettings
 
 
-def _get_github_section(github_token_configured: bool) -> str:
-    if not github_token_configured:
-        return ""
-    return """
+class SystemPromptBuilder:
+    @staticmethod
+    def github_section(github_token_configured: bool) -> str:
+        if not github_token_configured:
+            return ""
+        return """
 <github_integration>
 - Use `gh` CLI for GitHub operations (PRs, issues, API)
 - Examples: `gh pr list`, `gh pr view 193 --json number,title,body,headRefName,baseRefName,commits`, `gh pr diff 193` (where 193 is PR number)
@@ -19,11 +21,11 @@ def _get_github_section(github_token_configured: bool) -> str:
 </github_integration>
 """
 
-
-def _get_env_vars_section(env_vars_formatted: str | None) -> str:
-    if not env_vars_formatted:
-        return ""
-    return f"""
+    @staticmethod
+    def env_vars_section(env_vars_formatted: str | None) -> str:
+        if not env_vars_formatted:
+            return ""
+        return f"""
 
 <available_env_variables>
 - Available custom environment variables: {env_vars_formatted}
@@ -32,9 +34,9 @@ def _get_env_vars_section(env_vars_formatted: str | None) -> str:
 </available_env_variables>
 """
 
-
-def _get_prompt_suggestions_section() -> str:
-    return """
+    @staticmethod
+    def prompt_suggestions_section() -> str:
+        return """
 <prompt_suggestions_instructions>
 At the end of EVERY response, you MUST provide 2-3 contextually relevant follow-up prompt suggestions.
 These suggestions should help the user continue the conversation productively.
@@ -53,22 +55,22 @@ Guidelines for suggestions:
 </prompt_suggestions_instructions>
 """
 
-
-def _get_runtime_context_section(
-    sandbox_id: str,
-    current_date: str,
-    sandbox_provider: str = "docker",
-) -> str:
-    ports_str = ", ".join(str(p) for p in DOCKER_AVAILABLE_PORTS)
-    if sandbox_provider == SandboxProviderType.E2B.value:
-        provider_label = "E2B (cloud)"
-    elif sandbox_provider == SandboxProviderType.MODAL.value:
-        provider_label = "Modal (cloud)"
-    elif sandbox_provider == SandboxProviderType.HOST.value:
-        provider_label = "Host (local machine)"
-    else:
-        provider_label = "Docker (local)"
-    return f"""<runtime_context>
+    @staticmethod
+    def runtime_context_section(
+        sandbox_id: str,
+        current_date: str,
+        sandbox_provider: str = "docker",
+    ) -> str:
+        ports_str = ", ".join(str(p) for p in DOCKER_AVAILABLE_PORTS)
+        if sandbox_provider == SandboxProviderType.E2B.value:
+            provider_label = "E2B (cloud)"
+        elif sandbox_provider == SandboxProviderType.MODAL.value:
+            provider_label = "Modal (cloud)"
+        elif sandbox_provider == SandboxProviderType.HOST.value:
+            provider_label = "Host (local machine)"
+        else:
+            provider_label = "Docker (local)"
+        return f"""<runtime_context>
 - Workspace: /home/user
 - Sandbox: {sandbox_id}
 - Date: {current_date}
@@ -81,50 +83,26 @@ def _get_runtime_context_section(
 - IMPORTANT: Do NOT tell users specific localhost URLs. The actual port is dynamically mapped. Direct users to check the Preview panel for the correct URL.
 </runtime_context>"""
 
+    @staticmethod
+    def build(
+        sandbox_id: str,
+        github_token_configured: bool = False,
+        env_vars_formatted: str | None = None,
+        sandbox_provider: str = "docker",
+        custom_prompt_content: str | None = None,
+    ) -> str:
+        current_date = datetime.utcnow().strftime("%Y-%m-%d")
+        runtime_section = SystemPromptBuilder.runtime_context_section(
+            sandbox_id, current_date, sandbox_provider
+        )
+        github_section = SystemPromptBuilder.github_section(github_token_configured)
+        env_section = SystemPromptBuilder.env_vars_section(env_vars_formatted)
+        suggestions_section = SystemPromptBuilder.prompt_suggestions_section()
 
-def get_system_prompt(
-    sandbox_id: str,
-    github_token_configured: bool = False,
-    env_vars_formatted: str | None = None,
-    sandbox_provider: str = "docker",
-) -> str:
-    current_date = datetime.utcnow().strftime("%Y-%m-%d")
-    runtime_section = _get_runtime_context_section(
-        sandbox_id, current_date, sandbox_provider
-    )
-    github_section = _get_github_section(github_token_configured)
-    env_section = _get_env_vars_section(env_vars_formatted)
-    suggestions_section = _get_prompt_suggestions_section()
+        custom_section = f"\n{custom_prompt_content}\n" if custom_prompt_content else ""
 
-    return f"""
-{runtime_section}
-
-{github_section}
-
-{env_section}
-
-{suggestions_section}
-"""
-
-
-def build_custom_system_prompt(
-    custom_prompt_content: str,
-    sandbox_id: str,
-    github_token_configured: bool = False,
-    env_vars_formatted: str | None = None,
-    sandbox_provider: str = "docker",
-) -> str:
-    current_date = datetime.utcnow().strftime("%Y-%m-%d")
-    runtime_section = _get_runtime_context_section(
-        sandbox_id, current_date, sandbox_provider
-    )
-    github_section = _get_github_section(github_token_configured)
-    env_section = _get_env_vars_section(env_vars_formatted)
-    suggestions_section = _get_prompt_suggestions_section()
-
-    return f"""
-{custom_prompt_content}
-
+        return f"""
+{custom_section}
 {runtime_section}
 
 {github_section}
@@ -149,6 +127,7 @@ def build_system_prompt_for_chat(
 
     sandbox_provider = user_settings.sandbox_provider
 
+    custom_prompt_content = None
     if selected_prompt_name and user_settings.custom_prompts:
         custom_prompt = next(
             (
@@ -159,17 +138,12 @@ def build_system_prompt_for_chat(
             None,
         )
         if custom_prompt:
-            return build_custom_system_prompt(
-                custom_prompt["content"],
-                sandbox_id,
-                github_token_configured,
-                env_vars_formatted,
-                sandbox_provider,
-            )
+            custom_prompt_content = custom_prompt["content"]
 
-    return get_system_prompt(
+    return SystemPromptBuilder.build(
         sandbox_id,
         github_token_configured,
         env_vars_formatted,
         sandbox_provider,
+        custom_prompt_content=custom_prompt_content,
     )

@@ -17,6 +17,11 @@ try:
 except ModuleNotFoundError:
     _RedisError = OSError
 
+try:
+    from redis.asyncio import Redis as RedisClient
+except ModuleNotFoundError:
+    RedisClient = None
+
 CacheError = _RedisError
 
 
@@ -47,10 +52,10 @@ class MemoryPubSub:
         self._queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
 
     async def subscribe(self, channel: str) -> None:
-        self._store._add_subscriber(channel, self)
+        self._store.add_subscriber(channel, self)
 
     async def unsubscribe(self, channel: str) -> None:
-        self._store._remove_subscriber(channel, self)
+        self._store.remove_subscriber(channel, self)
 
     async def get_message(
         self, ignore_subscribe_messages: bool = False, timeout: float = 1.0
@@ -142,10 +147,10 @@ class MemoryStore:
     def pubsub(self) -> MemoryPubSub:
         return MemoryPubSub(self)
 
-    def _add_subscriber(self, channel: str, sub: MemoryPubSub) -> None:
+    def add_subscriber(self, channel: str, sub: MemoryPubSub) -> None:
         self._subscribers[channel].append(sub)
 
-    def _remove_subscriber(self, channel: str, sub: MemoryPubSub) -> None:
+    def remove_subscriber(self, channel: str, sub: MemoryPubSub) -> None:
         subs = self._subscribers.get(channel, [])
         if sub in subs:
             subs.remove(sub)
@@ -167,15 +172,18 @@ async def cache_connection() -> AsyncIterator[CacheStore]:
     if settings.DESKTOP_MODE:
         yield MemoryStore.get_instance()
         return
-    from redis.asyncio import Redis
+    if RedisClient is None:
+        raise CacheError("Redis client is not available")
 
-    store = cast(CacheStore, Redis.from_url(settings.REDIS_URL, decode_responses=True))
+    store = cast(
+        CacheStore, RedisClient.from_url(settings.REDIS_URL, decode_responses=True)
+    )
     try:
         yield store
     finally:
         try:
             await store.close()
-        except Exception as e:
+        except CacheError as e:
             logger.warning("Error closing Redis connection: %s", e)
 
 
@@ -188,9 +196,9 @@ async def cache_pubsub(store: CacheStore, channel: str) -> AsyncIterator[CachePu
     finally:
         try:
             await pubsub.unsubscribe(channel)
-        except Exception as e:
+        except CacheError as e:
             logger.warning("Error unsubscribing from channel %s: %s", channel, e)
         try:
             await pubsub.close()
-        except Exception as e:
+        except CacheError as e:
             logger.warning("Error closing pubsub: %s", e)

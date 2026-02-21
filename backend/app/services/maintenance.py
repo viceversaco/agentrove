@@ -5,6 +5,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import dataclass
+from functools import partial
 from typing import Any
 
 from app.core.config import get_settings
@@ -54,7 +55,7 @@ class MaintenanceService:
         return MaintenanceJob(
             name="scheduled_tasks",
             interval_seconds=60.0,
-            run=self._run_scheduled_tasks,
+            run=partial(self._scheduler_service.check_due_tasks, limit=100),
         )
 
     def _refresh_tokens_job(self) -> MaintenanceJob:
@@ -70,9 +71,6 @@ class MaintenanceService:
             interval_seconds=REAPER_INTERVAL_SECONDS,
             run=self._reap_idle_sessions,
         )
-
-    async def _run_scheduled_tasks(self) -> dict[str, Any]:
-        return await self._scheduler_service.check_due_tasks(limit=100)
 
     @staticmethod
     async def _reap_idle_sessions() -> dict[str, Any]:

@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncIterator
 
 from fastapi import Depends, HTTPException, Request, status
@@ -7,22 +8,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import get_current_user
 from app.core.user_manager import optional_current_active_user
 from app.db.session import SessionLocal, get_db
-from app.models.db_models import Chat, User
+from app.models.db_models.chat import Chat
+from app.models.db_models.user import User
 from app.services.agent import AgentService
 from app.services.chat import ChatService
-from app.services.provider import ProviderService
 from app.services.command import CommandService
 from app.services.exceptions import UserException
+from app.services.marketplace import MarketplaceService
+from app.services.plugin_installer import PluginInstallerService
+from app.services.provider import ProviderService
 from app.services.refresh_token import RefreshTokenService
 from app.services.sandbox import SandboxService
 from app.services.sandbox_providers import SandboxProviderType
 from app.services.sandbox_providers.factory import SandboxProviderFactory
 from app.services.scheduler import SchedulerService
-from app.services.marketplace import MarketplaceService
-from app.services.plugin_installer import PluginInstallerService
 from app.services.skill import SkillService
 from app.services.storage import StorageService
 from app.services.user import UserService
+
+logger = logging.getLogger(__name__)
 
 
 def get_provider_service() -> ProviderService:
@@ -141,8 +145,8 @@ async def get_sandbox_service(
                 e2b_api_key = user_settings.e2b_api_key
             if user_settings.modal_api_key:
                 modal_api_key = user_settings.modal_api_key
-        except UserException:
-            pass
+        except UserException as e:
+            logger.warning("Failed to load user settings for sandbox: %s", e)
 
     if sandbox_provider:
         provider_type = SandboxProviderType(sandbox_provider)

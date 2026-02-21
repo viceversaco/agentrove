@@ -7,7 +7,7 @@ from sqlalchemy import Enum as SQLAlchemyEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base, PG_GEN_UUID
-from app.db.types import GUID
+from app.db.types import GUID, enum_values
 
 from .enums import RecurrenceType, TaskExecutionStatus, TaskStatus
 
@@ -30,7 +30,7 @@ class ScheduledTask(Base):
         SQLAlchemyEnum(
             RecurrenceType,
             name="recurrencetype",
-            values_callable=lambda obj: [entry.value for entry in obj],
+            values_callable=enum_values,
         ),
         nullable=False,
     )
@@ -43,7 +43,7 @@ class ScheduledTask(Base):
         SQLAlchemyEnum(
             TaskStatus,
             name="taskstatus",
-            values_callable=lambda obj: [entry.value for entry in obj],
+            values_callable=enum_values,
         ),
         nullable=False,
         default=TaskStatus.ACTIVE,
@@ -85,7 +85,7 @@ class TaskExecution(Base):
         SQLAlchemyEnum(
             TaskExecutionStatus,
             name="taskexecutionstatus",
-            values_callable=lambda obj: [entry.value for entry in obj],
+            values_callable=enum_values,
         ),
         nullable=False,
     )

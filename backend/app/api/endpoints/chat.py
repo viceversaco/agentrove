@@ -1,6 +1,8 @@
 import asyncio
 import json
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any, Literal
 from uuid import UUID
 
@@ -23,9 +25,11 @@ from app.constants import (
 from app.core.config import get_settings
 from app.core.deps import get_chat_service
 from app.core.security import get_current_user
-from app.models.db_models import User, MessageStreamStatus
+from app.models.db_models.chat import Chat
+from app.models.db_models.enums import MessageStreamStatus
+from app.models.db_models.user import User
 from app.models.types import MessageAttachmentDict
-from app.models.schemas import (
+from app.models.schemas.chat import (
     Chat as ChatSchema,
     ChatCompletionResponse,
     ChatCreate,
@@ -33,21 +37,21 @@ from app.models.schemas import (
     ChatUpdate,
     ChatRequest,
     ContextUsage,
-    CursorPaginatedResponse,
-    CursorPaginationParams,
     EnhancePromptResponse,
     ForkChatRequest,
     ForkChatResponse,
     Message as MessageSchema,
     MessageEvent,
-    PaginatedResponse,
-    PaginationParams,
     PermissionRespondResponse,
-    QueueAddResponse,
-    QueuedMessage,
-    QueueMessageUpdate,
     RestoreRequest,
 )
+from app.models.schemas.pagination import (
+    CursorPaginatedResponse,
+    CursorPaginationParams,
+    PaginatedResponse,
+    PaginationParams,
+)
+from app.models.schemas.queue import QueueAddResponse, QueuedMessage, QueueMessageUpdate
 from app.services.chat import ChatService
 from app.services.claude_agent import ClaudeAgentService
 from app.services.exceptions import (
@@ -75,14 +79,23 @@ INACTIVE_TASK_RESPONSE = {
 
 async def _ensure_chat_access(
     chat_id: UUID, chat_service: ChatService, current_user: User
-) -> None:
+) -> Chat:
     try:
-        await chat_service.get_chat(chat_id, current_user)
+        return await chat_service.get_chat(chat_id, current_user)
     except ChatException:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Chat not found or access denied",
         )
+
+
+@asynccontextmanager
+async def _queue_service_context(action: str) -> AsyncIterator[QueueService]:
+    try:
+        async with cache_connection() as cache:
+            yield QueueService(cache)
+    except CacheError as e:
+        _raise_cache_http_exception(e, action)
 
 
 def _parse_non_negative_seq(value: str | None) -> int:
@@ -93,6 +106,26 @@ def _parse_non_negative_seq(value: str | None) -> int:
     except (TypeError, ValueError):
         return 0
     return parsed if parsed >= 0 else 0
+
+
+def _raise_chat_http_exception(exc: ChatException) -> None:
+    raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+
+def _raise_database_http_exception(exc: SQLAlchemyError, action: str) -> None:
+    logger.error("Database error %s: %s", action, exc, exc_info=True)
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=f"Database error while {action}",
+    ) from exc
+
+
+def _raise_cache_http_exception(exc: CacheError, action: str) -> None:
+    logger.error("Redis error %s: %s", action, exc, exc_info=True)
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Service temporarily unavailable",
+    ) from exc
 
 
 @router.post(
@@ -106,22 +139,13 @@ async def create_chat(
     chat_service: ChatService = Depends(get_chat_service),
 ) -> ChatSchema:
     try:
-        chat = await chat_service.create_chat(current_user, chat_data)
-        return chat
+        return await chat_service.create_chat(current_user, chat_data)
     except ChatException as e:
-        raise HTTPException(status_code=e.status_code, detail=str(e))
+        _raise_chat_http_exception(e)
     except SQLAlchemyError as e:
-        logger.error("Database error creating chat: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database error while creating chat",
-        )
+        _raise_database_http_exception(e, "creating chat")
     except CacheError as e:
-        logger.error("Redis error creating chat: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Service temporarily unavailable",
-        )
+        _raise_cache_http_exception(e, "creating chat")
 
 
 @router.post("/chat", response_model=ChatCompletionResponse)
@@ -157,7 +181,9 @@ async def send_message(
             "last_seq": result.get("last_seq", 0),
         }
     except ChatException as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
+        ) from e
 
 
 @router.post("/enhance-prompt", response_model=EnhancePromptResponse)
@@ -167,17 +193,17 @@ async def enhance_prompt(
     chat_service: ChatService = Depends(get_chat_service),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, str]:
+    ai_service = ClaudeAgentService(session_factory=chat_service.session_factory)
     try:
-        ai_service = ClaudeAgentService(session_factory=chat_service.session_factory)
         enhanced_prompt = await ai_service.enhance_prompt(
             prompt, model_id, current_user
         )
-        return {"enhanced_prompt": enhanced_prompt}
     except ClaudeAgentException as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),
         )
+    return {"enhanced_prompt": enhanced_prompt}
 
 
 @router.get("/chats", response_model=PaginatedResponse[ChatSchema])
@@ -199,16 +225,11 @@ async def get_chat_detail(
     chat_service: ChatService = Depends(get_chat_service),
 ) -> ChatSchema:
     try:
-        chat = await chat_service.get_chat(chat_id, current_user)
-        return chat
+        return await chat_service.get_chat(chat_id, current_user)
     except ChatException as e:
-        raise HTTPException(status_code=e.status_code, detail=str(e))
+        _raise_chat_http_exception(e)
     except SQLAlchemyError as e:
-        logger.error("Database error retrieving chat %s: %s", chat_id, e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database error while retrieving chat",
-        )
+        _raise_database_http_exception(e, "retrieving chat")
 
 
 @router.get("/chats/{chat_id}/context-usage", response_model=ContextUsage)
@@ -232,7 +253,7 @@ async def get_chat_context_usage(
                     ),
                     percentage=data.get("percentage", 0.0),
                 )
-    except (CacheError, json.JSONDecodeError, KeyError) as e:
+    except (CacheError, json.JSONDecodeError) as e:
         logger.warning("Failed to get context usage from cache: %s", e)
 
     tokens_used = chat.context_token_usage or 0
@@ -256,16 +277,11 @@ async def update_chat(
     chat_service: ChatService = Depends(get_chat_service),
 ) -> ChatSchema:
     try:
-        chat = await chat_service.update_chat(chat_id, chat_update, current_user)
-        return chat
+        return await chat_service.update_chat(chat_id, chat_update, current_user)
     except ChatException as e:
-        raise HTTPException(status_code=e.status_code, detail=str(e))
+        _raise_chat_http_exception(e)
     except SQLAlchemyError as e:
-        logger.error("Database error updating chat %s: %s", chat_id, e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database error while updating chat",
-        )
+        _raise_database_http_exception(e, "updating chat")
 
 
 @router.delete("/chats/all", status_code=status.HTTP_204_NO_CONTENT)
@@ -311,13 +327,9 @@ async def restore_chat(
             chat_id, request.message_id, current_user
         )
     except ChatException as e:
-        raise HTTPException(status_code=e.status_code, detail=str(e))
+        _raise_chat_http_exception(e)
     except SQLAlchemyError as e:
-        logger.error("Database error restoring chat %s: %s", chat_id, e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database error while restoring chat",
-        )
+        _raise_database_http_exception(e, "restoring chat")
 
 
 @router.post(
@@ -337,13 +349,9 @@ async def fork_chat(
         )
         return ForkChatResponse(chat=new_chat, messages_copied=messages_copied)
     except (ChatException, MessageException, SandboxException) as e:
-        raise HTTPException(status_code=e.status_code, detail=str(e))
+        raise HTTPException(status_code=e.status_code, detail=str(e)) from e
     except SQLAlchemyError as e:
-        logger.error("Database error forking chat %s: %s", chat_id, e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database error while forking chat",
-        )
+        _raise_database_http_exception(e, "forking chat")
     except FileNotFoundError as e:
         logger.error(
             "Checkpoint not found forking chat %s: %s", chat_id, e, exc_info=True
@@ -351,7 +359,7 @@ async def fork_chat(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Checkpoint not found",
-        )
+        ) from e
 
 
 @router.get("/chats/{chat_id}/stream")
@@ -409,13 +417,7 @@ async def get_stream_status(
             "last_seq": latest_assistant_message.last_seq,
         }
     except SQLAlchemyError as e:
-        logger.error(
-            "Database error checking chat status %s: %s", chat_id, e, exc_info=True
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to check chat status",
-        )
+        _raise_database_http_exception(e, "checking chat status")
 
 
 @router.get("/messages/{message_id}/events", response_model=list[MessageEvent])
@@ -507,13 +509,7 @@ async def queue_message(
     current_user: User = Depends(get_current_user),
     chat_service: ChatService = Depends(get_chat_service),
 ) -> QueueAddResponse:
-    try:
-        chat = await chat_service.get_chat(chat_id, current_user)
-    except ChatException:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Chat not found or access denied",
-        )
+    chat = await _ensure_chat_access(chat_id, chat_service, current_user)
 
     attachments: list[MessageAttachmentDict] | None = None
     files = attached_files or []
@@ -532,22 +528,14 @@ async def queue_message(
         )
     queue_attachments = [dict(item) for item in attachments] if attachments else None
 
-    try:
-        async with cache_connection() as cache:
-            queue_service = QueueService(cache)
-            return await queue_service.add_message(
-                str(chat_id),
-                content,
-                model_id,
-                permission_mode=permission_mode,
-                thinking_mode=thinking_mode,
-                attachments=queue_attachments,
-            )
-    except CacheError as e:
-        logger.error("Redis error queueing message: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Service temporarily unavailable",
+    async with _queue_service_context("queueing message") as queue_service:
+        return await queue_service.add_message(
+            str(chat_id),
+            content,
+            model_id,
+            permission_mode=permission_mode,
+            thinking_mode=thinking_mode,
+            attachments=queue_attachments,
         )
 
 
@@ -562,16 +550,8 @@ async def get_queue(
 ) -> list[QueuedMessage]:
     await _ensure_chat_access(chat_id, chat_service, current_user)
 
-    try:
-        async with cache_connection() as cache:
-            queue_service = QueueService(cache)
-            return await queue_service.get_queue(str(chat_id))
-    except CacheError as e:
-        logger.error("Redis error getting queue: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Service temporarily unavailable",
-        )
+    async with _queue_service_context("getting queue") as queue_service:
+        return await queue_service.get_queue(str(chat_id))
 
 
 @router.patch(
@@ -587,17 +567,9 @@ async def update_queued_message(
 ) -> QueuedMessage:
     await _ensure_chat_access(chat_id, chat_service, current_user)
 
-    try:
-        async with cache_connection() as cache:
-            queue_service = QueueService(cache)
-            result = await queue_service.update_message(
-                str(chat_id), str(message_id), update.content
-            )
-    except CacheError as e:
-        logger.error("Redis error updating queued message: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Service temporarily unavailable",
+    async with _queue_service_context("updating queued message") as queue_service:
+        result = await queue_service.update_message(
+            str(chat_id), str(message_id), update.content
         )
     if result is None:
         raise HTTPException(
@@ -619,16 +591,8 @@ async def delete_queued_message(
 ) -> None:
     await _ensure_chat_access(chat_id, chat_service, current_user)
 
-    try:
-        async with cache_connection() as cache:
-            queue_service = QueueService(cache)
-            found = await queue_service.delete_message(str(chat_id), str(message_id))
-    except CacheError as e:
-        logger.error("Redis error deleting queued message: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Service temporarily unavailable",
-        )
+    async with _queue_service_context("deleting queued message") as queue_service:
+        found = await queue_service.delete_message(str(chat_id), str(message_id))
     if not found:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -648,16 +612,8 @@ async def send_now_queued_message(
 ) -> None:
     await _ensure_chat_access(chat_id, chat_service, current_user)
 
-    try:
-        async with cache_connection() as cache:
-            queue_service = QueueService(cache)
-            found = await queue_service.mark_send_now(str(chat_id), str(message_id))
-    except CacheError as e:
-        logger.error("Redis error marking send-now: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Service temporarily unavailable",
-        )
+    async with _queue_service_context("marking send-now") as queue_service:
+        found = await queue_service.mark_send_now(str(chat_id), str(message_id))
     if not found:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -676,7 +632,7 @@ async def send_now_queued_message(
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Failed to start send-now execution",
-            )
+            ) from e
 
 
 @router.delete(
@@ -690,13 +646,5 @@ async def clear_queue(
 ) -> None:
     await _ensure_chat_access(chat_id, chat_service, current_user)
 
-    try:
-        async with cache_connection() as cache:
-            queue_service = QueueService(cache)
-            await queue_service.clear_queue(str(chat_id))
-    except CacheError as e:
-        logger.error("Redis error clearing queue: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Service temporarily unavailable",
-        )
+    async with _queue_service_context("clearing queue") as queue_service:
+        await queue_service.clear_queue(str(chat_id))

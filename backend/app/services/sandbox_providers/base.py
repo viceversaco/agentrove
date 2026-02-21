@@ -348,11 +348,6 @@ class SandboxProvider(ABC):
         sandbox_id: str,
         checkpoint_id: str,
     ) -> str:
-        # Creates a space-efficient incremental checkpoint using rsync hard links.
-        # The --link-dest option creates hard links to unchanged files from the previous
-        # checkpoint, meaning only modified files consume additional disk space.
-        # For example, if checkpoint A has 100 files and checkpoint B only changes 2 files,
-        # B will hard-link 98 files to A and only store 2 new copies.
         checkpoint_dir = f"{CHECKPOINT_BASE_DIR}/{checkpoint_id}"
 
         await self.execute_command(
@@ -366,7 +361,6 @@ class SandboxProvider(ABC):
             for pattern in SANDBOX_RESTORE_EXCLUDE_PATTERNS
         )
 
-        # Use --link-dest for incremental backup: unchanged files become hard links
         if prev_checkpoint:
             rsync_cmd = (
                 f"rsync -a --delete "

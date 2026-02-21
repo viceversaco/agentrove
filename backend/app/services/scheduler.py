@@ -12,25 +12,22 @@ from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.models.db_models import (
-    Chat,
-    Message,
+from app.models.db_models.chat import Chat, Message
+from app.models.db_models.enums import (
     MessageRole,
     MessageStreamStatus,
     RecurrenceType,
-    ScheduledTask,
-    TaskExecution,
     TaskExecutionStatus,
     TaskStatus,
-    User,
-    UserSettings,
 )
-from app.models.schemas import (
-    PaginatedResponse,
-    PaginationParams,
+from app.models.db_models.scheduled_tasks import ScheduledTask, TaskExecution
+from app.models.db_models.user import User, UserSettings
+from app.models.schemas.pagination import PaginatedResponse, PaginationParams
+from app.models.schemas.scheduler import (
     ScheduledTaskBase,
     ScheduledTaskUpdate,
     TaskExecutionResponse,
@@ -40,7 +37,6 @@ from app.prompts.system_prompt import build_system_prompt_for_chat
 from app.services.db import BaseDbService, SessionFactoryType
 from app.services.exceptions import SchedulerException
 from app.services.sandbox import SandboxService
-from app.services.sandbox_providers import SandboxProviderType
 from app.services.sandbox_providers.factory import SandboxProviderFactory
 from app.services.streaming.runtime import ChatStreamRuntime
 from app.services.streaming.types import ChatStreamRequest
@@ -76,7 +72,7 @@ class SchedulerService(BaseDbService[ScheduledTask]):
         }
         return len(self._scheduled_tasks)
 
-    def _tz(self, name: str | None) -> ZoneInfo:
+    def _parse_timezone(self, name: str | None) -> ZoneInfo:
         if not name:
             return ZoneInfo("UTC")
         try:
@@ -104,66 +100,122 @@ class SchedulerService(BaseDbService[ScheduledTask]):
         timezone_name: str | None,
         allow_once: bool,
     ) -> datetime | None:
-        local_now = from_time_utc.astimezone(self._tz(timezone_name))
+        local_now = from_time_utc.astimezone(self._parse_timezone(timezone_name))
         hour, minute, second = self._parse_time(scheduled_time)
 
         if recurrence_type == RecurrenceType.ONCE:
-            if not allow_once:
-                return None
-            target = local_now.replace(
-                hour=hour, minute=minute, second=second, microsecond=0
+            return self._next_once_run_utc(
+                local_now=local_now,
+                hour=hour,
+                minute=minute,
+                second=second,
+                allow_once=allow_once,
             )
-            next_local = target if target > local_now else target + timedelta(days=1)
-            return next_local.astimezone(timezone.utc)
 
         if recurrence_type == RecurrenceType.DAILY:
-            target = local_now.replace(
-                hour=hour, minute=minute, second=second, microsecond=0
-            )
-            next_local = target if target > local_now else target + timedelta(days=1)
-            return next_local.astimezone(timezone.utc)
+            return self._next_daily_run_utc(local_now, hour, minute, second)
 
         if recurrence_type == RecurrenceType.WEEKLY:
-            if scheduled_day is None or scheduled_day < 0 or scheduled_day > 6:
-                raise SchedulerException("Weekly tasks require scheduled_day (0-6)")
-            days_ahead = (scheduled_day - local_now.weekday()) % 7
-            target_date = local_now.date() + timedelta(days=days_ahead)
-            target = datetime(
-                target_date.year,
-                target_date.month,
-                target_date.day,
-                hour,
-                minute,
-                second,
-                tzinfo=local_now.tzinfo,
+            return self._next_weekly_run_utc(
+                local_now=local_now,
+                scheduled_day=scheduled_day,
+                hour=hour,
+                minute=minute,
+                second=second,
             )
-            next_local = target if target > local_now else target + timedelta(days=7)
-            return next_local.astimezone(timezone.utc)
 
         if recurrence_type == RecurrenceType.MONTHLY:
-            if scheduled_day is None or scheduled_day < 1 or scheduled_day > 31:
-                raise SchedulerException("Monthly tasks require scheduled_day (1-31)")
-            year = local_now.year
-            month = local_now.month
+            return self._next_monthly_run_utc(
+                local_now=local_now,
+                scheduled_day=scheduled_day,
+                hour=hour,
+                minute=minute,
+                second=second,
+            )
+
+        raise SchedulerException(f"Unexpected recurrence type: {recurrence_type}")
+
+    def _next_once_run_utc(
+        self,
+        *,
+        local_now: datetime,
+        hour: int,
+        minute: int,
+        second: int,
+        allow_once: bool,
+    ) -> datetime | None:
+        if not allow_once:
+            return None
+        return self._next_daily_run_utc(local_now, hour, minute, second)
+
+    def _next_daily_run_utc(
+        self,
+        local_now: datetime,
+        hour: int,
+        minute: int,
+        second: int,
+    ) -> datetime:
+        target = local_now.replace(
+            hour=hour, minute=minute, second=second, microsecond=0
+        )
+        next_local = target if target > local_now else target + timedelta(days=1)
+        return next_local.astimezone(timezone.utc)
+
+    def _next_weekly_run_utc(
+        self,
+        *,
+        local_now: datetime,
+        scheduled_day: int | None,
+        hour: int,
+        minute: int,
+        second: int,
+    ) -> datetime:
+        if scheduled_day is None or not 0 <= scheduled_day <= 6:
+            raise SchedulerException("Weekly tasks require scheduled_day (0-6)")
+        days_ahead = (scheduled_day - local_now.weekday()) % 7
+        target_date = local_now.date() + timedelta(days=days_ahead)
+        target = datetime(
+            target_date.year,
+            target_date.month,
+            target_date.day,
+            hour,
+            minute,
+            second,
+            tzinfo=local_now.tzinfo,
+        )
+        next_local = target if target > local_now else target + timedelta(days=7)
+        return next_local.astimezone(timezone.utc)
+
+    def _next_monthly_run_utc(
+        self,
+        *,
+        local_now: datetime,
+        scheduled_day: int | None,
+        hour: int,
+        minute: int,
+        second: int,
+    ) -> datetime:
+        if scheduled_day is None or not 1 <= scheduled_day <= 31:
+            raise SchedulerException("Monthly tasks require scheduled_day (1-31)")
+        year = local_now.year
+        month = local_now.month
+        max_day = monthrange(year, month)[1]
+        day = min(scheduled_day, max_day)
+        target = datetime(
+            year, month, day, hour, minute, second, tzinfo=local_now.tzinfo
+        )
+        if target <= local_now:
+            if month == 12:
+                year += 1
+                month = 1
+            else:
+                month += 1
             max_day = monthrange(year, month)[1]
             day = min(scheduled_day, max_day)
             target = datetime(
                 year, month, day, hour, minute, second, tzinfo=local_now.tzinfo
             )
-            if target <= local_now:
-                if month == 12:
-                    year += 1
-                    month = 1
-                else:
-                    month += 1
-                max_day = monthrange(year, month)[1]
-                day = min(scheduled_day, max_day)
-                target = datetime(
-                    year, month, day, hour, minute, second, tzinfo=local_now.tzinfo
-                )
-            return target.astimezone(timezone.utc)
-
-        raise SchedulerException(f"Unexpected recurrence type: {recurrence_type}")
+        return target.astimezone(timezone.utc)
 
     def validate_recurrence_constraints(
         self, recurrence_type: RecurrenceType, scheduled_day: int | None
@@ -184,7 +236,7 @@ class SchedulerService(BaseDbService[ScheduledTask]):
         timezone_name = cast(str, user_settings.timezone)
         return timezone_name
 
-    async def _get_user_task(
+    async def get_user_task(
         self, task_id: UUID, user_id: UUID, db: AsyncSession
     ) -> ScheduledTask:
         result = await db.execute(
@@ -242,11 +294,6 @@ class SchedulerService(BaseDbService[ScheduledTask]):
         )
         return list(result.scalars().all())
 
-    async def get_task(
-        self, task_id: UUID, user_id: UUID, db: AsyncSession
-    ) -> ScheduledTask:
-        return await self._get_user_task(task_id, user_id, db)
-
     async def update_task(
         self,
         task_id: UUID,
@@ -254,7 +301,7 @@ class SchedulerService(BaseDbService[ScheduledTask]):
         task_update: ScheduledTaskUpdate,
         db: AsyncSession,
     ) -> ScheduledTask:
-        task = await self._get_user_task(task_id, user_id, db)
+        task = await self.get_user_task(task_id, user_id, db)
         update_data = task_update.model_dump(exclude_unset=True)
         old_status = task.status
 
@@ -286,14 +333,14 @@ class SchedulerService(BaseDbService[ScheduledTask]):
         return task
 
     async def delete_task(self, task_id: UUID, user_id: UUID, db: AsyncSession) -> None:
-        task = await self._get_user_task(task_id, user_id, db)
+        task = await self.get_user_task(task_id, user_id, db)
         await db.delete(task)
         await db.commit()
 
     async def toggle_task(
         self, task_id: UUID, user_id: UUID, db: AsyncSession
     ) -> TaskToggleResponse:
-        task = await self._get_user_task(task_id, user_id, db)
+        task = await self.get_user_task(task_id, user_id, db)
 
         if task.status == TaskStatus.ACTIVE:
             task.status = TaskStatus.PAUSED
@@ -329,7 +376,7 @@ class SchedulerService(BaseDbService[ScheduledTask]):
         pagination: PaginationParams,
         db: AsyncSession,
     ) -> PaginatedResponse[TaskExecutionResponse]:
-        await self._get_user_task(task_id, user_id, db)
+        await self.get_user_task(task_id, user_id, db)
 
         count_result = await db.execute(
             select(func.count(TaskExecution.id)).where(TaskExecution.task_id == task_id)
@@ -491,11 +538,11 @@ class SchedulerService(BaseDbService[ScheduledTask]):
         user_settings: UserSettings,
         session_factory: SessionFactoryType,
     ) -> SandboxService:
-        api_key = None
-        if user_settings.sandbox_provider == SandboxProviderType.E2B.value:
-            api_key = user_settings.e2b_api_key
-        elif user_settings.sandbox_provider == SandboxProviderType.MODAL.value:
-            api_key = user_settings.modal_api_key
+        api_key = SandboxProviderFactory.resolve_api_key(
+            provider_type=user_settings.sandbox_provider,
+            e2b_api_key=user_settings.e2b_api_key,
+            modal_api_key=user_settings.modal_api_key,
+        )
 
         provider = SandboxProviderFactory.create(
             provider_type=user_settings.sandbox_provider,
@@ -542,7 +589,7 @@ class SchedulerService(BaseDbService[ScheduledTask]):
                     logger.warning(
                         "Recovered %s stale scheduled task execution(s)", recovered
                     )
-        except Exception as e:
+        except (SQLAlchemyError, SchedulerException) as e:
             logger.error("Error checking scheduled tasks: %s", e)
             return {"error": str(e)}
 
@@ -603,10 +650,15 @@ class SchedulerService(BaseDbService[ScheduledTask]):
                     await db.commit()
                     return {"error": str(e)}
 
+                prompt_message = scheduled_task.prompt_message
+                task_name = scheduled_task.task_name
+                user_id = user.id
+                sandbox_provider = user_settings.sandbox_provider or "docker"
+
             sandbox_service = self._create_sandbox_service(
                 user_settings, self.session_factory
             )
-            sandbox_id = await sandbox_service.create_sandbox()
+            sandbox_id = await sandbox_service.provider.create_sandbox()
 
             await sandbox_service.initialize_sandbox(
                 sandbox_id=sandbox_id,
@@ -615,7 +667,7 @@ class SchedulerService(BaseDbService[ScheduledTask]):
                 custom_skills=user_settings.custom_skills,
                 custom_slash_commands=user_settings.custom_slash_commands,
                 custom_agents=user_settings.custom_agents,
-                user_id=str(user.id),
+                user_id=str(user_id),
                 auto_compact_disabled=user_settings.auto_compact_disabled,
                 attribution_disabled=user_settings.attribution_disabled,
                 custom_providers=user_settings.custom_providers,
@@ -624,10 +676,9 @@ class SchedulerService(BaseDbService[ScheduledTask]):
             )
 
             async with self.session_factory() as db:
-                sandbox_provider = user_settings.sandbox_provider or "docker"
                 chat = Chat(
-                    title=scheduled_task.task_name,
-                    user_id=user.id,
+                    title=task_name,
+                    user_id=user_id,
                     sandbox_id=sandbox_id,
                     sandbox_provider=sandbox_provider,
                 )
@@ -636,14 +687,9 @@ class SchedulerService(BaseDbService[ScheduledTask]):
 
                 user_message = Message(
                     chat_id=chat.id,
-                    content_text=scheduled_task.prompt_message,
+                    content_text=prompt_message,
                     content_render={
-                        "events": [
-                            {
-                                "type": "user_text",
-                                "text": scheduled_task.prompt_message,
-                            }
-                        ],
+                        "events": [{"type": "user_text", "text": prompt_message}]
                     },
                     last_seq=0,
                     active_stream_id=None,
@@ -656,21 +702,25 @@ class SchedulerService(BaseDbService[ScheduledTask]):
                     last_seq=0,
                     active_stream_id=None,
                     role=MessageRole.ASSISTANT,
-                    model_id=scheduled_task.model_id,
+                    model_id=model_id,
                     stream_status=MessageStreamStatus.IN_PROGRESS,
                 )
                 db.add_all([user_message, assistant_message])
                 await db.flush()
 
+                chat_id = chat.id
+                chat_title = chat.title
+                assistant_message_id = assistant_message.id
+
                 execution = await db.get(TaskExecution, execution_id)
                 if execution:
-                    execution.chat_id = chat.id
+                    execution.chat_id = chat_id
                 await db.commit()
 
             chat_data = {
-                "id": str(chat.id),
-                "user_id": str(user.id),
-                "title": chat.title,
+                "id": str(chat_id),
+                "user_id": str(user_id),
+                "title": chat_title,
                 "sandbox_id": sandbox_id,
                 "session_id": None,
             }
@@ -679,14 +729,14 @@ class SchedulerService(BaseDbService[ScheduledTask]):
 
             await ChatStreamRuntime.execute_chat(
                 request=ChatStreamRequest(
-                    prompt=scheduled_task.prompt_message,
+                    prompt=prompt_message,
                     system_prompt=system_prompt,
                     custom_instructions=user_settings.custom_instructions,
                     chat_data=chat_data,
                     model_id=model_id,
                     permission_mode="auto",
                     session_id=None,
-                    assistant_message_id=str(assistant_message.id),
+                    assistant_message_id=str(assistant_message_id),
                     thinking_mode="ultra",
                     attachments=None,
                     is_custom_prompt=False,
@@ -701,7 +751,7 @@ class SchedulerService(BaseDbService[ScheduledTask]):
                 if execution and scheduled_task:
                     assistant_status = await db.scalar(
                         select(Message.stream_status).where(
-                            Message.id == assistant_message.id
+                            Message.id == assistant_message_id
                         )
                     )
                     if assistant_status == MessageStreamStatus.INTERRUPTED:
@@ -719,21 +769,9 @@ class SchedulerService(BaseDbService[ScheduledTask]):
             return {
                 "status": "success",
                 "task_id": str(task_id),
-                "chat_id": str(chat.id),
+                "chat_id": str(chat_id),
                 "execution_id": str(execution_id),
             }
-
-        except Exception as e:
-            logger.error("Fatal error in execute_scheduled_task: %s", e)
-            message = e.message if isinstance(e, SchedulerException) else str(e)
-            async with self.session_factory() as db:
-                execution = await db.get(TaskExecution, execution_id)
-                scheduled_task = await db.get(ScheduledTask, task_id)
-                if execution and scheduled_task:
-                    self._mark_execution(execution, TaskExecutionStatus.FAILED, message)
-                    self._finalize_task(scheduled_task, success=False)
-                    await db.commit()
-            return {"error": message}
         except asyncio.CancelledError:
             reason = "Scheduled task cancelled during shutdown"
             logger.warning(
@@ -743,7 +781,23 @@ class SchedulerService(BaseDbService[ScheduledTask]):
             )
             await self._fail_execution(task_id, execution_id, reason)
             return {"error": reason}
-
+        except (SchedulerException, SQLAlchemyError, ValueError) as e:
+            logger.error("Fatal error in execute_scheduled_task: %s", e)
+            message = str(e)
+            await self._fail_execution(task_id, execution_id, message)
+            return {"error": message}
+        except Exception:
+            logger.exception(
+                "Unexpected error in execute_scheduled_task for task %s execution %s",
+                task_id,
+                execution_id,
+            )
+            await self._fail_execution(
+                task_id,
+                execution_id,
+                "Unexpected scheduled task error",
+            )
+            return {"error": "Unexpected scheduled task error"}
         finally:
             if sandbox_service is not None:
                 try:

@@ -1,7 +1,5 @@
 from typing import Literal, TypedDict
 
-ExceptionDetails = dict[str, str]
-
 
 class BaseResourceDict(TypedDict, total=False):
     name: str
@@ -92,13 +90,6 @@ class ParsedResourceResult(TypedDict):
 class EnabledResourceInfo(TypedDict):
     name: str
     path: str
-
-
-type JSONValue = (
-    str | int | float | bool | None | list[JSONValue] | dict[str, JSONValue]
-)
-type JSONDict = dict[str, JSONValue]
-type JSONList = list[JSONValue]
 
 
 class MarketplaceAuthorDict(TypedDict, total=False):

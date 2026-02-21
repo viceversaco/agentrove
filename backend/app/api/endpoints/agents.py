@@ -1,13 +1,24 @@
+from typing import cast
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm.attributes import flag_modified
-
+from app.api.endpoints._shared import (
+    load_settings_list_or_404,
+    raise_bad_request_from_service,
+    save_settings_list,
+    validate_name_or_400,
+)
 from app.core.deps import get_db, get_agent_service, get_user_service
 from app.core.security import get_current_user
-from app.models.db_models import DeleteResponseStatus, User
-from app.models.schemas import AgentDeleteResponse, AgentResponse, AgentUpdateRequest
+from app.models.db_models.enums import DeleteResponseStatus
+from app.models.db_models.user import User
+from app.models.schemas.agents import (
+    AgentDeleteResponse,
+    AgentResponse,
+    AgentUpdateRequest,
+)
 from app.models.types import CustomAgentDict
-from app.services.exceptions import AgentException, UserException
+from app.services.exceptions import AgentException
 from app.services.agent import AgentService
 from app.services.user import UserService
 
@@ -24,40 +35,30 @@ async def upload_agent(
     agent_service: AgentService = Depends(get_agent_service),
     user_service: UserService = Depends(get_user_service),
 ) -> CustomAgentDict:
-    try:
-        user_settings = await user_service.get_user_settings(current_user.id, db=db)
-    except UserException as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
-
-    current_agents: list[CustomAgentDict] = user_settings.custom_agents or []
+    user_settings, raw_agents = await load_settings_list_or_404(
+        user_service=user_service,
+        user_id=current_user.id,
+        db=db,
+        field_name="custom_agents",
+    )
+    current_agents = cast(list[CustomAgentDict], raw_agents)
 
     try:
         agent_data = await agent_service.upload(
             str(current_user.id), file, current_agents
         )
     except AgentException as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise_bad_request_from_service(e)
 
     current_agents.append(agent_data)
-    user_settings.custom_agents = current_agents
-    flag_modified(user_settings, "custom_agents")
-
-    try:
-        await user_service.save_settings_or_rollback(
-            user_settings,
-            db,
-            current_user.id,
-            failure_message="Failed to save agent metadata",
-            rollback_side_effect=lambda: agent_service.delete(
-                str(current_user.id), str(agent_data["name"])
-            ),
-        )
-    except UserException as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)
-        )
+    await save_settings_list(
+        user_service=user_service,
+        user_settings=user_settings,
+        db=db,
+        user_id=current_user.id,
+        field_name="custom_agents",
+        items=current_agents,
+    )
 
     return agent_data
 
@@ -71,19 +72,15 @@ async def update_agent(
     agent_service: AgentService = Depends(get_agent_service),
     user_service: UserService = Depends(get_user_service),
 ) -> CustomAgentDict:
-    try:
-        agent_service.validate_exact_sanitized_name(agent_name)
-    except AgentException as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    validate_name_or_400(agent_service.validate_exact_sanitized_name, agent_name)
 
-    try:
-        user_settings = await user_service.get_user_settings(current_user.id, db=db)
-    except UserException as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
-
-    current_agents: list[CustomAgentDict] = user_settings.custom_agents or []
+    user_settings, raw_agents = await load_settings_list_or_404(
+        user_service=user_service,
+        user_id=current_user.id,
+        db=db,
+        field_name="custom_agents",
+    )
+    current_agents = cast(list[CustomAgentDict], raw_agents)
     agent_index = agent_service.find_item_index_by_name(current_agents, agent_name)
 
     if agent_index is None:
@@ -97,23 +94,17 @@ async def update_agent(
             str(current_user.id), agent_name, request.content, current_agents
         )
     except AgentException as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise_bad_request_from_service(e)
 
     current_agents[agent_index] = updated_agent
-    user_settings.custom_agents = current_agents
-    flag_modified(user_settings, "custom_agents")
-
-    try:
-        await user_service.save_settings_or_rollback(
-            user_settings,
-            db,
-            current_user.id,
-            failure_message="Failed to update agent",
-        )
-    except UserException as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)
-        )
+    await save_settings_list(
+        user_service=user_service,
+        user_settings=user_settings,
+        db=db,
+        user_id=current_user.id,
+        field_name="custom_agents",
+        items=current_agents,
+    )
 
     return updated_agent
 
@@ -126,19 +117,15 @@ async def delete_agent(
     agent_service: AgentService = Depends(get_agent_service),
     user_service: UserService = Depends(get_user_service),
 ) -> AgentDeleteResponse:
-    try:
-        agent_service.validate_exact_sanitized_name(agent_name)
-    except AgentException as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    validate_name_or_400(agent_service.validate_exact_sanitized_name, agent_name)
 
-    try:
-        user_settings = await user_service.get_user_settings(current_user.id, db=db)
-    except UserException as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
-
-    current_agents = user_settings.custom_agents or []
+    user_settings, raw_agents = await load_settings_list_or_404(
+        user_service=user_service,
+        user_id=current_user.id,
+        db=db,
+        field_name="custom_agents",
+    )
+    current_agents = cast(list[CustomAgentDict], raw_agents)
     agent_index = agent_service.find_item_index_by_name(current_agents, agent_name)
 
     if agent_index is None:
@@ -147,22 +134,14 @@ async def delete_agent(
     await agent_service.delete(str(current_user.id), agent_name)
 
     current_agents.pop(agent_index)
-    user_settings.custom_agents = current_agents
-    flag_modified(user_settings, "custom_agents")
-
-    if user_service.remove_installed_component(user_settings, f"agent:{agent_name}"):
-        flag_modified(user_settings, "installed_plugins")
-
-    try:
-        await user_service.save_settings_or_rollback(
-            user_settings,
-            db,
-            current_user.id,
-            failure_message="Failed to delete agent",
-        )
-    except UserException as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)
-        )
+    await save_settings_list(
+        user_service=user_service,
+        user_settings=user_settings,
+        db=db,
+        user_id=current_user.id,
+        field_name="custom_agents",
+        items=current_agents,
+        installed_component=f"agent:{agent_name}",
+    )
 
     return AgentDeleteResponse(status=DeleteResponseStatus.DELETED.value)

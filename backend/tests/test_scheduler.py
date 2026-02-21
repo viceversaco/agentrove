@@ -9,14 +9,13 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.db_models import (
+from app.models.db_models.enums import (
     RecurrenceType,
-    ScheduledTask,
-    TaskExecution,
     TaskExecutionStatus,
     TaskStatus,
-    User,
 )
+from app.models.db_models.scheduled_tasks import ScheduledTask, TaskExecution
+from app.models.db_models.user import User
 from app.services.scheduler import SchedulerService
 
 

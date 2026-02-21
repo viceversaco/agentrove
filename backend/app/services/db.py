@@ -1,6 +1,4 @@
-from collections.abc import AsyncIterator
-from typing import TypeVar, Generic, Callable, AsyncContextManager
-from contextlib import asynccontextmanager
+from typing import AsyncContextManager, Callable, Generic, TypeVar
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,8 +20,3 @@ class BaseDbService(Generic[T]):
     @session_factory.setter
     def session_factory(self, value: SessionFactoryType) -> None:
         self._session_factory = value
-
-    @asynccontextmanager
-    async def get_session(self) -> AsyncIterator[AsyncSession]:
-        async with self._session_factory() as session:
-            yield session

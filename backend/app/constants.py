@@ -16,9 +16,6 @@ QUEUE_MESSAGE_TTL_SECONDS: Final[int] = 3600
 SANDBOX_AUTO_PAUSE_TIMEOUT: Final[int] = 3000
 SANDBOX_DEFAULT_COMMAND_TIMEOUT: Final[int] = 120
 SANDBOX_DEFAULT_TIMEOUT: Final[int] = 3600
-LISTENING_PORTS_COMMAND: Final[str] = (
-    "ss -tuln | grep LISTEN | awk '{print $5}' | sed 's/.*://g' | grep -E '^[0-9]+$' | sort -u"
-)
 MAX_CHECKPOINTS_PER_SANDBOX: Final[int] = 20
 CHECKPOINT_BASE_DIR: Final[str] = "/home/user/.checkpoints"
 PTY_OUTPUT_QUEUE_SIZE: Final[int] = 512
@@ -201,5 +198,3 @@ DEFAULT_PTY_COLS: Final[int] = 80
 DOCKER_STATUS_RUNNING: Final[str] = "running"
 
 SANDBOX_BASHRC_PATH: Final[str] = "/home/user/.bashrc"
-
-STREAM_STATUS_CANCELLED: Final[str] = "cancelled"

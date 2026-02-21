@@ -13,6 +13,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.core.config import get_settings
 from app.services.exceptions import ServiceException
 
+settings = get_settings()
 logger = logging.getLogger(__name__)
 
 
@@ -52,7 +53,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         self, request: Request, call_next: Callable[[Request], Response]
     ) -> Response:
         response = await call_next(request)
-        settings = get_settings()
 
         if not settings.ENABLE_SECURITY_HEADERS:
             return response
@@ -148,7 +148,6 @@ async def _global_exception_handler(request: Request, exc: Exception) -> JSONRes
 
 
 def setup_middleware(app: FastAPI) -> None:
-    settings = get_settings()
 
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestIdMiddleware)

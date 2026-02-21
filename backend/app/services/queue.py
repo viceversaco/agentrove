@@ -1,5 +1,4 @@
 import json
-import logging
 from datetime import datetime, timezone
 from typing import Any, cast
 from uuid import UUID, uuid4
@@ -13,8 +12,6 @@ from app.models.schemas.queue import QueueAddResponse, QueuedMessage
 
 from app.utils.cache import CacheStore
 
-logger = logging.getLogger(__name__)
-
 
 class QueueService:
     def __init__(self, cache: CacheStore):
@@ -27,10 +24,7 @@ class QueueService:
         raw = await self.cache.get(key)
         if not raw:
             return []
-        parsed = json.loads(raw)
-        if isinstance(parsed, dict):
-            return [parsed]
-        return cast(list[dict[str, Any]], parsed)
+        return cast(list[dict[str, Any]], json.loads(raw))
 
     async def _write_queue(self, key: str, queue: list[dict[str, Any]]) -> None:
         if not queue:

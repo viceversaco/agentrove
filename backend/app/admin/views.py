@@ -2,13 +2,8 @@ from enum import Enum
 from typing import Any, TypeVar
 
 from sqladmin import ModelView
-from app.models.db_models import (
-    User,
-    Chat,
-    Message,
-    MessageAttachment,
-    UserSettings,
-)
+from app.models.db_models.chat import Chat, Message, MessageAttachment
+from app.models.db_models.user import User, UserSettings
 from wtforms import PasswordField, SelectField
 from app.models.db_models.enums import (
     MessageRole,
@@ -21,6 +16,11 @@ from starlette.requests import Request
 
 
 E = TypeVar("E", bound=Enum)
+
+
+def _format_datetime(model: Any, attr: str) -> str:
+    value = getattr(model, attr, None)
+    return value.strftime("%Y-%m-%d %H:%M:%S") if value else ""
 
 
 class EnumCoercer:
@@ -52,12 +52,8 @@ class UserAdmin(ModelView, model=User):
     column_default_sort = [("email", False)]
 
     column_formatters = {
-        "created_at": lambda m, _: (
-            m.created_at.strftime("%Y-%m-%d %H:%M:%S") if m.created_at else ""
-        ),
-        "updated_at": lambda m, _: (
-            m.updated_at.strftime("%Y-%m-%d %H:%M:%S") if m.updated_at else ""
-        ),
+        "created_at": _format_datetime,
+        "updated_at": _format_datetime,
     }
 
     form_excluded_columns = ["chats", "settings", "hashed_password"]
@@ -99,15 +95,9 @@ class ChatAdmin(ModelView, model=Chat):
     column_default_sort = [("created_at", True)]
 
     column_formatters = {
-        "created_at": lambda m, _: (
-            m.created_at.strftime("%Y-%m-%d %H:%M:%S") if m.created_at else ""
-        ),
-        "updated_at": lambda m, _: (
-            m.updated_at.strftime("%Y-%m-%d %H:%M:%S") if m.updated_at else ""
-        ),
-        "deleted_at": lambda m, _: (
-            m.deleted_at.strftime("%Y-%m-%d %H:%M:%S") if m.deleted_at else ""
-        ),
+        "created_at": _format_datetime,
+        "updated_at": _format_datetime,
+        "deleted_at": _format_datetime,
         "context_token_usage": lambda m, _: (
             f"{m.context_token_usage:,} tokens"
             if m.context_token_usage is not None
@@ -189,12 +179,8 @@ class MessageAdmin(ModelView, model=Message):
             f"${m.total_cost_usd:.4f}" if m.total_cost_usd is not None else "$0.0000"
         ),
         "stream_status": lambda m, _: m.stream_status.value if m.stream_status else "",
-        "created_at": lambda m, _: (
-            m.created_at.strftime("%Y-%m-%d %H:%M:%S") if m.created_at else ""
-        ),
-        "updated_at": lambda m, _: (
-            m.updated_at.strftime("%Y-%m-%d %H:%M:%S") if m.updated_at else ""
-        ),
+        "created_at": _format_datetime,
+        "updated_at": _format_datetime,
     }
 
     column_searchable_list = ["content_text"]
@@ -256,12 +242,8 @@ class MessageAttachmentAdmin(ModelView, model=MessageAttachment):
     ]
 
     column_formatters = {
-        "created_at": lambda m, _: (
-            m.created_at.strftime("%Y-%m-%d %H:%M:%S") if m.created_at else ""
-        ),
-        "updated_at": lambda m, _: (
-            m.updated_at.strftime("%Y-%m-%d %H:%M:%S") if m.updated_at else ""
-        ),
+        "created_at": _format_datetime,
+        "updated_at": _format_datetime,
     }
 
     column_searchable_list = ["filename"]
@@ -297,12 +279,8 @@ class UserSettingsAdmin(ModelView, model=UserSettings):
     ]
 
     column_formatters = {
-        "created_at": lambda m, _: (
-            m.created_at.strftime("%Y-%m-%d %H:%M:%S") if m.created_at else ""
-        ),
-        "updated_at": lambda m, _: (
-            m.updated_at.strftime("%Y-%m-%d %H:%M:%S") if m.updated_at else ""
-        ),
+        "created_at": _format_datetime,
+        "updated_at": _format_datetime,
     }
 
     form_args = {

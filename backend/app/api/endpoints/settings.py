@@ -1,17 +1,13 @@
-import logging
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_db, get_user_service
 from app.core.security import get_current_user
-from app.models.db_models import User
-from app.models.schemas import UserSettingsBase, UserSettingsResponse
+from app.models.db_models.user import User
+from app.models.schemas.settings import UserSettingsBase, UserSettingsResponse
 from app.services.exceptions import UserException
 from app.services.user import DuplicateProviderNameError, UserService
 from app.utils.cache import cache_connection
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -40,17 +36,11 @@ async def update_user_settings(
     db: AsyncSession = Depends(get_db),
     user_service: UserService = Depends(get_user_service),
 ) -> UserSettingsResponse:
+    update_data = settings_update.model_dump(exclude_unset=True)
     try:
-        update_data = settings_update.model_dump(exclude_unset=True)
         user_settings = await user_service.update_user_settings(
             user_id=current_user.id, settings_update=update_data, db=db
         )
-        async with cache_connection() as cache:
-            await user_service.invalidate_settings_cache(cache, current_user.id)
-        response: UserSettingsResponse = UserSettingsResponse.model_validate(
-            user_settings
-        )
-        return response
     except DuplicateProviderNameError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -61,3 +51,6 @@ async def update_user_settings(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e),
         )
+    async with cache_connection() as cache:
+        await user_service.invalidate_settings_cache(cache, current_user.id)
+    return UserSettingsResponse.model_validate(user_settings)

@@ -65,7 +65,6 @@ class BaseMarkdownResourceService(ABC, Generic[T]):
     max_size_bytes: int = MAX_RESOURCE_SIZE_BYTES
     exception_class: type[ServiceException] = ServiceException
     valid_models: list[str] = VALID_COMMAND_MODELS
-    requires_name_in_frontmatter: bool = True
 
     def __init__(self) -> None:
         self.storage_path = Path(settings.STORAGE_PATH)

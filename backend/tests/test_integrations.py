@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from httpx import AsyncClient, HTTPStatusError
 
-from app.models.db_models import User
+from app.models.db_models.user import User
 from app.services import gmail_oauth
 from app.services.gmail_oauth import GmailOAuthService
 

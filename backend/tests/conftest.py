@@ -41,10 +41,11 @@ from app.core.deps import (
 )
 from app.core.security import get_password_hash
 from app.core.user_manager import get_jwt_strategy
-from app.db.base import Base
+from app.db.base_class import Base
 from app.db.session import get_db
 from app.main import create_application
-from app.models.db_models import Chat, Message, User, UserSettings
+from app.models.db_models.chat import Chat, Message
+from app.models.db_models.user import User, UserSettings
 from app.models.db_models.enums import MessageRole, MessageStreamStatus
 from app.services.provider import ProviderService
 from app.services.chat import ChatService

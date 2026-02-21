@@ -14,7 +14,9 @@ from app.constants import SANDBOX_GIT_ASKPASS_PATH, SANDBOX_HOME_DIR
 from app.core.config import get_settings
 from app.core.security import create_chat_scoped_token
 from app.db.session import SessionLocal
-from app.models.db_models import Chat, MessageRole, User, UserSettings
+from app.models.db_models.chat import Chat
+from app.models.db_models.enums import MessageRole
+from app.models.db_models.user import User, UserSettings
 from app.models.schemas.settings import ProviderType
 from app.prompts.enhance_prompt import ENHANCE_PROMPT
 from app.services.exceptions import ClaudeAgentException
@@ -56,15 +58,6 @@ SDK_PERMISSION_MODE_MAP: dict[
     "ask": "default",
     "auto": "bypassPermissions",
 }
-
-
-class SessionParams(NamedTuple):
-    options: ClaudeAgentOptions
-    sandbox_id: str
-    sandbox_provider: str
-    transport_factory: Callable[[], SandboxTransport]
-
-
 MCP_TYPE_CONFIGS: dict[str, dict[str, Any]] = {
     "npx": {
         "command": "npx",
@@ -89,13 +82,11 @@ MCP_TYPE_CONFIGS: dict[str, dict[str, Any]] = {
 }
 
 
-class SessionHandler:
-    def __init__(self, session_callback: Callable[[str], None] | None) -> None:
-        self.session_callback = session_callback
-
-    def __call__(self, new_session_id: str) -> None:
-        if self.session_callback:
-            self.session_callback(new_session_id)
+class SessionParams(NamedTuple):
+    options: ClaudeAgentOptions
+    sandbox_id: str
+    sandbox_provider: str
+    transport_factory: Callable[[], SandboxTransport]
 
 
 class ClaudeAgentService:
@@ -121,7 +112,6 @@ class ClaudeAgentService:
         if (
             sandbox_provider == SandboxProviderType.DOCKER
             or sandbox_provider == SandboxProviderType.DOCKER.value
-            or not sandbox_provider
         ):
             docker_config = SandboxProviderFactory.create_docker_config()
             return DockerSandboxTransport(
@@ -177,7 +167,9 @@ class ClaudeAgentService:
             session_factory=self.session_factory
         ).get_user_settings(user.id)
 
-        sandbox_provider = user_settings.sandbox_provider
+        sandbox_provider = (
+            user_settings.sandbox_provider or SandboxProviderType.DOCKER.value
+        )
         sandbox_id = chat.sandbox_id
         if not sandbox_id:
             raise ClaudeAgentException(
@@ -235,7 +227,7 @@ class ClaudeAgentService:
 
         processor = StreamProcessor(
             tool_registry=self.tool_registry,
-            session_handler=self._create_session_handler(session_callback),
+            session_handler=session_callback,
         )
 
         try:
@@ -272,11 +264,6 @@ class ClaudeAgentService:
 
     def get_usage(self) -> dict[str, Any] | None:
         return self._usage
-
-    def _create_session_handler(
-        self, session_callback: Callable[[str], None] | None
-    ) -> SessionHandler:
-        return SessionHandler(session_callback)
 
     def _build_auth_env(
         self, model_id: str, user_settings: UserSettings

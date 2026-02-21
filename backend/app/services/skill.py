@@ -3,7 +3,6 @@ import logging
 import os
 import re
 import zipfile
-from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from fastapi import UploadFile
@@ -16,6 +15,7 @@ from app.constants import (
 from app.core.config import get_settings
 from app.models.types import CustomSkillDict, EnabledResourceInfo, YamlMetadata
 from app.services.exceptions import SkillException
+from app.services.resource import BaseMarkdownResourceService
 from app.utils.yaml_parser import YAMLParser
 
 settings = get_settings()
@@ -56,13 +56,7 @@ class SkillService:
 
         return name
 
-    @staticmethod
-    def find_item_index_by_name(
-        items: Sequence[Mapping[str, object]], name: str
-    ) -> int | None:
-        return next(
-            (i for i, item in enumerate(items) if item.get("name") == name), None
-        )
+    find_item_index_by_name = BaseMarkdownResourceService.find_item_index_by_name
 
     def validate_exact_sanitized_name(self, name: str) -> None:
         if self.sanitize_name(name) != name:

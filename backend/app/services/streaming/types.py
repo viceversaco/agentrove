@@ -6,7 +6,6 @@ from hashlib import sha256
 from typing import Any, Literal, TypedDict
 from uuid import UUID
 
-from app.models.types import JSONDict, JSONValue
 
 StreamEventType = Literal[
     "assistant_text",
@@ -51,8 +50,8 @@ class ToolPayload(TypedDict, total=False):
     title: str
     status: Literal["started", "completed", "failed"]
     parent_id: str | None
-    input: JSONDict | None
-    result: JSONValue
+    input: dict[str, Any] | None
+    result: Any
     error: str
 
 
@@ -61,10 +60,10 @@ class StreamEvent(TypedDict, total=False):
     text: str
     thinking: str
     tool: ToolPayload
-    data: JSONDict
+    data: dict[str, Any]
     request_id: str
     tool_name: str
-    tool_input: JSONDict
+    tool_input: dict[str, Any]
     suggestions: list[str]
 
 
@@ -74,7 +73,7 @@ class ActiveToolState:
     name: str
     title: str
     parent_id: str | None
-    input: JSONDict | None
+    input: dict[str, Any] | None
 
     def to_payload(self) -> ToolPayload:
         payload: ToolPayload = {
@@ -130,9 +129,9 @@ class StreamEnvelope:
         }
 
     @staticmethod
-    def sanitize_payload(value: Any) -> JSONValue:
+    def sanitize_payload(value: Any) -> Any:
         if isinstance(value, dict):
-            redacted: JSONDict = {}
+            redacted: dict[str, Any] = {}
             for key, nested in value.items():
                 lower = key.lower()
                 if any(part in lower for part in SENSITIVE_KEY_PARTS):

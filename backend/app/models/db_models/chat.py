@@ -17,7 +17,7 @@ from sqlalchemy import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base, PG_GEN_UUID
-from app.db.types import GUID
+from app.db.types import GUID, enum_values
 
 from .enums import AttachmentType, MessageRole, MessageStreamStatus
 
@@ -104,7 +104,7 @@ class Message(Base):
         SQLAlchemyEnum(
             MessageRole,
             name="messagerole",
-            values_callable=lambda obj: [entry.value for entry in obj],
+            values_callable=enum_values,
         ),
         nullable=False,
     )
@@ -118,7 +118,7 @@ class Message(Base):
         SQLAlchemyEnum(
             MessageStreamStatus,
             name="messagestreamstatus",
-            values_callable=lambda obj: [entry.value for entry in obj],
+            values_callable=enum_values,
         ),
         nullable=False,
         default=MessageStreamStatus.IN_PROGRESS,
@@ -165,7 +165,7 @@ class MessageAttachment(Base):
         SQLAlchemyEnum(
             AttachmentType,
             name="attachmenttype",
-            values_callable=lambda obj: [entry.value for entry in obj],
+            values_callable=enum_values,
         ),
         nullable=False,
         default=AttachmentType.IMAGE,

@@ -139,14 +139,9 @@ class SessionRegistry:
             logger.info("Reaped %d idle chat session(s)", len(expired))
 
     @staticmethod
-    def _stable_mcp_key(mcp_servers: Any) -> Any:
-        if not isinstance(mcp_servers, dict):
-            return mcp_servers
+    def _stable_mcp_key(mcp_servers: dict[str, Any]) -> dict[str, Any]:
         stable: dict[str, Any] = {}
         for name, cfg in mcp_servers.items():
-            if not isinstance(cfg, dict):
-                stable[name] = cfg
-                continue
             env = cfg.get("env")
             if isinstance(env, dict):
                 filtered_env = {
@@ -159,20 +154,6 @@ class SessionRegistry:
 
     @staticmethod
     def _options_fingerprint(options: ClaudeAgentOptions) -> str:
-        # Persistent sessions reuse the underlying CLI subprocess across messages.
-        # Only model and permission_mode can be updated at runtime via SDK setters
-        # (set_model / set_permission_mode). All other ClaudeAgentOptions fields
-        # (system_prompt, env, mcp_servers, disallowed_tools) are baked into the
-        # subprocess at spawn time. If any of these change between messages — e.g.
-        # the user edits custom instructions, rotates API keys, switches to a
-        # different provider, or adds an MCP server — we must tear down the session
-        # and start a new CLI process. This fingerprint captures those immutable
-        # fields so get_or_create can detect the drift and restart.
-        #
-        # Ephemeral MCP env keys (e.g. CHAT_TOKEN from create_chat_scoped_token)
-        # are excluded because they change on every request, which would defeat
-        # session reuse. Other MCP env values (user-configured credentials) are
-        # kept so that credential changes trigger a session restart.
         data = json.dumps(
             {
                 "system_prompt": options.system_prompt,
@@ -222,8 +203,17 @@ class SessionRegistry:
             task.cancel()
             try:
                 await asyncio.wait_for(task, timeout=TASK_CANCEL_TIMEOUT_SECONDS)
-            except BaseException:
-                pass
+            except (asyncio.TimeoutError, asyncio.CancelledError):
+                logger.debug(
+                    "Timed out waiting for task cancellation for chat %s",
+                    session.chat_id,
+                )
+            except Exception as exc:
+                logger.debug(
+                    "Error waiting for task cancellation for chat %s: %s",
+                    session.chat_id,
+                    exc,
+                )
 
         try:
             await session.client.disconnect()

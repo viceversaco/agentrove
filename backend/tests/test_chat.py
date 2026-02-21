@@ -10,7 +10,8 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_password_hash
-from app.models.db_models import Chat, Message, MessageAttachment, User
+from app.models.db_models.chat import Chat, Message, MessageAttachment
+from app.models.db_models.user import User
 from app.models.db_models.enums import AttachmentType, MessageRole, MessageStreamStatus
 from app.services.sandbox import SandboxService
 from tests.conftest import (

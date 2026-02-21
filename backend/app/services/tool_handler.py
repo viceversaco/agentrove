@@ -1,12 +1,11 @@
 import json
 import logging
 from copy import deepcopy
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 from claude_agent_sdk.types import ToolUseBlock
 
-from app.models.db_models import ToolStatus
-from app.models.types import JSONValue
+from app.models.db_models.enums import ToolStatus
 from app.services.streaming.types import ActiveToolState, StreamEvent
 
 logger = logging.getLogger(__name__)
@@ -61,7 +60,7 @@ class ToolHandlerRegistry:
     def finish_tool(
         self,
         tool_use_id: str | None,
-        raw_result: JSONValue,
+        raw_result: Any,
         *,
         is_error: bool = False,
     ) -> StreamEvent | None:
@@ -95,10 +94,7 @@ class ToolHandlerRegistry:
         event: StreamEvent = {"type": event_type, "tool": payload}
         return event
 
-    def _normalize_result(self, result: JSONValue) -> JSONValue:
-        # Recursively normalizes tool results, attempting to parse JSON-encoded strings.
-        # Tool outputs often contain stringified JSON that needs to be converted to objects
-        # for proper display. Silently falls back to raw string if parsing fails.
+    def _normalize_result(self, result: Any) -> Any:
         if result is None:
             return None
 
@@ -113,13 +109,13 @@ class ToolHandlerRegistry:
             if not text:
                 return ""
             try:
-                return cast(JSONValue, json.loads(text))
+                return cast(Any, json.loads(text))
             except json.JSONDecodeError:
                 return text
 
         return result
 
-    def _stringify_result(self, result: JSONValue) -> str:
+    def _stringify_result(self, result: Any) -> str:
         if isinstance(result, str):
             return result
         try:

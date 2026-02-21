@@ -36,11 +36,6 @@ class YAMLParser:
 
     @staticmethod
     def _is_real_yaml_field(line: str) -> bool:
-        # Heuristics to distinguish real YAML fields from field-like text in description content:
-        # - description/name: always real (primary fields that break continuation)
-        # - model: only real if value is a known model name (opus, sonnet, haiku, etc.)
-        # - other fields: real if value is empty, an array/object, or short (<20 chars without spaces)
-        # This prevents "model: I will analyze..." inside examples from breaking the parser.
         if not line or line[0].isspace():
             return False
         if not YAML_FIELD_PATTERN.match(line):

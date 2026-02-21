@@ -11,6 +11,7 @@ from fastapi_users.authentication import (
 )
 from fastapi_users.db import SQLAlchemyUserDatabase
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -57,7 +58,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
                 session.add(user_settings)
                 await session.commit()
                 logger.info("Created user settings for user %s", user.id)
-        except Exception as e:
+        except SQLAlchemyError as e:
             logger.error("Failed to create user settings for %s: %s", user.id, e)
 
         if settings.REQUIRE_EMAIL_VERIFICATION and not user.is_verified:

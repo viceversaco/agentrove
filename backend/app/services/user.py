@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
 from datetime import date, datetime, timezone
 from typing import Any, cast
 from uuid import UUID
@@ -11,11 +10,13 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.constants import REDIS_KEY_USER_SETTINGS
 from app.core.config import get_settings
-from app.models.db_models import Chat, Message, MessageRole, UserSettings
-from app.models.schemas import UserSettingsResponse
-from app.models.types import InstalledPluginDict, JSONValue
+from app.models.db_models.chat import Chat, Message
+from app.models.db_models.enums import MessageRole
+from app.models.db_models.user import UserSettings
+from app.models.schemas.settings import UserSettingsResponse
+from app.models.types import InstalledPluginDict
 from app.services.db import BaseDbService, SessionFactoryType
-from app.services.exceptions import ErrorCode, UserException
+from app.services.exceptions import UserException
 from app.utils.cache import CacheStore, cache_connection
 
 settings = get_settings()
@@ -96,7 +97,7 @@ class UserService(BaseDbService[UserSettings]):
         return response
 
     async def update_user_settings(
-        self, user_id: UUID, settings_update: dict[str, JSONValue], db: AsyncSession
+        self, user_id: UUID, settings_update: dict[str, Any], db: AsyncSession
     ) -> UserSettings:
         user_settings: UserSettings | None = await db.scalar(
             select(UserSettings).where(UserSettings.user_id == user_id)
@@ -136,26 +137,6 @@ class UserService(BaseDbService[UserSettings]):
         await db.refresh(user_settings)
         async with cache_connection() as cache:
             await self.invalidate_settings_cache(cache, user_id)
-
-    async def save_settings_or_rollback(
-        self,
-        user_settings: UserSettings,
-        db: AsyncSession,
-        user_id: UUID,
-        failure_message: str,
-        rollback_side_effect: Callable[[], Awaitable[None]] | None = None,
-    ) -> None:
-        try:
-            await self.save_settings(user_settings, db, user_id)
-        except Exception as exc:
-            if rollback_side_effect is not None:
-                await rollback_side_effect()
-            await db.rollback()
-            raise UserException(
-                failure_message,
-                error_code=ErrorCode.UNKNOWN_ERROR,
-                status_code=500,
-            ) from exc
 
     def remove_installed_component(
         self, user_settings: UserSettings, component_id: str

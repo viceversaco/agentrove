@@ -1,7 +1,5 @@
 from enum import Enum
 
-from app.models.types import ExceptionDetails
-
 
 class ErrorCode(str, Enum):
     UNKNOWN_ERROR = "UNKNOWN_ERROR"
@@ -32,16 +30,16 @@ class ServiceException(Exception):
         self,
         message: str,
         error_code: ErrorCode = ErrorCode.UNKNOWN_ERROR,
-        details: ExceptionDetails | None = None,
+        details: dict[str, str] | None = None,
         status_code: int = 500,
     ):
         super().__init__(message)
         self.message = message
         self.error_code = error_code
-        self.details: ExceptionDetails = details or {}
+        self.details: dict[str, str] = details or {}
         self.status_code = status_code
 
-    def to_dict(self) -> dict[str, str | ExceptionDetails]:
+    def to_dict(self) -> dict[str, str | dict[str, str]]:
         return {
             "error_code": self.error_code.value,
             "message": self.message,
@@ -54,7 +52,7 @@ class ChatException(ServiceException):
         self,
         message: str,
         error_code: ErrorCode = ErrorCode.CHAT_NOT_FOUND,
-        details: ExceptionDetails | None = None,
+        details: dict[str, str] | None = None,
         status_code: int = 400,
     ):
         super().__init__(message, error_code, details, status_code)
@@ -65,7 +63,7 @@ class MessageException(ServiceException):
         self,
         message: str,
         error_code: ErrorCode = ErrorCode.MESSAGE_NOT_FOUND,
-        details: ExceptionDetails | None = None,
+        details: dict[str, str] | None = None,
         status_code: int = 400,
     ):
         super().__init__(message, error_code, details, status_code)
@@ -76,7 +74,7 @@ class UserException(ServiceException):
         self,
         message: str,
         error_code: ErrorCode = ErrorCode.USER_NOT_FOUND,
-        details: ExceptionDetails | None = None,
+        details: dict[str, str] | None = None,
         status_code: int = 400,
     ):
         super().__init__(message, error_code, details, status_code)
@@ -87,7 +85,7 @@ class SandboxException(ServiceException):
         self,
         message: str,
         error_code: ErrorCode = ErrorCode.SANDBOX_OPERATION_FAILED,
-        details: ExceptionDetails | None = None,
+        details: dict[str, str] | None = None,
         status_code: int = 400,
     ):
         super().__init__(message, error_code, details, status_code)
@@ -98,7 +96,7 @@ class StorageException(ServiceException):
         self,
         message: str,
         error_code: ErrorCode = ErrorCode.STORAGE_FILE_NOT_FOUND,
-        details: ExceptionDetails | None = None,
+        details: dict[str, str] | None = None,
         status_code: int = 400,
     ):
         super().__init__(message, error_code, details, status_code)
@@ -109,7 +107,7 @@ class ClaudeAgentException(ServiceException):
         self,
         message: str,
         error_code: ErrorCode = ErrorCode.AI_SERVICE_ERROR,
-        details: ExceptionDetails | None = None,
+        details: dict[str, str] | None = None,
         status_code: int = 400,
     ):
         super().__init__(message, error_code, details, status_code)
@@ -120,7 +118,7 @@ class SchedulerException(ServiceException):
         self,
         message: str,
         error_code: ErrorCode = ErrorCode.SCHEDULER_TASK_NOT_FOUND,
-        details: ExceptionDetails | None = None,
+        details: dict[str, str] | None = None,
         status_code: int = 400,
     ):
         super().__init__(message, error_code, details, status_code)
@@ -131,7 +129,7 @@ class SkillException(ServiceException):
         self,
         message: str,
         error_code: ErrorCode = ErrorCode.SKILL_NOT_FOUND,
-        details: ExceptionDetails | None = None,
+        details: dict[str, str] | None = None,
         status_code: int = 400,
     ):
         super().__init__(message, error_code, details, status_code)
@@ -142,7 +140,7 @@ class CommandException(ServiceException):
         self,
         message: str,
         error_code: ErrorCode = ErrorCode.COMMAND_NOT_FOUND,
-        details: ExceptionDetails | None = None,
+        details: dict[str, str] | None = None,
         status_code: int = 400,
     ):
         super().__init__(message, error_code, details, status_code)
@@ -153,7 +151,7 @@ class AgentException(ServiceException):
         self,
         message: str,
         error_code: ErrorCode = ErrorCode.AGENT_NOT_FOUND,
-        details: ExceptionDetails | None = None,
+        details: dict[str, str] | None = None,
         status_code: int = 400,
     ):
         super().__init__(message, error_code, details, status_code)
@@ -164,7 +162,7 @@ class APIKeyValidationException(ServiceException):
         self,
         message: str,
         error_code: ErrorCode = ErrorCode.API_KEY_MISSING,
-        details: ExceptionDetails | None = None,
+        details: dict[str, str] | None = None,
         status_code: int = 400,
     ):
         super().__init__(message, error_code, details, status_code)
@@ -176,7 +174,7 @@ class ExternalServiceException(ServiceException):
         message: str,
         service_name: str,
         error_code: ErrorCode = ErrorCode.EXTERNAL_SERVICE_ERROR,
-        details: ExceptionDetails | None = None,
+        details: dict[str, str] | None = None,
         status_code: int = 503,
     ):
         details = details or {}
@@ -189,7 +187,7 @@ class AuthException(ServiceException):
         self,
         message: str,
         error_code: ErrorCode = ErrorCode.AUTH_INVALID_TOKEN,
-        details: ExceptionDetails | None = None,
+        details: dict[str, str] | None = None,
         status_code: int = 401,
     ):
         super().__init__(message, error_code, details, status_code)
@@ -200,7 +198,7 @@ class MarketplaceException(ServiceException):
         self,
         message: str,
         error_code: ErrorCode = ErrorCode.MARKETPLACE_FETCH_FAILED,
-        details: ExceptionDetails | None = None,
+        details: dict[str, str] | None = None,
         status_code: int = 400,
     ):
         super().__init__(message, error_code, details, status_code)

@@ -11,10 +11,11 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
+from app.api.endpoints._shared import load_user_settings_or_404
 from app.core.config import get_settings
 from app.core.deps import get_db, get_user_service
 from app.core.security import get_current_user
-from app.models.db_models import User
+from app.models.db_models.user import User, UserSettings
 from app.models.schemas.integrations import (
     DeviceCodeResponse,
     GmailStatusResponse,
@@ -36,6 +37,18 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
+def _clear_gmail_state(
+    user_settings: UserSettings, *, clear_client: bool = False
+) -> None:
+    user_settings.gmail_oauth_tokens = None
+    user_settings.gmail_connected_at = None
+    user_settings.gmail_email = None
+    flag_modified(user_settings, "gmail_oauth_tokens")
+    if clear_client:
+        user_settings.gmail_oauth_client = None
+        flag_modified(user_settings, "gmail_oauth_client")
+
+
 @router.post("/gmail/oauth-client", response_model=OAuthClientResponse)
 async def upload_oauth_client(
     request: OAuthClientUploadRequest,
@@ -52,17 +65,11 @@ async def upload_oauth_client(
             detail=error_msg or "Invalid OAuth client configuration",
         )
 
-    try:
-        user_settings = await user_service.get_user_settings(current_user.id, db=db)
-    except UserException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    user_settings = await load_user_settings_or_404(user_service, current_user.id, db)
 
     user_settings.gmail_oauth_client = request.client_config
-    user_settings.gmail_oauth_tokens = None
-    user_settings.gmail_connected_at = None
-    user_settings.gmail_email = None
     flag_modified(user_settings, "gmail_oauth_client")
-    flag_modified(user_settings, "gmail_oauth_tokens")
+    _clear_gmail_state(user_settings)
 
     await user_service.save_settings(user_settings, db, current_user.id)
 
@@ -75,17 +82,9 @@ async def delete_oauth_client(
     db: AsyncSession = Depends(get_db),
     user_service: UserService = Depends(get_user_service),
 ) -> OAuthClientResponse:
-    try:
-        user_settings = await user_service.get_user_settings(current_user.id, db=db)
-    except UserException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    user_settings = await load_user_settings_or_404(user_service, current_user.id, db)
 
-    user_settings.gmail_oauth_client = None
-    user_settings.gmail_oauth_tokens = None
-    user_settings.gmail_connected_at = None
-    user_settings.gmail_email = None
-    flag_modified(user_settings, "gmail_oauth_client")
-    flag_modified(user_settings, "gmail_oauth_tokens")
+    _clear_gmail_state(user_settings, clear_client=True)
 
     await user_service.save_settings(user_settings, db, current_user.id)
 
@@ -100,10 +99,7 @@ async def get_oauth_url(
     db: AsyncSession = Depends(get_db),
     user_service: UserService = Depends(get_user_service),
 ) -> OAuthUrlResponse:
-    try:
-        user_settings = await user_service.get_user_settings(current_user.id, db=db)
-    except UserException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    user_settings = await load_user_settings_or_404(user_service, current_user.id, db)
 
     if not user_settings.gmail_oauth_client:
         raise HTTPException(
@@ -235,10 +231,7 @@ async def get_gmail_status(
     db: AsyncSession = Depends(get_db),
     user_service: UserService = Depends(get_user_service),
 ) -> GmailStatusResponse:
-    try:
-        user_settings = await user_service.get_user_settings(current_user.id, db=db)
-    except UserException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    user_settings = await load_user_settings_or_404(user_service, current_user.id, db)
 
     return GmailStatusResponse(
         connected=user_settings.gmail_oauth_tokens is not None,
@@ -254,20 +247,14 @@ async def disconnect_gmail(
     db: AsyncSession = Depends(get_db),
     user_service: UserService = Depends(get_user_service),
 ) -> OAuthClientResponse:
-    try:
-        user_settings = await user_service.get_user_settings(current_user.id, db=db)
-    except UserException as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    user_settings = await load_user_settings_or_404(user_service, current_user.id, db)
 
     if user_settings.gmail_oauth_tokens:
         refresh_token = user_settings.gmail_oauth_tokens.get("refresh_token")
         if refresh_token:
             await GmailOAuthService.revoke_token(refresh_token)
 
-    user_settings.gmail_oauth_tokens = None
-    user_settings.gmail_connected_at = None
-    user_settings.gmail_email = None
-    flag_modified(user_settings, "gmail_oauth_tokens")
+    _clear_gmail_state(user_settings)
 
     await user_service.save_settings(user_settings, db, current_user.id)
 

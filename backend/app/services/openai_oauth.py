@@ -36,7 +36,7 @@ class OpenAIOAuthService:
             )
         try:
             body = resp.json()
-        except Exception:
+        except ValueError:
             body = {}
         return {"status_code": resp.status_code, **body}
 

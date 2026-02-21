@@ -1,9 +1,9 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import and_, delete, select, update
+from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import (
@@ -12,7 +12,8 @@ from app.core.security import (
     hash_refresh_token,
 )
 from app.db.session import SessionLocal
-from app.models.db_models import RefreshToken, User
+from app.models.db_models.refresh_token import RefreshToken
+from app.models.db_models.user import User
 from app.services.db import SessionFactoryType
 from app.services.exceptions import AuthException
 
@@ -54,9 +55,6 @@ class RefreshTokenService:
         user_agent: str | None = None,
         ip_address: str | None = None,
     ) -> tuple[User, str]:
-        # Token rotation with theft detection: if a revoked token is reused, it indicates
-        # the token was likely stolen (attacker has old token, legitimate user has new one).
-        # We revoke ALL user tokens to force re-authentication on all devices.
         token_hash = hash_refresh_token(token)
 
         result = await db.execute(
@@ -145,29 +143,35 @@ class RefreshTokenService:
         await db.commit()
         return count
 
-    async def cleanup_expired_tokens(self, db: AsyncSession | None = None) -> int:
+    async def cleanup_expired_and_revoked_tokens(
+        self, revoked_grace_days: int = 7
+    ) -> dict[str, int]:
         now = datetime.now(timezone.utc)
-        delete_stmt = delete(RefreshToken).where(RefreshToken.expires_at < now)
+        revoked_cutoff = now - timedelta(days=revoked_grace_days)
 
-        if db is None:
-            async with self.session_factory() as session:
-                result = await session.execute(delete_stmt)
-                await session.commit()
-                return int(getattr(result, "rowcount", 0))
-        else:
-            result_db = await db.execute(delete_stmt)
+        delete_stmt = delete(RefreshToken).where(
+            or_(
+                RefreshToken.expires_at < now,
+                RefreshToken.revoked_at < revoked_cutoff,
+            )
+        )
+
+        async with self.session_factory() as db:
+            result = await db.execute(delete_stmt)
             await db.commit()
-            return int(getattr(result_db, "rowcount", 0))
+            deleted_count = int(getattr(result, "rowcount", 0))
+            return {"deleted_count": deleted_count}
 
     @classmethod
     async def cleanup_expired_tokens_job(cls) -> dict[str, Any]:
         try:
             service = cls(session_factory=SessionLocal)
-            deleted_count = await service.cleanup_expired_tokens()
-            logger.info("Cleaned up %s expired refresh tokens", deleted_count)
+            result = await service.cleanup_expired_and_revoked_tokens()
+            deleted_count = result.get("deleted_count", 0)
+            logger.info("Cleaned up %s expired/revoked refresh tokens", deleted_count)
             return {"deleted_count": deleted_count}
         except Exception as e:
-            logger.error("Error cleaning up expired refresh tokens: %s", e)
+            logger.error("Error cleaning up refresh tokens: %s", e)
             return {"error": str(e)}
 
 
