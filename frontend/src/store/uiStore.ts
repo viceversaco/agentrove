@@ -32,9 +32,12 @@ export const useUIStore = create<UIStoreState>()(
     (set, get) => ({
       theme: 'dark',
       toggleTheme: () =>
-        set((state) => ({
-          theme: state.theme === 'dark' ? 'light' : 'dark',
-        })),
+        set((state) => {
+          const next =
+            state.theme === 'dark' ? 'light' : state.theme === 'light' ? 'system' : 'dark';
+          return { theme: next };
+        }),
+      setTheme: (theme) => set({ theme }),
       permissionMode: 'auto',
       setPermissionMode: (mode) => set({ permissionMode: mode }),
       thinkingMode: null,

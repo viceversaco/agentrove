@@ -3,7 +3,7 @@ import { logger } from '@/utils/logger';
 import type { FC } from 'react';
 import 'xterm/css/xterm.css';
 
-import { useUIStore } from '@/store/uiStore';
+import { useResolvedTheme } from '@/hooks/useResolvedTheme';
 import { authService } from '@/services/authService';
 import { WS_BASE_URL } from '@/lib/api';
 
@@ -30,7 +30,7 @@ export const TerminalTab: FC<TerminalTabProps> = ({
   shouldClose = false,
   onClosed,
 }) => {
-  const theme = useUIStore((state) => state.theme);
+  const theme = useResolvedTheme();
   const [sessionState, setSessionState] = useState<SessionState>('idle');
 
   const lastSentSizeRef = useRef<TerminalSize | null>(null);

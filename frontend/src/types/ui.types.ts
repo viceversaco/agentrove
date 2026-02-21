@@ -3,7 +3,8 @@ import type { ToolAggregate } from './tools.types';
 
 export type ToolComponent = React.FC<{ tool: ToolAggregate; chatId?: string }>;
 
-export type Theme = 'light' | 'dark';
+export type Theme = 'light' | 'dark' | 'system';
+export type ResolvedTheme = 'light' | 'dark';
 
 type MentionType = 'file' | 'agent' | 'prompt';
 
@@ -17,6 +18,7 @@ export interface MentionItem {
 export interface ThemeState {
   theme: Theme;
   toggleTheme: () => void;
+  setTheme: (theme: Theme) => void;
 }
 
 export interface ModelSelectionState {

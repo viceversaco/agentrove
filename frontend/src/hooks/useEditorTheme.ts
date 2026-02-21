@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useUIStore } from '@/store/uiStore';
+import { useResolvedTheme } from '@/hooks/useResolvedTheme';
 import type * as monaco from 'monaco-editor';
 
 const LIGHT_THEME: monaco.editor.IStandaloneThemeData = {
@@ -77,7 +77,7 @@ const DARK_THEME: monaco.editor.IStandaloneThemeData = {
 };
 
 export function useEditorTheme() {
-  const theme = useUIStore((state) => state.theme);
+  const theme = useResolvedTheme();
 
   const setupEditorTheme = useCallback(
     (monaco: typeof import('monaco-editor')) => {

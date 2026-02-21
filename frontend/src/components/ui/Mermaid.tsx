@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Eye, EyeOff, AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from './primitives/Button';
-import { useUIStore } from '@/store/uiStore';
+import { useResolvedTheme } from '@/hooks/useResolvedTheme';
 
 interface MermaidProps {
   content: string;
@@ -27,7 +27,7 @@ const sanitizeSvg = async (svg: string): Promise<string> => {
 };
 
 export function Mermaid({ content }: MermaidProps) {
-  const theme = useUIStore((state) => state.theme);
+  const theme = useResolvedTheme();
   const [showPreview, setShowPreview] = useState(true);
   const [state, setState] = useState<RenderState>({ status: 'idle' });
   const renderIdRef = useRef(0);

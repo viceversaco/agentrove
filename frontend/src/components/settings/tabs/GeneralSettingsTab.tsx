@@ -4,6 +4,8 @@ import { Switch } from '@/components/ui/primitives/Switch';
 import { SegmentedControl } from '@/components/ui/primitives/SegmentedControl';
 import type { ApiFieldKey, GeneralSecretFieldConfig } from '@/types/settings.types';
 import type { UserSettings, SandboxProviderType } from '@/types/user.types';
+import type { Theme } from '@/types/ui.types';
+import { useUIStore } from '@/store/uiStore';
 import { SecretInput } from '@/components/settings/inputs/SecretInput';
 import { cn } from '@/utils/cn';
 
@@ -38,6 +40,23 @@ function SectionCard({
       </h2>
       {children}
     </div>
+  );
+}
+
+const THEME_OPTIONS = [
+  { value: 'light', label: 'Light', disabled: false },
+  { value: 'dark', label: 'Dark', disabled: false },
+  { value: 'system', label: 'System', disabled: false },
+];
+
+function ThemeControl() {
+  const theme = useUIStore((state) => state.theme);
+  return (
+    <SegmentedControl
+      value={theme}
+      onChange={(val) => useUIStore.getState().setTheme(val as Theme)}
+      options={THEME_OPTIONS}
+    />
   );
 }
 
@@ -116,7 +135,13 @@ export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
 
     <SectionCard title="Preferences">
       <div className="divide-y divide-border dark:divide-border-dark">
-        <div className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0 sm:items-center">
+        <div className="flex items-center justify-between gap-4 py-3 first:pt-0">
+          <h3 className="text-sm font-medium text-text-primary dark:text-text-dark-primary">
+            Theme
+          </h3>
+          <ThemeControl />
+        </div>
+        <div className="flex items-start justify-between gap-4 py-3 sm:items-center">
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-medium text-text-primary dark:text-text-dark-primary">
               Sound Notification

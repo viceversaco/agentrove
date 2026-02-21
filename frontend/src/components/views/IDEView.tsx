@@ -3,7 +3,7 @@ import { Download, ExternalLink, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/primitives/Button';
 import { Spinner } from '@/components/ui/primitives/Spinner';
 import { useIDEUrlQuery } from '@/hooks/queries/useSandboxQueries';
-import { useUIStore } from '@/store/uiStore';
+import { useResolvedTheme } from '@/hooks/useResolvedTheme';
 import { sandboxService } from '@/services/sandboxService';
 
 interface IDEViewProps {
@@ -12,7 +12,7 @@ interface IDEViewProps {
 }
 
 export const IDEView = memo(function IDEView({ sandboxId, isActive = false }: IDEViewProps) {
-  const theme = useUIStore((state) => state.theme);
+  const theme = useResolvedTheme();
   const [isLoading, setIsLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);

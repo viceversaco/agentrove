@@ -3,7 +3,7 @@ import { logger } from '@/utils/logger';
 import { CodeView } from '../code-view/CodeView';
 import type { FileStructure } from '@/types/file-system.types';
 import type { Chat } from '@/types/chat.types';
-import { useUIStore } from '@/store/uiStore';
+import { useResolvedTheme } from '@/hooks/useResolvedTheme';
 import { sandboxService } from '@/services/sandboxService';
 
 const collectFolderPaths = (items: FileStructure[], validPaths: Set<string>) => {
@@ -38,7 +38,7 @@ export const Editor = memo(function Editor({
   onRefresh,
   isRefreshing = false,
 }: EditorProps) {
-  const theme = useUIStore((state) => state.theme);
+  const theme = useResolvedTheme();
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
 
   const validFolderPaths = useMemo(() => {

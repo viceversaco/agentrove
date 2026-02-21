@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Command, LogOut, Moon, Settings, Sun } from 'lucide-react';
+import { ArrowLeft, Command, LogOut, Monitor, Moon, Settings, Sun } from 'lucide-react';
 import { useNavigate, useMatch } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useUIStore } from '@/store/uiStore';
@@ -41,7 +41,21 @@ function useClickOutside<T extends HTMLElement>(
   }, [handler, ref]);
 }
 
+const THEME_ICON_MAP = {
+  dark: Sun,
+  light: Moon,
+  system: Monitor,
+} as const;
+
+const THEME_NEXT_LABEL = {
+  dark: 'light',
+  light: 'system',
+  system: 'dark',
+} as const;
+
 function ThemeToggleButton({ theme, onToggle }: { theme: string; onToggle: () => void }) {
+  const Icon = THEME_ICON_MAP[theme as keyof typeof THEME_ICON_MAP] ?? Monitor;
+  const nextLabel = THEME_NEXT_LABEL[theme as keyof typeof THEME_NEXT_LABEL] ?? 'dark';
   return (
     <Button
       onClick={onToggle}
@@ -54,9 +68,9 @@ function ThemeToggleButton({ theme, onToggle }: { theme: string; onToggle: () =>
         'transition-colors duration-200',
       )}
       aria-label="Toggle theme"
-      title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+      title={`Switch to ${nextLabel} mode`}
     >
-      {theme === 'dark' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+      <Icon className="h-3.5 w-3.5" />
     </Button>
   );
 }
@@ -95,15 +109,11 @@ function AuthButtons({ onLogin, onSignup }: { onLogin: () => void; onSignup: () 
 
 function UserMenu({
   displayName,
-  theme,
-  onToggleTheme,
   onSettings,
   onPrefetchSettings,
   onLogout,
 }: {
   displayName: string;
-  theme: string;
-  onToggleTheme: () => void;
   onSettings: () => void;
   onPrefetchSettings: () => void;
   onLogout: () => void;
@@ -154,14 +164,6 @@ function UserMenu({
           </div>
 
           <div className="p-1">
-            <Button onClick={onToggleTheme} variant="unstyled" className={menuItemClasses}>
-              {theme === 'dark' ? (
-                <Sun className="h-3.5 w-3.5" />
-              ) : (
-                <Moon className="h-3.5 w-3.5" />
-              )}
-              <span className="flex-1">{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
-            </Button>
             <Button
               onClick={() => {
                 onSettings();
@@ -291,8 +293,6 @@ export function Header({ onLogout, userName = 'User', isAuthPage = false }: Head
           {isAuthPage ? null : isAuthenticated ? (
             <UserMenu
               displayName={displayName}
-              theme={theme}
-              onToggleTheme={() => useUIStore.getState().toggleTheme()}
               onSettings={() => {
                 prefetchSettingsPage();
                 handleNavigate('/settings');

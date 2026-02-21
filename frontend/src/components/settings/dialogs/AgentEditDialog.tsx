@@ -3,7 +3,7 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 const Editor = lazy(() => import('@monaco-editor/react'));
 import { BaseModal } from '@/components/ui/shared/BaseModal';
 import { Button } from '@/components/ui/primitives/Button';
-import { useUIStore } from '@/store/uiStore';
+import { useResolvedTheme } from '@/hooks/useResolvedTheme';
 import type { CustomAgent } from '@/types/user.types';
 
 interface AgentEditDialogProps {
@@ -24,7 +24,7 @@ export const AgentEditDialog: React.FC<AgentEditDialogProps> = ({
   onSave,
 }) => {
   const [editedContent, setEditedContent] = useState('');
-  const theme = useUIStore((state) => state.theme);
+  const theme = useResolvedTheme();
 
   useEffect(() => {
     if (agent) {

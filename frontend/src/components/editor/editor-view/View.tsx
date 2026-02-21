@@ -5,7 +5,7 @@ import { Content } from './Content';
 import { EmptyState } from './EmptyState';
 import { FilePreview } from '../file-preview/FilePreview';
 import { useEditorTheme } from '@/hooks/useEditorTheme';
-import { useUIStore } from '@/store/uiStore';
+import { useResolvedTheme } from '@/hooks/useResolvedTheme';
 import type { FileStructure } from '@/types/file-system.types';
 import { detectLanguage, findFileInStructure } from '@/utils/file';
 import { useUpdateFileMutation, useFileContentQuery } from '@/hooks/queries/useSandboxQueries';
@@ -26,7 +26,7 @@ export const View = memo(function View({
   chatId,
   onToggleFileTree,
 }: ViewProps) {
-  const theme = useUIStore((state) => state.theme);
+  const theme = useResolvedTheme();
   const previousFileRef = useRef<FileStructure | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [currentContent, setCurrentContent] = useState('');

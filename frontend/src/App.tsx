@@ -4,7 +4,7 @@ import { Layout } from '@/components/layout/Layout';
 import { Toaster } from 'react-hot-toast';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/authStore';
-import { useUIStore } from '@/store/uiStore';
+import { useResolvedTheme } from '@/hooks/useResolvedTheme';
 import { useCurrentUserQuery } from '@/hooks/queries/useAuthQueries';
 import { useInfiniteChatsQuery } from '@/hooks/queries/useChatQueries';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
@@ -172,7 +172,7 @@ function AppContent() {
 }
 
 export default function App() {
-  const theme = useUIStore((state) => state.theme);
+  const resolvedTheme = useResolvedTheme();
   const [backendReady, setBackendReady] = useState<boolean | null>(null);
   const [authHydrated, setAuthHydrated] = useState(false);
 
@@ -199,13 +199,13 @@ export default function App() {
 
   useEffect(() => {
     document.body.classList.remove('light', 'dark');
-    document.body.classList.add(theme);
-    document.documentElement.setAttribute('data-theme', theme);
+    document.body.classList.add(resolvedTheme);
+    document.documentElement.setAttribute('data-theme', resolvedTheme);
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');
     if (metaThemeColor) {
-      metaThemeColor.setAttribute('content', theme === 'dark' ? '#0a0a0a' : '#ffffff');
+      metaThemeColor.setAttribute('content', resolvedTheme === 'dark' ? '#0a0a0a' : '#ffffff');
     }
-  }, [theme]);
+  }, [resolvedTheme]);
 
   useEffect(() => {
     if (!isTauri()) return;
