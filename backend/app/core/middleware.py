@@ -149,6 +149,9 @@ async def _global_exception_handler(request: Request, exc: Exception) -> JSONRes
 
 def setup_middleware(app: FastAPI) -> None:
 
+    session_secret = settings.SESSION_SECRET_KEY or settings.SECRET_KEY
+    app.add_middleware(SessionMiddleware, secret_key=session_secret)
+
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestIdMiddleware)
 
@@ -167,9 +170,6 @@ def setup_middleware(app: FastAPI) -> None:
         ],
         expose_headers=["X-Message-Id", "X-Request-ID", "X-Process-Time"],
     )
-
-    session_secret = settings.SESSION_SECRET_KEY or settings.SECRET_KEY
-    app.add_middleware(SessionMiddleware, secret_key=session_secret)
 
     app.add_exception_handler(ServiceException, _service_exception_handler)
     app.add_exception_handler(StarletteHTTPException, _http_exception_handler)

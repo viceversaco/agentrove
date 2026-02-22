@@ -87,19 +87,10 @@ async function refreshTokenIfNeeded(baseURL: string): Promise<TokenResponse> {
   }
 }
 
+// Desktop reinstalls can leave stale refresh tokens in local storage while the backend
+// identity/session store resets. Treat refresh 4xx as terminal to break retry loops.
 function shouldInvalidateSession(error: unknown): boolean {
-  if (!(error instanceof RefreshTokenError)) {
-    return false;
-  }
-  if (error.status === 0) {
-    return false;
-  }
-  if (error.status >= 500) {
-    return false;
-  }
-  // Desktop reinstalls can leave stale refresh tokens in local storage while the backend
-  // identity/session store resets. Treat refresh 4xx as terminal to break retry loops.
-  return error.status >= 400 && error.status < 500;
+  return error instanceof RefreshTokenError && error.status >= 400 && error.status < 500;
 }
 
 const extractErrorMessage = async (response: Response): Promise<string> => {
