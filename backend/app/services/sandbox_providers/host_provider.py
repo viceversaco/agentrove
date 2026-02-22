@@ -91,7 +91,11 @@ class LocalHostProvider(SandboxProvider):
         sandbox_id = str(uuid.uuid4())[:12]
         sandbox_dir = (self._base_dir / sandbox_id).resolve()
         sandbox_dir.mkdir(parents=True, exist_ok=True)
-        (sandbox_dir / ".bashrc").touch(exist_ok=True)
+        bashrc_content = f'export PS1="user@{sandbox_id}:\\w$ "\n'
+        (sandbox_dir / ".bashrc").write_text(bashrc_content)
+        (sandbox_dir / ".bash_profile").write_text(
+            "[ -f ~/.bashrc ] && source ~/.bashrc\n"
+        )
         self._sandboxes[sandbox_id] = sandbox_dir
         return sandbox_id
 
@@ -138,7 +142,8 @@ class LocalHostProvider(SandboxProvider):
         if envs:
             process_env.update(envs)
         process_env["HOME"] = str(sandbox_dir)
-        process_env["USER"] = process_env.get("USER", "user")
+        process_env["USER"] = "user"
+        process_env["HOSTNAME"] = sandbox_id
         process_env["TERM"] = process_env.get("TERM", TERMINAL_TYPE)
 
         if background:
@@ -237,7 +242,8 @@ class LocalHostProvider(SandboxProvider):
 
         env = os.environ.copy()
         env["HOME"] = str(sandbox_dir)
-        env["USER"] = env.get("USER", "user")
+        env["USER"] = "user"
+        env["HOSTNAME"] = sandbox_id
         env["TERM"] = TERMINAL_TYPE
 
         cmd = (
