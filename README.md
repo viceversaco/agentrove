@@ -17,7 +17,7 @@ Join the [Discord server](https://discord.gg/cp3sBgEX).
 - Claude Code as the execution harness, exposed through a self-hosted web UI
 - One workflow across Anthropic, OpenAI, GitHub Copilot, OpenRouter, and custom Anthropic-compatible endpoints
 - Anthropic Bridge routing for non-Anthropic providers while preserving Claude Code behavior
-- Isolated sandbox backends (Docker, E2B, Modal, host)
+- Isolated sandbox backends (Docker, host)
 - Extension surface: MCP servers, skills, agents, slash commands, prompts, and marketplace plugins
 - Provider switching with shared working context
 
@@ -28,7 +28,7 @@ React/Vite Frontend
   -> FastAPI Backend
   -> PostgreSQL + Redis (web/docker mode)
   -> SQLite + in-memory cache/pubsub (desktop mode)
-  -> Sandbox runtime (Docker/E2B/Modal/Host)
+  -> Sandbox runtime (Docker/Host)
   -> Claude Code CLI + claude-agent-sdk
 ```
 
@@ -58,7 +58,7 @@ For Anthropic providers, Claudex uses your Claude auth token directly. For custo
 
 - Claude Code-native chat execution through `claude-agent-sdk`
 - Anthropic Bridge provider routing with provider-scoped models (`openai/*`, `openrouter/*`, `copilot/*`)
-- Multi-sandbox runtime (Docker/E2B/Modal/Host)
+- Multi-sandbox runtime (Docker/Host)
 - MCP + custom skills/agents/commands + plugin marketplace
 - Checkpoint restore and chat forking from any prior message state
 - Streaming architecture with resumable SSE events and explicit cancellation

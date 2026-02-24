@@ -111,17 +111,9 @@ class SandboxService:
                 raise UserException("User settings not found")
 
             provider_type = user_settings.sandbox_provider
-            e2b_api_key = user_settings.e2b_api_key
-            modal_api_key = user_settings.modal_api_key
-            api_key = SandboxProviderFactory.resolve_api_key(
-                provider_type=provider_type,
-                e2b_api_key=e2b_api_key,
-                modal_api_key=modal_api_key,
-            )
 
             provider = SandboxProviderFactory.create(
                 provider_type=provider_type,
-                api_key=api_key,
             )
         return cls(provider=provider, session_factory=session_factory)
 

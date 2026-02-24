@@ -62,11 +62,7 @@ Guidelines for suggestions:
         sandbox_provider: str = "docker",
     ) -> str:
         ports_str = ", ".join(str(p) for p in DOCKER_AVAILABLE_PORTS)
-        if sandbox_provider == SandboxProviderType.E2B.value:
-            provider_label = "E2B (cloud)"
-        elif sandbox_provider == SandboxProviderType.MODAL.value:
-            provider_label = "Modal (cloud)"
-        elif sandbox_provider == SandboxProviderType.HOST.value:
+        if sandbox_provider == SandboxProviderType.HOST.value:
             provider_label = "Host (local machine)"
         else:
             provider_label = "Docker (local)"
@@ -77,7 +73,7 @@ Guidelines for suggestions:
 - Sandbox Provider: {provider_label}
 - Available ports for dev servers: {ports_str}
 - IMPORTANT: Only use ports from the available ports list above. Other ports will not be accessible.
-- IMPORTANT: For sandbox providers (Docker/E2B/Modal), ensure dev servers bind to all interfaces and allow external hosts:
+- IMPORTANT: For sandbox providers (Docker), ensure dev servers bind to all interfaces and allow external hosts:
   - Set `host: "0.0.0.0"` in the framework config (e.g., Vite `server.host`).
   - Set `allowedHosts: true` in the framework config (e.g., Vite `server.allowedHosts`).
 - IMPORTANT: Do NOT tell users specific localhost URLs. The actual port is dynamically mapped. Direct users to check the Preview panel for the correct URL.

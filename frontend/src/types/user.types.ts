@@ -67,7 +67,7 @@ export interface CustomPrompt {
   content: string;
 }
 
-export type SandboxProviderType = 'docker' | 'e2b' | 'modal' | 'host';
+export type SandboxProviderType = 'docker' | 'host';
 
 export type ProviderType = 'anthropic' | 'openrouter' | 'openai' | 'copilot' | 'custom';
 
@@ -91,8 +91,6 @@ export interface UserSettings {
   id: string;
   user_id: string;
   github_personal_access_token: string | null;
-  e2b_api_key: string | null;
-  modal_api_key: string | null;
   sandbox_provider: SandboxProviderType | null;
   timezone: string;
   custom_instructions: string | null;

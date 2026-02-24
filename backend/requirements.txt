@@ -17,8 +17,6 @@ markupsafe
 python-multipart
 starlette
 aiodocker>=0.22.0
-e2b==1.3.4rc1
-modal
 claude-agent-sdk @ git+https://github.com/Mng-dev-ai/claude-code-sdk-python.git@main
 mcp
 sqladmin[full]

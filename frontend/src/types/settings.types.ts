@@ -1,4 +1,4 @@
-export type ApiFieldKey = 'github_personal_access_token' | 'e2b_api_key' | 'modal_api_key';
+export type ApiFieldKey = 'github_personal_access_token';
 
 export interface HelperTextLink {
   prefix: string;

@@ -79,8 +79,6 @@ class UserSettings(Base):
     github_personal_access_token: Mapped[str | None] = mapped_column(
         EncryptedString, nullable=True
     )
-    e2b_api_key: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
-    modal_api_key: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
     sandbox_provider: Mapped[str] = mapped_column(
         String(32), default="docker", server_default="docker", nullable=False
     )

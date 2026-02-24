@@ -58,31 +58,3 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-  build-e2b-template:
-    name: Build E2B Sandbox Template
-    runs-on: ubuntu-latest
-    if: ${{ vars.E2B_ENABLED == 'true' }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Install E2B CLI
-        run: npm install -g @e2b/cli
-
-      - name: Copy shared files into E2B build context
-        run: |
-          cp scripts/start-vnc.sh sandbox/e2b/start-vnc.sh
-          cp backend/permission_server.py sandbox/e2b/permission_server.py
-
-      - name: Build E2B template
-        working-directory: sandbox/e2b
-        env:
-          E2B_ACCESS_TOKEN: ${{ secrets.E2B_ACCESS_TOKEN }}
-        run: e2b template build --cpu-count 2 --memory-mb 4098

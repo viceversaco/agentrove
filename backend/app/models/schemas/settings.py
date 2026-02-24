@@ -111,9 +111,7 @@ class InstalledPluginSchema(BaseModel):
 
 class UserSettingsBase(BaseModel):
     github_personal_access_token: str | None = None
-    e2b_api_key: str | None = None
-    modal_api_key: str | None = None
-    sandbox_provider: Literal["docker", "e2b", "modal", "host"] = "docker"
+    sandbox_provider: Literal["docker", "host"] = "docker"
     timezone: str = Field(default="UTC", max_length=64)
     custom_instructions: str | None = Field(default=None, max_length=1500)
     custom_providers: list[CustomProvider] | None = None

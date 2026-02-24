@@ -1,8 +1,8 @@
 """initial_schema
 
-Revision ID: ce1a6cb4974a
+Revision ID: 2b31227aabdf
 Revises: 
-Create Date: 2026-02-23 01:24:07.449807
+Create Date: 2026-02-24 06:48:02.117713
 
 """
 from typing import Sequence, Union
@@ -15,7 +15,7 @@ from app.db.types import EncryptedString
 from app.db.types import GUID
 
 # revision identifiers, used by Alembic.
-revision: str = 'ce1a6cb4974a'
+revision: str = '2b31227aabdf'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -99,8 +99,6 @@ def upgrade() -> None:
     sa.Column('id', GUID(), server_default=uuid_server_default(), nullable=False),
     sa.Column('user_id', GUID(), nullable=False),
     sa.Column('github_personal_access_token', EncryptedString(), nullable=True),
-    sa.Column('e2b_api_key', EncryptedString(), nullable=True),
-    sa.Column('modal_api_key', EncryptedString(), nullable=True),
     sa.Column('sandbox_provider', sa.String(length=32), server_default='docker', nullable=False),
     sa.Column('timezone', sa.String(length=64), server_default='UTC', nullable=False),
     sa.Column('custom_instructions', sa.Text(), nullable=True),
@@ -228,10 +226,4 @@ def downgrade() -> None:
     op.drop_index('idx_chats_user_id_deleted_at', table_name='chats')
     op.drop_table('chats')
     op.drop_table('users')
-    op.execute("DROP TYPE IF EXISTS attachmenttype")
-    op.execute("DROP TYPE IF EXISTS messagestreamstatus")
-    op.execute("DROP TYPE IF EXISTS messagerole")
-    op.execute("DROP TYPE IF EXISTS taskexecutionstatus")
-    op.execute("DROP TYPE IF EXISTS taskstatus")
-    op.execute("DROP TYPE IF EXISTS recurrencetype")
     # ### end Alembic commands ###

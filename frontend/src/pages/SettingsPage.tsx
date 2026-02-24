@@ -77,8 +77,6 @@ const createFallbackSettings = (): UserSettings => ({
   id: '',
   user_id: '',
   github_personal_access_token: null,
-  e2b_api_key: null,
-  modal_api_key: null,
   sandbox_provider: null,
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   custom_instructions: null,
@@ -97,7 +95,7 @@ const createFallbackSettings = (): UserSettings => ({
 });
 
 const TAB_FIELDS: Record<TabKey, (keyof UserSettings)[]> = {
-  general: ['github_personal_access_token', 'e2b_api_key', 'modal_api_key', 'timezone'],
+  general: ['github_personal_access_token', 'timezone'],
   providers: ['custom_providers'],
   integrations: [],
   marketplace: [],
@@ -199,8 +197,6 @@ const SettingsPage: React.FC = () => {
       const payload: UserSettingsUpdate = {};
       const fields: (keyof UserSettingsUpdate)[] = [
         'github_personal_access_token',
-        'e2b_api_key',
-        'modal_api_key',
         'sandbox_provider',
         'timezone',
         'custom_instructions',
@@ -259,8 +255,6 @@ const SettingsPage: React.FC = () => {
 
   const [revealedFields, setRevealedFields] = useState<Record<ApiFieldKey, boolean>>({
     github_personal_access_token: false,
-    e2b_api_key: false,
-    modal_api_key: false,
   });
 
   const hasUnsavedChanges = useMemo(() => {
@@ -570,7 +564,6 @@ const SettingsPage: React.FC = () => {
                       <GeneralSettingsTab
                         fields={generalSecretFields}
                         settings={localSettings}
-                        savedSettings={settings}
                         revealedFields={revealedFields}
                         onSecretChange={handleSecretFieldChange}
                         onToggleVisibility={toggleFieldVisibility}

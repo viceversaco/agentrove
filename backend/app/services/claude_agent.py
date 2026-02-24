@@ -30,9 +30,7 @@ from app.services.streaming.types import StreamEvent
 from app.services.tool_handler import ToolHandlerRegistry
 from app.services.transports import (
     DockerSandboxTransport,
-    E2BSandboxTransport,
     HostSandboxTransport,
-    ModalSandboxTransport,
     SandboxTransport,
 )
 from app.services.user import UserService
@@ -106,12 +104,7 @@ class ClaudeAgentService:
         workspace_path: str | None,
         options: ClaudeAgentOptions,
         user_settings: UserSettings,
-    ) -> (
-        E2BSandboxTransport
-        | DockerSandboxTransport
-        | HostSandboxTransport
-        | ModalSandboxTransport
-    ):
+    ) -> DockerSandboxTransport | HostSandboxTransport:
         if (
             sandbox_provider == SandboxProviderType.DOCKER
             or sandbox_provider == SandboxProviderType.DOCKER.value
@@ -130,28 +123,7 @@ class ClaudeAgentService:
                 options=options,
             )
 
-        if sandbox_provider == SandboxProviderType.MODAL.value:
-            if not user_settings.modal_api_key:
-                raise ClaudeAgentException(
-                    "Modal API key is required for Modal sandbox provider"
-                )
-
-            return ModalSandboxTransport(
-                sandbox_id=sandbox_id,
-                api_key=user_settings.modal_api_key,
-                options=options,
-            )
-
-        if not user_settings.e2b_api_key:
-            raise ClaudeAgentException(
-                "E2B API key is required for E2B sandbox provider"
-            )
-
-        return E2BSandboxTransport(
-            sandbox_id=sandbox_id,
-            api_key=user_settings.e2b_api_key,
-            options=options,
-        )
+        raise ValueError(f"Unknown sandbox provider: {sandbox_provider}")
 
     async def build_session_params(
         self,
@@ -365,11 +337,6 @@ class ClaudeAgentService:
             )
         elif settings.DOCKER_PERMISSION_API_URL:
             api_base_url = settings.DOCKER_PERMISSION_API_URL
-        elif sandbox_provider in (
-            SandboxProviderType.E2B.value,
-            SandboxProviderType.MODAL.value,
-        ):
-            api_base_url = settings.BASE_URL.rstrip("/")
         else:
             base_url = settings.BASE_URL
             port = (

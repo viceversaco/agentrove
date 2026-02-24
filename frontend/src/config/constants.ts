@@ -2,8 +2,6 @@ import type { CustomAgent } from '@/types/user.types';
 
 export const SandboxProvider = {
   DOCKER: 'docker',
-  E2B: 'e2b',
-  MODAL: 'modal',
   HOST: 'host',
 } as const;
 

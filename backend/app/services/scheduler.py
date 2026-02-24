@@ -539,15 +539,8 @@ class SchedulerService(BaseDbService[ScheduledTask]):
         user_settings: UserSettings,
         session_factory: SessionFactoryType,
     ) -> SandboxService:
-        api_key = SandboxProviderFactory.resolve_api_key(
-            provider_type=user_settings.sandbox_provider,
-            e2b_api_key=user_settings.e2b_api_key,
-            modal_api_key=user_settings.modal_api_key,
-        )
-
         provider = SandboxProviderFactory.create(
             provider_type=user_settings.sandbox_provider,
-            api_key=api_key,
         )
         return SandboxService(provider, session_factory=session_factory)
 

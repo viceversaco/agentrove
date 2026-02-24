@@ -13,7 +13,6 @@ import { isTauri } from '@tauri-apps/api/core';
 interface GeneralSettingsTabProps {
   fields: GeneralSecretFieldConfig[];
   settings: UserSettings;
-  savedSettings: UserSettings | undefined;
   revealedFields: Record<ApiFieldKey, boolean>;
   onSecretChange: (field: ApiFieldKey, value: string) => void;
   onToggleVisibility: (field: ApiFieldKey) => void;
@@ -64,7 +63,6 @@ function ThemeControl() {
 export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
   fields,
   settings,
-  savedSettings,
   revealedFields,
   onSecretChange,
   onToggleVisibility,
@@ -106,7 +104,7 @@ export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
     <SectionCard title="Sandbox Provider">
       <div className="space-y-4">
         <p className="mb-2 text-xs text-text-tertiary dark:text-text-dark-tertiary">
-          Select the sandbox environment for code execution. E2B and Modal require API keys.
+          Select the sandbox environment for code execution.
         </p>
         <SegmentedControl
           value={settings.sandbox_provider ?? 'docker'}
@@ -114,8 +112,6 @@ export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
           options={[
             ...(isTauri() ? [{ value: 'host', label: 'Host (Local)', disabled: false }] : []),
             { value: 'docker', label: 'Docker (Local)', disabled: false },
-            { value: 'e2b', label: 'E2B (Cloud)', disabled: !savedSettings?.e2b_api_key },
-            { value: 'modal', label: 'Modal (Cloud)', disabled: !savedSettings?.modal_api_key },
           ]}
         />
       </div>

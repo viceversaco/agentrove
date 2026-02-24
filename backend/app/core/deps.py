@@ -111,8 +111,6 @@ async def get_sandbox_service(
     user_service: UserService = Depends(get_user_service),
 ) -> AsyncIterator[SandboxService]:
     provider_type = SandboxProviderType.DOCKER
-    e2b_api_key = None
-    modal_api_key = None
 
     sandbox_id = request.path_params.get("sandbox_id")
     if sandbox_id:
@@ -144,25 +142,14 @@ async def get_sandbox_service(
             user_settings = await user_service.get_user_settings(user.id, db=db)
             if user_settings.sandbox_provider:
                 provider_type = SandboxProviderType(user_settings.sandbox_provider)
-            if user_settings.e2b_api_key:
-                e2b_api_key = user_settings.e2b_api_key
-            if user_settings.modal_api_key:
-                modal_api_key = user_settings.modal_api_key
         except UserException as e:
             logger.warning("Failed to load user settings for sandbox: %s", e)
 
     if sandbox_provider:
         provider_type = SandboxProviderType(sandbox_provider)
 
-    api_key = None
-    if provider_type == SandboxProviderType.E2B:
-        api_key = e2b_api_key
-    elif provider_type == SandboxProviderType.MODAL:
-        api_key = modal_api_key
-
     provider = SandboxProviderFactory.create(
         provider_type=provider_type,
-        api_key=api_key,
     )
     if (
         sandbox_id

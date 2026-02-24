@@ -619,22 +619,9 @@ DOCKER_TRAEFIK_ENTRYPOINT=https
 | `DOCKER_HOST` | *(none)* | Custom Docker daemon socket/host |
 | `DOCKER_PREVIEW_BASE_URL` | `http://localhost` | Base URL for sandbox preview links |
 | `DOCKER_TRAEFIK_ENTRYPOINT` | `https` | Traefik entrypoint for sandbox routing |
-| `SANDBOX_PROVIDER` | `docker` | Sandbox provider (`docker` or `e2b`) |
+| `SANDBOX_PROVIDER` | `docker` | Sandbox provider (`docker` or `host`) |
 
 > **Note**: `DOCKER_PREVIEW_BASE_URL`, `DOCKER_TRAEFIK_NETWORK`, and `DOCKER_PERMISSION_API_URL` are documented in the main configuration section above as they're typically required for Coolify deployments.
-
-### E2B Sandbox Configuration (Alternative)
-
-If using E2B instead of Docker for sandboxes:
-
-```env
-SANDBOX_PROVIDER=e2b
-E2B_TEMPLATE_ID=61kjt118n5mlnh5c00j9
-```
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `E2B_TEMPLATE_ID` | `61kjt118n5mlnh5c00j9` | E2B template ID for sandbox containers |
 
 ### Storage & Upload Configuration
 
