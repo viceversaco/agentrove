@@ -27,7 +27,6 @@ slowapi
 sse-starlette
 wtforms
 redis
-tenacity==8.2.3
 PyYAML>=6.0
 python-json-logger>=2.0.0
 anthropic-bridge==0.1.38
