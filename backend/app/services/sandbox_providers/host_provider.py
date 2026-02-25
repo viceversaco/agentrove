@@ -63,6 +63,7 @@ LISTENING_PORTS_COMMAND = (
         " | grep -E '^[0-9]+$' | sort -u"
     )
 )
+HOST_REQUIRED_PATH_PREFIX = f"{Path.home()}/.local/bin:/opt/homebrew/bin:/usr/local/bin"
 
 
 class LocalHostProvider(SandboxProvider):
@@ -173,6 +174,9 @@ class LocalHostProvider(SandboxProvider):
     ) -> CommandResult:
         sandbox_dir = self._resolve_sandbox_dir(sandbox_id)
         command_to_run = self._map_virtual_paths(sandbox_id, command)
+        command_with_path = (
+            f"export PATH={HOST_REQUIRED_PATH_PREFIX}:$PATH; {command_to_run}"
+        )
         process_env = os.environ.copy()
         if envs:
             process_env.update(envs)
@@ -184,7 +188,7 @@ class LocalHostProvider(SandboxProvider):
         if background:
             await asyncio.to_thread(
                 subprocess.Popen,
-                ["bash", "-lc", command_to_run],
+                ["bash", "-lc", command_with_path],
                 cwd=str(sandbox_dir),
                 env=process_env,
                 stdin=subprocess.DEVNULL,
@@ -202,7 +206,7 @@ class LocalHostProvider(SandboxProvider):
         process = await asyncio.create_subprocess_exec(
             "bash",
             "-lc",
-            command_to_run,
+            command_with_path,
             cwd=str(sandbox_dir),
             env=process_env,
             stdout=asyncio.subprocess.PIPE,
@@ -333,6 +337,7 @@ class LocalHostProvider(SandboxProvider):
         env["TERM"] = TERMINAL_TYPE
 
         cmd = (
+            f"export PATH={HOST_REQUIRED_PATH_PREFIX}:$PATH; "
             "command -v tmux >/dev/null && "
             f"tmux new -A -s {shlex.quote(tmux_session)} \\; set -g status off || exec bash"
         )

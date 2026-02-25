@@ -1,24 +1,33 @@
 use std::fs;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read, Write};
+use std::net::{TcpListener, TcpStream};
 use std::os::unix::process::CommandExt;
 use std::process::{Child, Command, Stdio};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use libc;
 use rand::Rng;
-use std::net::TcpListener;
 use tauri::Manager;
 
-fn app_data_dir() -> std::path::PathBuf {
+#[tauri::command]
+fn get_backend_port(state: tauri::State<'_, Arc<OnceLock<Result<u16, String>>>>) -> Result<u16, String> {
+    loop {
+        if let Some(result) = state.get() {
+            return result.clone();
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
+fn data_dir() -> std::path::PathBuf {
     dirs::data_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
         .join("com.claudex.app")
 }
 
-fn ensure_secret_key() -> String {
-    let data_dir = app_data_dir();
-    fs::create_dir_all(&data_dir).ok();
+fn ensure_secret_key(data_dir: &std::path::Path) -> String {
+    fs::create_dir_all(data_dir).ok();
     let key_path = data_dir.join(".secret_key");
     if let Ok(key) = fs::read_to_string(&key_path) {
         let key = key.trim().to_string();
@@ -27,22 +36,11 @@ fn ensure_secret_key() -> String {
         }
     }
     let mut rng = rand::rng();
-    let key: String = (0..64)
-        .map(|_| {
-            let idx = rng.random_range(0..36);
-            if idx < 10 {
-                (b'0' + idx) as char
-            } else {
-                (b'a' + idx - 10) as char
-            }
-        })
+    let key: String = (0..32)
+        .map(|_| format!("{:02x}", rng.random_range(0u8..=255)))
         .collect();
     fs::write(&key_path, &key).ok();
     key
-}
-
-fn launcher_name() -> &'static str {
-    "claudex-backend"
 }
 
 fn resolve_backend_binary(app_handle: &tauri::AppHandle) -> std::path::PathBuf {
@@ -51,17 +49,15 @@ fn resolve_backend_binary(app_handle: &tauri::AppHandle) -> std::path::PathBuf {
         .resource_dir()
         .expect("failed to resolve resource dir");
 
-    let name = launcher_name();
-
     let binary = resource_dir
         .join("_up_")
         .join("backend-sidecar")
-        .join(name);
+        .join("claudex-backend");
     if binary.exists() {
         return binary;
     }
 
-    let direct = resource_dir.join("backend-sidecar").join(name);
+    let direct = resource_dir.join("backend-sidecar").join("claudex-backend");
     if direct.exists() {
         return direct;
     }
@@ -70,7 +66,7 @@ fn resolve_backend_binary(app_handle: &tauri::AppHandle) -> std::path::PathBuf {
         .parent()
         .unwrap()
         .join("backend-sidecar")
-        .join(name);
+        .join("claudex-backend");
     if dev_binary.exists() {
         return dev_binary;
     }
@@ -81,64 +77,108 @@ fn resolve_backend_binary(app_handle: &tauri::AppHandle) -> std::path::PathBuf {
     );
 }
 
-const BACKEND_PORT: u16 = 8081;
-
-fn show_error_and_exit(message: &str) -> ! {
-    eprintln!("{}", message);
-    let _ = Command::new("osascript")
-        .arg("-e")
-        .arg(format!(
-            "display dialog \"{}\" with title \"Claudex\" buttons {{\"OK\"}} default button \"OK\" with icon stop",
-            message
-        ))
-        .output();
-    std::process::exit(1);
+fn pick_available_port() -> u16 {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).expect("failed to bind ephemeral port");
+    listener.local_addr().unwrap().port()
 }
 
-fn check_port_available() {
-    if TcpListener::bind(("127.0.0.1", BACKEND_PORT)).is_err() {
-        show_error_and_exit(&format!(
-            "Port {} is already in use. Another Claudex instance may be running.",
-            BACKEND_PORT
-        ));
+fn backend_ready(port: u16) -> bool {
+    let mut stream = match TcpStream::connect(("127.0.0.1", port)) {
+        Ok(stream) => stream,
+        Err(_) => return false,
+    };
+    let _ = stream.set_write_timeout(Some(Duration::from_secs(1)));
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(1)));
+    let request =
+        b"GET /api/v1/readyz HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+    if stream.write_all(request).is_err() {
+        return false;
     }
+    let mut response = String::new();
+    if stream.read_to_string(&mut response).is_err() {
+        return false;
+    }
+    response.starts_with("HTTP/1.1 200") || response.starts_with("HTTP/1.0 200")
 }
 
 fn terminate_backend_process(backend: &Arc<Mutex<Option<Child>>>) {
     if let Ok(mut guard) = backend.lock() {
         if let Some(ref mut child) = *guard {
             let pid = child.id() as libc::pid_t;
-
             unsafe {
-                libc::kill(-pid, libc::SIGTERM);
+                libc::kill(-pid, libc::SIGKILL);
             }
-
-            let deadline = std::time::Instant::now() + Duration::from_secs(5);
-            loop {
-                match child.try_wait() {
-                    Ok(Some(_)) => break,
-                    Ok(None) if std::time::Instant::now() < deadline => {
-                        std::thread::sleep(Duration::from_millis(100));
-                    }
-                    _ => {
-                        unsafe {
-                            libc::kill(-pid, libc::SIGKILL);
-                        }
-                        let _ = child.kill();
-                        let _ = child.wait();
-                        break;
-                    }
-                }
-            }
+            let _ = child.wait();
         }
         *guard = None;
     }
 }
 
+fn pipe_output<R: Read + Send + 'static>(stream: R, is_err: bool) {
+    std::thread::spawn(move || {
+        let reader = BufReader::new(stream);
+        for line in reader.lines().flatten() {
+            if is_err {
+                eprintln!("[backend] {}", line);
+            } else {
+                println!("[backend] {}", line);
+            }
+        }
+    });
+}
+
+fn spawn_backend(
+    app_handle: &tauri::AppHandle,
+    data_dir: &std::path::Path,
+    secret_key: &str,
+    port: u16,
+) -> Child {
+    let backend_bin = resolve_backend_binary(app_handle);
+    let mut backend_path = std::env::var("PATH").unwrap_or_default();
+    if let Some(home) = dirs::home_dir() {
+        backend_path.push_str(&format!(":{}/.local/bin", home.display()));
+    }
+
+    let db_path = data_dir.join("claudex.db").to_string_lossy().to_string();
+    let mut command = Command::new(&backend_bin);
+    command
+        .env("DESKTOP_MODE", "true")
+        .env("SECRET_KEY", secret_key)
+        .env("BASE_URL", format!("http://127.0.0.1:{port}"))
+        .env("DATABASE_URL", format!("sqlite+aiosqlite:///{db_path}"))
+        .env("PATH", backend_path)
+        .env(
+            "STORAGE_PATH",
+            data_dir.join("storage").to_string_lossy().to_string(),
+        )
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    unsafe {
+        command.pre_exec(|| {
+            if libc::setpgid(0, 0) != 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+
+    let mut child = command.spawn().expect("failed to spawn backend process");
+
+    if let Some(stdout) = child.stdout.take() {
+        pipe_output(stdout, false);
+    }
+    if let Some(stderr) = child.stderr.take() {
+        pipe_output(stderr, true);
+    }
+
+    child
+}
+
 fn main() {
-    let secret_key = ensure_secret_key();
-    let data_dir = app_data_dir();
-    check_port_available();
+    let data_dir = data_dir();
+    let secret_key = ensure_secret_key(&data_dir);
+    let port = pick_available_port();
+    let backend_port: Arc<OnceLock<Result<u16, String>>> = Arc::new(OnceLock::new());
     let backend_process: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(None));
     let backend_for_exit = backend_process.clone();
 
@@ -147,81 +187,25 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
+        .manage(backend_port.clone())
+        .invoke_handler(tauri::generate_handler![get_backend_port])
         .setup(move |app| {
-            let app_handle = app.handle().clone();
-            let backend_bin = resolve_backend_binary(&app_handle);
-
-            let db_path = data_dir
-                .join("claudex.db")
-                .to_string_lossy()
-                .replace('\\', "/");
-
-            let mut command = Command::new(&backend_bin);
-            command
-                .env("DESKTOP_MODE", "true")
-                .env("SECRET_KEY", &secret_key)
-                .env("BASE_URL", format!("http://127.0.0.1:{BACKEND_PORT}"))
-                .env("DATABASE_URL", format!("sqlite+aiosqlite:///{db_path}"))
-                .env(
-                    "STORAGE_PATH",
-                    data_dir.join("storage").to_string_lossy().to_string(),
-                )
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped());
-            unsafe {
-                command.pre_exec(|| {
-                    if libc::setpgid(0, 0) != 0 {
-                        return Err(std::io::Error::last_os_error());
-                    }
-                    Ok(())
-                });
-            }
-            let mut child = command
-                .spawn()
-                .expect("failed to spawn backend process");
-
-            if let Some(stdout) = child.stdout.take() {
-                std::thread::spawn(move || {
-                    let reader = BufReader::new(stdout);
-                    for line in reader.lines() {
-                        if let Ok(line) = line {
-                            println!("[backend] {}", line);
-                        }
-                    }
-                });
-            }
-
-            if let Some(stderr) = child.stderr.take() {
-                std::thread::spawn(move || {
-                    let reader = BufReader::new(stderr);
-                    for line in reader.lines() {
-                        if let Ok(line) = line {
-                            eprintln!("[backend] {}", line);
-                        }
-                    }
-                });
-            }
-
+            let child = spawn_backend(app.handle(), &data_dir, &secret_key, port);
             *backend_process.lock().unwrap() = Some(child);
 
-            let readyz_url = format!("http://127.0.0.1:{BACKEND_PORT}/api/v1/readyz");
-            tauri::async_runtime::spawn(async move {
-                let client = reqwest::Client::new();
+            let port_ref = backend_port.clone();
+            std::thread::spawn(move || {
                 for _ in 0..60 {
-                    tokio::time::sleep(Duration::from_millis(500)).await;
-                    if let Ok(resp) = client.get(&readyz_url).send().await {
-                        if resp.status().is_success() {
-                            if let Some(window) = app_handle.get_webview_window("main") {
-                                let _ = window.show();
-                            }
-                            return;
-                        }
+                    std::thread::sleep(Duration::from_millis(500));
+                    if backend_ready(port) {
+                        let _ = port_ref.set(Ok(port));
+                        return;
                     }
                 }
-                eprintln!("[backend] readyz timeout — showing window anyway");
-                if let Some(window) = app_handle.get_webview_window("main") {
-                    let _ = window.show();
-                }
+                eprintln!("[backend] readyz timeout");
+                let _ = port_ref.set(Err(
+                    "Backend failed readiness checks within startup timeout".to_string(),
+                ));
             });
 
             Ok(())

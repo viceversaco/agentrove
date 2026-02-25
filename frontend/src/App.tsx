@@ -12,9 +12,11 @@ import { useGlobalStream, useStreamRestoration } from '@/hooks/useChatStreaming'
 import { authService } from '@/services/authService';
 import { toasterConfig } from '@/config/toaster';
 import { AuthRoute } from '@/components/routes/AuthRoute';
-import { API_BASE_URL } from '@/lib/api';
-import { isTauri } from '@tauri-apps/api/core';
+import { setApiPort } from '@/lib/api';
+import { isTauri, invoke } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { check } from '@tauri-apps/plugin-updater';
+import { ask } from '@tauri-apps/plugin-dialog';
 import { authStorage } from '@/utils/storage';
 
 const LandingPage = lazy(() =>
@@ -42,7 +44,10 @@ async function checkDesktopUpdate(): Promise<void> {
     return;
   }
 
-  const shouldInstall = window.confirm(`Claudex ${update.version} is available. Install now?`);
+  const shouldInstall = await ask(`Claudex ${update.version} is available. Install now?`, {
+    title: 'Update Available',
+    kind: 'info',
+  });
   if (!shouldInstall) {
     return;
   }
@@ -173,10 +178,11 @@ function AppContent() {
 
 export default function App() {
   const resolvedTheme = useResolvedTheme();
-  const [backendReady, setBackendReady] = useState<boolean | null>(null);
+  const [desktopReady, setDesktopReady] = useState(!isTauri());
+  const [desktopError, setDesktopError] = useState<string | null>(null);
   const [authHydrated, setAuthHydrated] = useState(false);
 
-  useGlobalStream({ enabled: authHydrated });
+  useGlobalStream({ enabled: authHydrated && desktopReady });
 
   useEffect(() => {
     let cancelled = false;
@@ -210,32 +216,32 @@ export default function App() {
   useEffect(() => {
     if (!isTauri()) return;
 
-    let interval: number | undefined;
     let cancelled = false;
-    const apiUrl = new URL(API_BASE_URL, window.location.origin);
-    const healthUrl = `${apiUrl.origin}/api/v1/readyz`;
 
-    const check = async () => {
-      try {
-        const response = await fetch(healthUrl, { method: 'GET', cache: 'no-store' });
-        if (!cancelled) {
-          setBackendReady(response.ok);
-          if (response.ok && interval) {
-            window.clearInterval(interval);
-            interval = undefined;
-          }
-        }
-      } catch {
-        if (!cancelled) setBackendReady(false);
-      }
-    };
-
-    check();
-    interval = window.setInterval(check, 3000);
+    invoke<number>('get_backend_port')
+      .then((port) => {
+        if (cancelled) return;
+        setApiPort(port);
+        setDesktopReady(true);
+        getCurrentWindow()
+          .show()
+          .catch((error) => {
+            console.error('Failed to show desktop window:', error);
+          });
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error('Failed to resolve desktop backend port:', error);
+        setDesktopError('Desktop backend failed to start. Restart Claudex and try again.');
+        getCurrentWindow()
+          .show()
+          .catch((error) => {
+            console.error('Failed to show desktop window:', error);
+          });
+      });
 
     return () => {
       cancelled = true;
-      if (interval) window.clearInterval(interval);
     };
   }, []);
 
@@ -247,36 +253,22 @@ export default function App() {
     });
   }, []);
 
-  if (!authHydrated) {
+  if (desktopError) {
+    return (
+      <div className="bg-surface-primary dark:bg-surface-dark-primary flex min-h-screen items-center justify-center text-text-primary dark:text-text-dark-primary">
+        <div className="rounded-lg border border-border/50 bg-surface-secondary px-4 py-3 text-xs dark:border-border-dark/50 dark:bg-surface-dark-secondary">
+          {desktopError}
+        </div>
+      </div>
+    );
+  }
+
+  if (!desktopReady || !authHydrated) {
     return <LoadingScreen />;
   }
 
   return (
     <BrowserRouter>
-      {backendReady === false && (
-        <div className="fixed inset-x-0 top-0 z-[100] flex items-center justify-center gap-2 bg-surface-tertiary px-4 py-2 text-center text-xs font-medium text-text-primary dark:bg-surface-dark-tertiary dark:text-text-dark-primary">
-          <svg
-            className="h-3 w-3 animate-spin text-text-quaternary dark:text-text-dark-quaternary"
-            viewBox="0 0 24 24"
-            fill="none"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-            />
-          </svg>
-          Starting backend...
-        </div>
-      )}
       <Toaster {...toasterConfig} />
       <AppContent />
     </BrowserRouter>

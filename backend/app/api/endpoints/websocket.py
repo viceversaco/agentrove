@@ -192,7 +192,7 @@ async def terminal_websocket(
                     )
                 )
 
-                if is_reattach:
+                if is_reattach and session.pty_id is not None:
                     await session.sandbox_service.send_pty_input(
                         session.sandbox_id, session.pty_id, b" \x0c"
                     )

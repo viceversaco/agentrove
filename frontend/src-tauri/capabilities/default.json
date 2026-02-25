@@ -5,6 +5,7 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:window:allow-show",
     "store:default",
     "updater:default",
     "notification:default",

@@ -212,7 +212,11 @@ class SandboxService:
         on_data: PtyDataCallbackType,
     ) -> str:
         pty_session = await self.provider.create_pty(
-            sandbox_id, rows, cols, tmux_session, on_data=on_data,
+            sandbox_id,
+            rows,
+            cols,
+            tmux_session,
+            on_data=on_data,
         )
         return pty_session.id
 

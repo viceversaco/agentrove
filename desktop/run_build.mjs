@@ -1,9 +1,9 @@
 import { createWriteStream } from 'node:fs';
-import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { get } from 'node:https';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 
 const dir = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(dir, '..');
@@ -16,6 +16,8 @@ const GET_PIP_URL = 'https://bootstrap.pypa.io/get-pip.py';
 
 const platform = process.platform;
 const arch = process.arch;
+const forceClean = process.argv.includes('--clean');
+const PYTHON_STAMP_VALUE = `${PYTHON_VERSION}+${RELEASE_TAG}-${arch}-${platform}`;
 
 const archMap = {
   arm64: 'aarch64',
@@ -40,11 +42,8 @@ function pythonBin() {
   return join(sidecarDir, 'python', 'bin', 'python3');
 }
 
-function resetSidecarDir() {
-  if (existsSync(sidecarDir)) {
-    rmSync(sidecarDir, { recursive: true, force: true });
-  }
-  mkdirSync(sidecarDir, { recursive: true });
+function pythonStampPath() {
+  return join(sidecarDir, '.python-stamp');
 }
 
 function downloadFile(url, outputPath) {
@@ -80,24 +79,22 @@ function downloadFile(url, outputPath) {
   });
 }
 
-function extractArchive(archivePath) {
-  execFileSync('tar', ['-xzf', archivePath, '-C', sidecarDir], {
-    stdio: 'inherit',
-  });
-}
-
 function downloadPython() {
   const archivePath = join(sidecarDir, 'python.tar.gz');
   const url = pythonUrl();
   console.log(`Downloading Python ${PYTHON_VERSION}...`);
   return downloadFile(url, archivePath)
     .then(() => {
-      extractArchive(archivePath);
+      execFileSync('tar', ['-xzf', archivePath, '-C', sidecarDir], {
+        stdio: 'inherit',
+      });
       rmSync(archivePath, { force: true });
 
       if (!existsSync(pythonBin())) {
         throw new Error(`Python binary not found at ${pythonBin()}`);
       }
+
+      writeFileSync(pythonStampPath(), `${PYTHON_STAMP_VALUE}\n`);
     });
 }
 
@@ -112,19 +109,44 @@ async function installPip() {
       [getPipPath, '--disable-pip-version-check'],
       { stdio: 'inherit' }
     );
-    const result = spawnSync(pythonBin(), ['-m', 'pip', '--version'], {
-      stdio: 'ignore',
-    });
-    if (result.status !== 0) {
-      throw new Error('Failed to bootstrap pip in bundled Python');
-    }
   } finally {
     rmSync(getPipPath, { force: true });
   }
 }
 
+function depsStampPath() {
+  return join(sidecarDir, '.deps-stamp');
+}
+
+function depsStampValue() {
+  const requirements = readFileSync(join(dir, 'requirements.txt'), 'utf-8');
+  return JSON.stringify({ requirements, python: PYTHON_STAMP_VALUE });
+}
+
+function pythonUpToDate() {
+  const stamp = pythonStampPath();
+  if (!existsSync(pythonBin()) || !existsSync(stamp)) return false;
+  return readFileSync(stamp, 'utf-8').trim() === PYTHON_STAMP_VALUE;
+}
+
+function depsUpToDate() {
+  const stamp = depsStampPath();
+  if (!existsSync(stamp)) return false;
+  try {
+    const installed = JSON.parse(readFileSync(stamp, 'utf-8'));
+    return installed.requirements === readFileSync(join(dir, 'requirements.txt'), 'utf-8') &&
+      installed.python === PYTHON_STAMP_VALUE;
+  } catch {
+    return false;
+  }
+}
+
 async function installDeps() {
-  await installPip();
+  try {
+    execFileSync(pythonBin(), ['-m', 'pip', '--version'], { stdio: 'ignore' });
+  } catch {
+    await installPip();
+  }
   console.log('Installing dependencies...');
   execFileSync(
     pythonBin(),
@@ -143,23 +165,22 @@ async function installDeps() {
       stdio: 'inherit',
     }
   );
+  writeFileSync(depsStampPath(), depsStampValue());
 }
 
 function copySource() {
   console.log('Copying source...');
+  const pycacheFilter = (src) => !src.includes('__pycache__') && !src.endsWith('.pyc');
+  rmSync(join(sidecarDir, 'app'), { recursive: true, force: true });
+  rmSync(join(sidecarDir, 'migrations'), { recursive: true, force: true });
+
   cpSync(join(backendDir, 'app'), join(sidecarDir, 'app'), {
     recursive: true,
-    filter: (src) => {
-      const rel = src.replace(join(backendDir, 'app'), '');
-      return !rel.includes('__pycache__') && !src.endsWith('.pyc');
-    },
+    filter: pycacheFilter,
   });
   cpSync(join(backendDir, 'migrations'), join(sidecarDir, 'migrations'), {
     recursive: true,
-    filter: (src) => {
-      const rel = src.replace(join(backendDir, 'migrations'), '');
-      return !rel.includes('__pycache__') && !src.endsWith('.pyc');
-    },
+    filter: pycacheFilter,
   });
   copyFileSync(join(backendDir, 'alembic.ini'), join(sidecarDir, 'alembic.ini'));
   copyFileSync(join(backendDir, 'migrate.py'), join(sidecarDir, 'migrate.py'));
@@ -183,9 +204,26 @@ async function run() {
   if (platform !== 'darwin') {
     throw new Error(`Desktop build currently supports macOS only (received: ${platform})`);
   }
-  resetSidecarDir();
-  await downloadPython();
-  await installDeps();
+
+  if (forceClean && existsSync(sidecarDir)) {
+    rmSync(sidecarDir, { recursive: true, force: true });
+  }
+  mkdirSync(sidecarDir, { recursive: true });
+
+  const pythonChanged = !pythonUpToDate();
+  if (pythonChanged) {
+    rmSync(join(sidecarDir, 'python'), { recursive: true, force: true });
+    await downloadPython();
+  } else {
+    console.log('Python already installed, skipping download.');
+  }
+
+  if (!pythonChanged && depsUpToDate()) {
+    console.log('Dependencies up to date, skipping install.');
+  } else {
+    await installDeps();
+  }
+
   copySource();
   writeLauncher();
   console.log('Done');

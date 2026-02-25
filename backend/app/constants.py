@@ -102,6 +102,8 @@ SANDBOX_EXCLUDED_PATHS: Final[list[str]] = [
     "*/package-lock.json",
     "bun.lock",
     "*/bun.lock",
+    "Library",
+    "Library/*",
 ]
 
 SANDBOX_BINARY_EXTENSIONS: Final[set[str]] = {

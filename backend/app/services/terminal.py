@@ -40,7 +40,10 @@ class TerminalSessionRecord:
             tmux_session = self._get_tmux_session_name()
             self.output_queue = asyncio.Queue(maxsize=PTY_OUTPUT_QUEUE_SIZE)
             self.pty_id = await self.sandbox_service.create_pty_session(
-                self.sandbox_id, rows, cols, tmux_session,
+                self.sandbox_id,
+                rows,
+                cols,
+                tmux_session,
                 on_data=self._enqueue_output,
             )
             self.input_queue = asyncio.Queue(maxsize=PTY_INPUT_QUEUE_SIZE)
@@ -81,9 +84,7 @@ class TerminalSessionRecord:
         if self.output_task:
             self.output_task.cancel()
 
-        self.output_task = asyncio.create_task(
-            self._forward_output(websocket)
-        )
+        self.output_task = asyncio.create_task(self._forward_output(websocket))
 
     async def detach(self) -> None:
         self.active_websocket = None
@@ -166,7 +167,9 @@ class TerminalSessionRecord:
         except (OSError, RuntimeError) as e:
             logger.error(
                 "Error forwarding PTY output for sandbox %s: %s",
-                self.sandbox_id, e, exc_info=True,
+                self.sandbox_id,
+                e,
+                exc_info=True,
             )
 
     @staticmethod
