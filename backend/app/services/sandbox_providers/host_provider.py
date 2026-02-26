@@ -183,6 +183,7 @@ class LocalHostProvider(SandboxProvider):
         process_env = os.environ.copy()
         if envs:
             process_env.update(envs)
+        process_env["HOST_HOME"] = os.environ.get("HOME", "")
         process_env["HOME"] = str(sandbox_dir)
         process_env["USER"] = "user"
         process_env["HOSTNAME"] = sandbox_id

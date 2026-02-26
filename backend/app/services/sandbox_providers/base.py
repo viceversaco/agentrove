@@ -35,11 +35,12 @@ T = TypeVar("T")
 
 LISTENING_PORTS_COMMAND = "ss -tuln | grep LISTEN | awk '{print $5}' | sed 's/.*://g' | grep -E '^[0-9]+$' | sort -u"
 GITIGNORE_CMD = (
-    '{ [ -f .gitignore ] && cat .gitignore && echo;'
-    ' p=$(git config --global core.excludesFile 2>/dev/null);'
-    ' [ -z "$p" ] && p="${XDG_CONFIG_HOME:-$HOME/.config}/git/ignore";'
-    ' [ -n "$p" ] && p="${p/#~/$HOME}"'
-    ' && case "$p" in /*) ;; *) p="$HOME/$p" ;; esac'
+    '{ base_home="${HOST_HOME:-$HOME}";'
+    ' [ -f .gitignore ] && cat .gitignore && echo;'
+    ' p=$(HOME="$base_home" git config --global core.excludesFile 2>/dev/null);'
+    ' [ -z "$p" ] && p="${XDG_CONFIG_HOME:-$base_home/.config}/git/ignore";'
+    ' [ -n "$p" ] && p="${p/#~/$base_home}"'
+    ' && case "$p" in /*) ;; *) p="$base_home/$p" ;; esac'
     ' && [ -f "$p" ] && cat "$p"; } 2>/dev/null'
 )
 
