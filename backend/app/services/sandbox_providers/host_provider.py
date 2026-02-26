@@ -511,23 +511,17 @@ class LocalHostProvider(SandboxProvider):
             excluded_ports=EXCLUDED_PREVIEW_PORTS,
         )
 
-    async def _is_port_listening(self, sandbox_id: str, port: int) -> bool:
-        result = await self.execute_command(
-            sandbox_id, LISTENING_PORTS_COMMAND, timeout=5
-        )
-        return port in self._parse_listening_ports(result.stdout)
-
     async def get_ide_url(self, sandbox_id: str) -> str | None:
-        sandbox_dir = self._resolve_sandbox_dir(sandbox_id)
-        if not await self._is_port_listening(sandbox_id, OPENVSCODE_PORT):
+        if not shutil.which("openvscode-server"):
             return None
+        sandbox_dir = self._resolve_sandbox_dir(sandbox_id)
         folder = quote(str(sandbox_dir), safe="/")
         return f"{self._preview_base_url}:{OPENVSCODE_PORT}/?folder={folder}"
 
     async def get_vnc_url(self, sandbox_id: str) -> str | None:
-        self._resolve_sandbox_dir(sandbox_id)
-        if not await self._is_port_listening(sandbox_id, VNC_WEBSOCKET_PORT):
+        if not shutil.which("websockify"):
             return None
+        self._resolve_sandbox_dir(sandbox_id)
         base_url = self._preview_base_url.replace("http://", "ws://", 1).replace(
             "https://", "wss://", 1
         )
