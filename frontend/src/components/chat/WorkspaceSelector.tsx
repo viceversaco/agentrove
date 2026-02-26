@@ -113,6 +113,14 @@ export function WorkspaceSelector({
     setIsPopoverOpen(false);
   }, [onWorkspaceChange]);
 
+  const removeRecentWorkspace = useCallback((pathToRemove: string) => {
+    setRecentWorkspaces((prev) => {
+      const next = prev.filter((p) => p !== pathToRemove);
+      localStorage.setItem(RECENT_WORKSPACES_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
   const handleChooseWorkspace = useCallback(async () => {
     const selected = await open({
       directory: true,
@@ -199,18 +207,35 @@ export function WorkspaceSelector({
                     Recent
                   </p>
                   {recentWorkspaces.map((path) => (
-                    <button
+                    <div
                       key={path}
-                      type="button"
-                      onClick={() => {
-                        setWorkspace(path);
-                        setIsPopoverOpen(false);
-                      }}
-                      title={path}
-                      className="flex w-full items-center rounded-md px-2.5 py-1.5 text-left font-mono text-2xs text-text-tertiary transition-colors duration-200 hover:bg-surface-hover hover:text-text-primary dark:text-text-dark-tertiary dark:hover:bg-surface-dark-hover dark:hover:text-text-dark-primary"
+                      className="group flex w-full items-center rounded-md transition-colors duration-200 hover:bg-surface-hover dark:hover:bg-surface-dark-hover"
                     >
-                      <span className="truncate">{getWorkspaceLabel(path)}</span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setWorkspace(path);
+                          setIsPopoverOpen(false);
+                        }}
+                        title={path}
+                        className="min-w-0 flex-1 px-2.5 py-1.5 text-left font-mono text-2xs text-text-tertiary transition-colors duration-200 hover:text-text-primary dark:text-text-dark-tertiary dark:hover:text-text-dark-primary"
+                      >
+                        <span className="block truncate">{getWorkspaceLabel(path)}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeRecentWorkspace(path);
+                        }}
+                        title="Remove from recent"
+                        className="mr-1 flex shrink-0 items-center justify-center rounded p-0.5 text-text-quaternary opacity-0 transition-all duration-200 hover:text-text-primary group-hover:opacity-100 dark:text-text-dark-quaternary dark:hover:text-text-dark-primary"
+                      >
+                        <svg className="h-3 w-3" viewBox="0 0 16 16" fill="currentColor">
+                          <path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z" />
+                        </svg>
+                      </button>
+                    </div>
                   ))}
                 </div>
               )}
