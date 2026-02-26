@@ -34,6 +34,14 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 LISTENING_PORTS_COMMAND = "ss -tuln | grep LISTEN | awk '{print $5}' | sed 's/.*://g' | grep -E '^[0-9]+$' | sort -u"
+GITIGNORE_CMD = (
+    '{ [ -f .gitignore ] && cat .gitignore && echo;'
+    ' p=$(git config --global core.excludesFile 2>/dev/null);'
+    ' [ -z "$p" ] && p="${XDG_CONFIG_HOME:-$HOME/.config}/git/ignore";'
+    ' [ -n "$p" ] && p="${p/#~/$HOME}"'
+    ' && case "$p" in /*) ;; *) p="$HOME/$p" ;; esac'
+    ' && [ -f "$p" ] && cat "$p"; } 2>/dev/null'
+)
 
 
 class SandboxProvider(ABC):
@@ -161,7 +169,7 @@ class SandboxProvider(ABC):
     async def _get_gitignore_patterns(self, sandbox_id: str) -> list[str]:
         result = await self.execute_command(
             sandbox_id,
-            "if [ -f .gitignore ]; then cat .gitignore; fi",
+            GITIGNORE_CMD,
             timeout=5,
         )
         if not result.stdout:
