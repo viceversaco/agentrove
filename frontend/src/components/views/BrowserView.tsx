@@ -85,11 +85,13 @@ export const BrowserView = memo(function BrowserView({
   }, []);
 
   const handleReconnect = useCallback(() => {
-    setIsConnecting(true);
     setConnectionError(null);
-    setVncInstanceKey((prev) => prev + 1);
+    if (vncUrl) {
+      setIsConnecting(true);
+      setVncInstanceKey((prev) => prev + 1);
+    }
     refetchVncUrl();
-  }, [refetchVncUrl]);
+  }, [vncUrl, refetchVncUrl]);
 
   const isBrowserRunning = browserStatus?.running;
 

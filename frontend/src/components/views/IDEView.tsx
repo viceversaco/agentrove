@@ -19,7 +19,7 @@ export const IDEView = memo(function IDEView({ sandboxId, isActive = false }: ID
   const prevThemeRef = useRef(theme);
   const hasLoadedRef = useRef(false);
 
-  const { data: ideUrl, isError, isFetched } = useIDEUrlQuery(sandboxId || '');
+  const { data: ideUrl, isError, isFetched, isFetching, refetch } = useIDEUrlQuery(sandboxId || '');
 
   const iframeKey = useMemo(() => {
     if (!ideUrl) return 'no-ide';
@@ -32,9 +32,12 @@ export const IDEView = memo(function IDEView({ sandboxId, isActive = false }: ID
   }, []);
 
   const handleReload = useCallback(() => {
-    setIsLoading(true);
-    setReloadToken((t) => t + 1);
-  }, []);
+    if (ideUrl) {
+      setIsLoading(true);
+      setReloadToken((t) => t + 1);
+    }
+    refetch();
+  }, [ideUrl, refetch]);
 
   const handleOpenInNewTab = useCallback(() => {
     if (ideUrl) {
@@ -110,7 +113,7 @@ export const IDEView = memo(function IDEView({ sandboxId, isActive = false }: ID
             title="Reload IDE"
             aria-label="Reload IDE"
           >
-            <RotateCcw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            <RotateCcw className={`h-3.5 w-3.5 ${isLoading || isFetching ? 'animate-spin' : ''}`} />
           </Button>
 
           <span className="text-xs font-medium text-text-secondary dark:text-text-dark-secondary">

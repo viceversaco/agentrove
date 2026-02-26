@@ -36,6 +36,7 @@
 
 ## Code Style
 
+- Always choose the smallest, simplest fix that solves the problem — do not refactor, restructure, or add abstractions as part of a bug fix; if a one-line guard or a single conditional handles it, prefer that over reworking control flow
 - Do not optimize for no regressions or long-term resilience unless explicitly requested — favor simple, direct changes over defensive scaffolding
 - Do not build elaborate rollback/state-restoration logic for failure paths — in a single-user app, a simple log + best-effort recovery (e.g., re-queue the item) is sufficient; do not save/restore every field, delete orphaned rows, or revert intermediate state changes
 - Do not add pre-flight compatibility checks that gate an operation when a natural fallback already exists — if the operation can't proceed, let it fall through to the existing path (e.g., normal queue processing) instead of adding branching to detect and re-route
