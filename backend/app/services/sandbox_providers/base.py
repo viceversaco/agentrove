@@ -241,7 +241,7 @@ class SandboxProvider(ABC):
         if patterns:
             prune_conditions = [
                 f"-name {shlex.quote(p)}"
-                if p.startswith("*.")
+                if p.startswith("*.") or p.startswith(".")
                 else f"-path {shlex.quote(p)}"
                 for p in patterns
             ]

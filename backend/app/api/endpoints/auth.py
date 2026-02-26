@@ -92,6 +92,12 @@ async def register(
     user_create: UserCreate,
     user_manager: UserManager = Depends(get_user_manager),
 ) -> User:
+    if settings.REGISTRATION_DISABLED:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Registration is disabled",
+        )
+
     if settings.BLOCK_DISPOSABLE_EMAILS:
         if await email_service.is_disposable_email(user_create.email):
             raise HTTPException(

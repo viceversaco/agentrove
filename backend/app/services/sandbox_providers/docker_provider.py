@@ -294,6 +294,9 @@ class LocalDockerProvider(SandboxProvider):
             mounts = info.get("Mounts", []) or []
             if any(mount.get("Destination") == workspace_mount_dir for mount in mounts):
                 target_path = workspace_mount_dir
+            else:
+                excluded_patterns = list(excluded_patterns or [])
+                excluded_patterns.append(".*")
         return await super().list_files(sandbox_id, target_path, excluded_patterns)
 
     async def is_running(self, sandbox_id: str) -> bool:

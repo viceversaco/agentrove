@@ -8,7 +8,6 @@ import type { Theme } from '@/types/ui.types';
 import { useUIStore } from '@/store/uiStore';
 import { SecretInput } from '@/components/settings/inputs/SecretInput';
 import { cn } from '@/utils/cn';
-import { isTauri } from '@tauri-apps/api/core';
 
 interface GeneralSettingsTabProps {
   fields: GeneralSecretFieldConfig[];
@@ -110,7 +109,7 @@ export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
           value={settings.sandbox_provider ?? 'docker'}
           onChange={(val) => onSandboxProviderChange(val as SandboxProviderType)}
           options={[
-            ...(isTauri() ? [{ value: 'host', label: 'Host (Local)', disabled: false }] : []),
+            { value: 'host', label: 'Host (Local)', disabled: false },
             { value: 'docker', label: 'Docker (Local)', disabled: false },
           ]}
         />

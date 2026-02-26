@@ -1,5 +1,4 @@
 from app.core.config import get_settings
-from app.services.exceptions import SandboxException
 from app.services.sandbox_providers.base import SandboxProvider
 from app.services.sandbox_providers.docker_provider import LocalDockerProvider
 from app.services.sandbox_providers.host_provider import LocalHostProvider
@@ -38,10 +37,6 @@ class SandboxProviderFactory:
             )
 
         if provider_type == SandboxProviderType.HOST:
-            if not settings.DESKTOP_MODE:
-                raise SandboxException(
-                    "Host provider is only available in the desktop app"
-                )
             host_base_dir = settings.get_host_sandbox_base_dir()
             return LocalHostProvider(
                 base_dir=host_base_dir,
