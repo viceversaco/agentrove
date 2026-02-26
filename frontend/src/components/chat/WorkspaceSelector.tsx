@@ -113,13 +113,20 @@ export function WorkspaceSelector({
     setIsPopoverOpen(false);
   }, [onWorkspaceChange]);
 
-  const removeRecentWorkspace = useCallback((pathToRemove: string) => {
-    setRecentWorkspaces((prev) => {
-      const next = prev.filter((p) => p !== pathToRemove);
-      localStorage.setItem(RECENT_WORKSPACES_KEY, JSON.stringify(next));
-      return next;
-    });
-  }, []);
+  const removeRecentWorkspace = useCallback(
+    (pathToRemove: string) => {
+      if (pathToRemove === workspacePath) {
+        onWorkspaceChange('');
+        localStorage.setItem(ACTIVE_WORKSPACE_KEY, '');
+      }
+      setRecentWorkspaces((prev) => {
+        const next = prev.filter((p) => p !== pathToRemove);
+        localStorage.setItem(RECENT_WORKSPACES_KEY, JSON.stringify(next));
+        return next;
+      });
+    },
+    [workspacePath, onWorkspaceChange],
+  );
 
   const handleChooseWorkspace = useCallback(async () => {
     const selected = await open({
