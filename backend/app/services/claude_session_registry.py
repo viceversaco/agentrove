@@ -18,77 +18,69 @@ logger = logging.getLogger(__name__)
 
 TASK_CANCEL_TIMEOUT_SECONDS = 5.0
 
-REAPER_INTERVAL_SECONDS = 60.0
+IDLE_CHECK_INTERVAL_SECONDS = 60.0
 
+# Env vars excluded from the session fingerprint because they change every
+# request (e.g. CHAT_TOKEN is a short-lived JWT) but don't affect SDK behavior.
 EPHEMERAL_MCP_ENV_KEYS = frozenset({"CHAT_TOKEN"})
 
 
 @dataclass
 class ChatSession:
     chat_id: str
-    sandbox_id: str
-    provider: str
     transport: SandboxTransport
     client: ClaudeSDKClient
-    max_thinking_tokens: int | None
-    config_fingerprint: str
+    fingerprint: str
     active_generation_task: asyncio.Task[Any] | None = None
     cancel_event: asyncio.Event = field(default_factory=asyncio.Event)
-    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     last_used_at: float = field(default_factory=time.monotonic)
 
 
 class SessionRegistry:
     def __init__(self) -> None:
+        # One long-lived SDK session per chat, keyed by chat_id. Reused
+        # across messages and torn down when the config fingerprint changes.
         self._sessions: dict[str, ChatSession] = {}
+        # Tracks cancel requests that arrive before the generation loop starts
+        # (e.g. during transport setup). consume_pending_cancel() checks this
+        # set right before streaming begins so the cancel isn't lost.
         self._pending_cancels: set[str] = set()
-        self._lock = asyncio.Lock()
 
     async def get_or_create(
         self,
         *,
         chat_id: str,
-        sandbox_id: str,
-        provider: str,
-        max_thinking_tokens: int | None,
         options: ClaudeAgentOptions,
         transport_factory: Callable[[], SandboxTransport],
     ) -> ChatSession:
-        async with self._lock:
-            session = self._sessions.get(chat_id)
+        # Return the existing session if its config still matches, otherwise
+        # tear it down and create a fresh one.
+        session = self._sessions.get(chat_id)
+        fingerprint = self._compute_fingerprint(options)
 
-            fingerprint = self._options_fingerprint(options)
+        if session is not None and session.fingerprint != fingerprint:
+            await self._close_session(session)
+            session = None
 
-            if session is not None:
-                needs_restart = (
-                    session.sandbox_id != sandbox_id
-                    or session.provider != provider
-                    or session.max_thinking_tokens != max_thinking_tokens
-                    or session.config_fingerprint != fingerprint
-                )
-                if needs_restart:
-                    await self._close_session(session)
-                    session = None
+        if session is None:
+            session = await self._create_session(
+                chat_id=chat_id,
+                fingerprint=fingerprint,
+                options=options,
+                transport_factory=transport_factory,
+            )
+            self._sessions[chat_id] = session
 
-            if session is None:
-                session = await self._create_session(
-                    chat_id=chat_id,
-                    sandbox_id=sandbox_id,
-                    provider=provider,
-                    max_thinking_tokens=max_thinking_tokens,
-                    config_fingerprint=fingerprint,
-                    options=options,
-                    transport_factory=transport_factory,
-                )
-                self._sessions[chat_id] = session
-
-            session.last_used_at = time.monotonic()
-            return session
+        session.last_used_at = time.monotonic()
+        return session
 
     def get_session(self, chat_id: str) -> ChatSession | None:
         return self._sessions.get(chat_id)
 
     async def cancel_generation(self, chat_id: str) -> None:
+        # Signal the running generation to stop and send an interrupt to the
+        # SDK client. The cancel is also recorded in _pending_cancels so the
+        # runtime can detect it even if the session hasn't started streaming yet.
         self._pending_cancels.add(chat_id)
         session = self._sessions.get(chat_id)
         if session is None:
@@ -100,66 +92,77 @@ class SessionRegistry:
             logger.debug("Interrupt failed for chat %s: %s", chat_id, exc)
 
     def consume_pending_cancel(self, chat_id: str) -> bool:
+        # Check and clear a pending cancel flag — returns True if a cancel
+        # was requested before the generation loop had a chance to observe it.
         if chat_id in self._pending_cancels:
             self._pending_cancels.discard(chat_id)
             return True
         return False
 
     async def terminate(self, chat_id: str) -> None:
-        async with self._lock:
-            session = self._sessions.pop(chat_id, None)
-            if session is not None:
-                await self._close_session(session)
+        # Remove a single session from the registry and close it.
+        session = self._sessions.pop(chat_id, None)
+        if session is not None:
+            await self._close_session(session)
 
     async def terminate_all(self) -> None:
-        async with self._lock:
-            sessions = list(self._sessions.values())
-            self._sessions.clear()
+        # Shut down all sessions — called during application shutdown.
+        sessions = list(self._sessions.values())
+        self._sessions.clear()
         for session in sessions:
             await self._close_session(session)
 
-    async def reap_idle(self, ttl_seconds: float) -> None:
+    async def close_idle_sessions(self, ttl_seconds: float) -> None:
+        # Close sessions that have been idle longer than ttl_seconds and
+        # have no active generation task running.
         now = time.monotonic()
         expired: list[str] = []
 
-        async with self._lock:
-            for chat_id, session in self._sessions.items():
-                task = session.active_generation_task
-                if task is not None and not task.done():
-                    continue
-                if (now - session.last_used_at) >= ttl_seconds:
-                    expired.append(chat_id)
+        for chat_id, session in self._sessions.items():
+            task = session.active_generation_task
+            if task is not None and not task.done():
+                continue
+            if (now - session.last_used_at) >= ttl_seconds:
+                expired.append(chat_id)
 
-            removed = [self._sessions.pop(cid) for cid in expired]
-
-        for session in removed:
-            await self._close_session(session)
+        for chat_id in expired:
+            await self._close_session(self._sessions.pop(chat_id))
 
         if expired:
-            logger.info("Reaped %d idle chat session(s)", len(expired))
+            logger.info("Closed %d idle chat session(s)", len(expired))
 
     @staticmethod
-    def _stable_mcp_key(mcp_servers: dict[str, Any]) -> dict[str, Any]:
-        stable: dict[str, Any] = {}
+    def _remove_per_request_mcp_env(mcp_servers: dict[str, Any]) -> dict[str, Any]:
+        # Remove per-request env vars (like CHAT_TOKEN) from MCP configs
+        # so the fingerprint only reflects stable configuration.
+        filtered: dict[str, Any] = {}
         for name, cfg in mcp_servers.items():
             env = cfg.get("env")
             if isinstance(env, dict):
                 filtered_env = {
                     k: v for k, v in env.items() if k not in EPHEMERAL_MCP_ENV_KEYS
                 }
-                stable[name] = {**cfg, "env": filtered_env}
+                filtered[name] = {**cfg, "env": filtered_env}
             else:
-                stable[name] = cfg
-        return stable
+                filtered[name] = cfg
+        return filtered
 
     @staticmethod
-    def _options_fingerprint(options: ClaudeAgentOptions) -> str:
+    def _compute_fingerprint(options: ClaudeAgentOptions) -> str:
+        # Hash the options that are immutable on a live session. The SDK has
+        # no set_system_prompt() / set_env() — these are baked in at creation
+        # time, so any change requires tearing down and recreating the session.
+        # Model and permission_mode are excluded because the SDK supports
+        # updating those dynamically via set_model() / set_permission_mode().
         data = json.dumps(
             {
                 "system_prompt": options.system_prompt,
                 "env": options.env,
-                "mcp_servers": SessionRegistry._stable_mcp_key(options.mcp_servers),
+                "mcp_servers": SessionRegistry._remove_per_request_mcp_env(
+                    options.mcp_servers
+                ),
                 "disallowed_tools": options.disallowed_tools,
+                "max_thinking_tokens": options.max_thinking_tokens,
             },
             sort_keys=True,
             default=str,
@@ -170,13 +173,12 @@ class SessionRegistry:
     async def _create_session(
         *,
         chat_id: str,
-        sandbox_id: str,
-        provider: str,
-        max_thinking_tokens: int | None,
-        config_fingerprint: str,
+        fingerprint: str,
         options: ClaudeAgentOptions,
         transport_factory: Callable[[], SandboxTransport],
     ) -> ChatSession:
+        # Spin up a transport + SDK client and connect. If connect fails,
+        # clean up both before propagating the error.
         transport: SandboxTransport = transport_factory()
         client = ClaudeSDKClient(options=options, transport=transport)
         try:
@@ -188,49 +190,34 @@ class SessionRegistry:
 
         return ChatSession(
             chat_id=chat_id,
-            sandbox_id=sandbox_id,
-            provider=provider,
             transport=transport,
             client=client,
-            max_thinking_tokens=max_thinking_tokens,
-            config_fingerprint=config_fingerprint,
+            fingerprint=fingerprint,
         )
 
     @staticmethod
     async def _close_session(session: ChatSession) -> None:
+        # Gracefully tear down: cancel any in-flight generation, disconnect
+        # the SDK client, then close the transport. Each step is guarded
+        # independently so a failure in one doesn't skip the others.
         task = session.active_generation_task
         if task is not None and not task.done():
             task.cancel()
             try:
                 await asyncio.wait_for(task, timeout=TASK_CANCEL_TIMEOUT_SECONDS)
             except (asyncio.TimeoutError, asyncio.CancelledError):
-                logger.debug(
-                    "Timed out waiting for task cancellation for chat %s",
-                    session.chat_id,
-                )
-            except Exception as exc:
-                logger.debug(
-                    "Error waiting for task cancellation for chat %s: %s",
-                    session.chat_id,
-                    exc,
-                )
+                pass
 
         try:
             await session.client.disconnect()
         except Exception as exc:
-            logger.debug(
-                "Error disconnecting session for chat %s: %s",
-                session.chat_id,
-                exc,
-            )
+            logger.debug("Error disconnecting chat %s: %s", session.chat_id, exc)
 
         try:
             await session.transport.close()
         except Exception as exc:
             logger.debug(
-                "Error closing transport for chat %s: %s",
-                session.chat_id,
-                exc,
+                "Error closing transport for chat %s: %s", session.chat_id, exc
             )
 
 

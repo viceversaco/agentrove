@@ -151,6 +151,7 @@ SANDBOX_BINARY_EXTENSIONS: Final[set[str]] = {
 }
 
 SANDBOX_HOME_DIR: Final[str] = "/home/user"
+SANDBOX_WORKSPACE_DIR: Final[str] = "/home/user/workspace"
 SANDBOX_CLAUDE_DIR: Final[str] = "/home/user/.claude"
 SANDBOX_CLAUDE_JSON_PATH: Final[str] = "/home/user/.claude.json"
 SANDBOX_GIT_ASKPASS_PATH: Final[str] = "/home/user/.git-askpass.sh"

@@ -170,10 +170,8 @@ class Settings(BaseSettings):
     # Example: DOCKER_PREVIEW_BASE_URL=https://yourdomain.com, DOCKER_TRAEFIK_NETWORK=coolify
     DOCKER_TRAEFIK_NETWORK: str = ""
     DOCKER_TRAEFIK_ENTRYPOINT: str = "https"
-    # Override URL for sandbox->API connectivity (permission server)
-    # Use when host.docker.internal doesn't work (Linux VPS, Coolify, etc.)
-    # Example: DOCKER_PERMISSION_API_URL=http://api:8080
-    DOCKER_PERMISSION_API_URL: str = ""
+    # URL the permission server inside Docker sandboxes uses to reach the API
+    DOCKER_PERMISSION_API_URL: str = "http://host.docker.internal:8080"
     DOCKER_RUNTIME: str = (
         ""  # e.g. "sysbox-runc" for Sysbox, leave empty for default Docker runtime
     )
@@ -186,9 +184,8 @@ class Settings(BaseSettings):
     HOST_STORAGE_PATH: str | None = None
     HOST_SANDBOX_BASE_DIR: str | None = None
     HOST_PREVIEW_BASE_URL: str = "http://localhost"
-    # Override URL for host provider permission-server callbacks.
-    # Example (docker-compose web): HOST_PERMISSION_API_URL=http://api:8080
-    HOST_PERMISSION_API_URL: str = ""
+    # URL the permission server in host mode uses to reach the API
+    HOST_PERMISSION_API_URL: str = "http://localhost:8080"
 
     @field_validator("HOST_SANDBOX_BASE_DIR", mode="before")
     @classmethod
@@ -227,7 +224,7 @@ class Settings(BaseSettings):
     MODELS_CACHE_TTL_SECONDS: int = 3600
     CONTEXT_USAGE_CACHE_TTL_SECONDS: int = 600
     CANCEL_PENDING_TTL_SECONDS: float = 10.0
-    CHAT_PROCESS_IDLE_TTL_SECONDS: float = 300.0
+    CHAT_PROCESS_IDLE_TTL_SECONDS: float = 1800.0
 
     # GitHub Copilot OAuth (default ID from https://github.com/anomalyco/opencode)
     GITHUB_CLIENT_ID: str = "Ov23li8tweQw6odWQebz"

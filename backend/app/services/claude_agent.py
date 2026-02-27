@@ -1,8 +1,9 @@
 import logging
+import shutil
+import sys
 from collections.abc import AsyncIterator, Callable
 from functools import partial
 from pathlib import Path
-import sys
 from typing import Any, Literal, NamedTuple
 
 from claude_agent_sdk import (
@@ -12,7 +13,11 @@ from claude_agent_sdk import (
     ResultMessage,
 )
 
-from app.constants import SANDBOX_GIT_ASKPASS_PATH, SANDBOX_HOME_DIR
+from app.constants import (
+    SANDBOX_GIT_ASKPASS_PATH,
+    SANDBOX_HOME_DIR,
+    SANDBOX_WORKSPACE_DIR,
+)
 from app.core.config import get_settings
 from app.core.security import create_chat_scoped_token
 from app.db.session import SessionLocal
@@ -24,15 +29,11 @@ from app.prompts.enhance_prompt import ENHANCE_PROMPT
 from app.services.exceptions import ClaudeAgentException
 from app.services.provider import ProviderService
 from app.services.sandbox_providers import SandboxProviderType
-from app.services.sandbox_providers.factory import SandboxProviderFactory
 from app.services.streaming.processor import StreamProcessor
 from app.services.streaming.types import StreamEvent
 from app.services.tool_handler import ToolHandlerRegistry
-from app.services.transports import (
-    DockerSandboxTransport,
-    HostSandboxTransport,
-    SandboxTransport,
-)
+from app.services.transports import SandboxTransport
+from app.services.transports.factory import create_sandbox_transport
 from app.services.user import UserService
 
 settings = get_settings()
@@ -58,6 +59,12 @@ SDK_PERMISSION_MODE_MAP: dict[
     "ask": "default",
     "auto": "bypassPermissions",
 }
+PLAN_MODE_TRANSITIONS: dict[tuple[str, str], str] = {
+    ("tool_completed", "ExitPlanMode"): "auto",
+    ("tool_completed", "EnterPlanMode"): "plan",
+    ("tool_failed", "ExitPlanMode"): "plan",
+    ("tool_failed", "EnterPlanMode"): "auto",
+}
 MCP_TYPE_CONFIGS: dict[str, dict[str, Any]] = {
     "npx": {
         "command": "npx",
@@ -82,10 +89,16 @@ MCP_TYPE_CONFIGS: dict[str, dict[str, Any]] = {
 }
 
 
+class StreamResult:
+    __slots__ = ("total_cost_usd", "usage")
+
+    def __init__(self) -> None:
+        self.total_cost_usd: float = 0.0
+        self.usage: dict[str, Any] | None = None
+
+
 class SessionParams(NamedTuple):
     options: ClaudeAgentOptions
-    sandbox_id: str
-    sandbox_provider: str
     transport_factory: Callable[[], SandboxTransport]
 
 
@@ -93,37 +106,7 @@ class ClaudeAgentService:
     def __init__(self, session_factory: Callable[..., Any] | None = None) -> None:
         self.tool_registry = ToolHandlerRegistry()
         self.session_factory = session_factory or SessionLocal
-        self._total_cost_usd = 0.0
-        self._usage: dict[str, Any] | None = None
         self._provider_service = ProviderService()
-
-    def _create_sandbox_transport(
-        self,
-        sandbox_provider: str,
-        sandbox_id: str,
-        workspace_path: str | None,
-        options: ClaudeAgentOptions,
-        user_settings: UserSettings,
-    ) -> DockerSandboxTransport | HostSandboxTransport:
-        if (
-            sandbox_provider == SandboxProviderType.DOCKER
-            or sandbox_provider == SandboxProviderType.DOCKER.value
-        ):
-            docker_config = SandboxProviderFactory.create_docker_config()
-            return DockerSandboxTransport(
-                sandbox_id=sandbox_id,
-                docker_config=docker_config,
-                options=options,
-            )
-
-        if sandbox_provider == SandboxProviderType.HOST.value:
-            return HostSandboxTransport(
-                sandbox_id=sandbox_id,
-                workspace_path=workspace_path,
-                options=options,
-            )
-
-        raise ValueError(f"Unknown sandbox provider: {sandbox_provider}")
 
     async def build_session_params(
         self,
@@ -131,13 +114,14 @@ class ClaudeAgentService:
         user: User,
         chat: Chat,
         system_prompt: str,
-        custom_instructions: str | None,
         model_id: str,
         permission_mode: str,
         session_id: str | None,
         thinking_mode: str | None,
         is_custom_prompt: bool,
     ) -> SessionParams:
+        # Resolve chat + user settings into everything needed to launch a Claude
+        # SDK session: agent options, sandbox identity, and a transport factory.
         chat_id = str(chat.id)
         user_settings = await UserService(
             session_factory=self.session_factory
@@ -145,18 +129,12 @@ class ClaudeAgentService:
 
         sandbox_provider = chat.sandbox_provider or SandboxProviderType.DOCKER.value
         sandbox_id = chat.sandbox_id
-        if not sandbox_id:
-            raise ClaudeAgentException(
-                "Chat does not have an associated sandbox environment"
-            )
         workspace_path = chat.workspace_path
         claude_cwd = SANDBOX_HOME_DIR
         if workspace_path and sandbox_provider == SandboxProviderType.DOCKER.value:
-            claude_cwd = f"{SANDBOX_HOME_DIR}/workspace"
-        sandbox_id_str = str(sandbox_id)
+            claude_cwd = SANDBOX_WORKSPACE_DIR
 
         options = await self._build_claude_options(
-            user=user,
             user_settings=user_settings,
             system_prompt=system_prompt,
             permission_mode=permission_mode,
@@ -170,32 +148,30 @@ class ClaudeAgentService:
         )
 
         transport_factory = partial(
-            self._create_sandbox_transport,
+            create_sandbox_transport,
             sandbox_provider=sandbox_provider,
-            sandbox_id=sandbox_id_str,
+            sandbox_id=sandbox_id,
             workspace_path=workspace_path,
             options=options,
-            user_settings=user_settings,
         )
 
         return SessionParams(
             options=options,
-            sandbox_id=sandbox_id_str,
-            sandbox_provider=sandbox_provider,
             transport_factory=transport_factory,
         )
 
-    async def stream_with_client(
+    async def stream_response(
         self,
         client: ClaudeSDKClient,
         prompt: str,
         custom_instructions: str | None,
         session_id: str | None,
+        result: StreamResult,
         session_callback: Callable[[str], None] | None = None,
         attachments: list[dict[str, Any]] | None = None,
     ) -> AsyncIterator[StreamEvent]:
-        self._total_cost_usd = 0.0
-        self._usage = None
+        # Send a prompt to the Claude SDK client and yield processed stream
+        # events, handling plan mode transitions on tool success/failure.
         user_prompt = self.prepare_user_prompt(prompt, custom_instructions, attachments)
 
         prompt_message = {
@@ -218,88 +194,79 @@ class ClaudeAgentService:
                 for event in processor.emit_events_for_message(message):
                     if event:
                         yield event
-                        event_type = event.get("type")
-                        if event_type == "tool_completed":
-                            tool_name = event.get("tool", {}).get("name")
-                            if tool_name == "ExitPlanMode":
-                                await client.set_permission_mode("auto")
-                            elif tool_name == "EnterPlanMode":
-                                await client.set_permission_mode("plan")
-                        elif event_type == "tool_failed":
-                            tool_name = event.get("tool", {}).get("name")
-                            if tool_name == "ExitPlanMode":
-                                await client.set_permission_mode("plan")
-                            elif tool_name == "EnterPlanMode":
-                                await client.set_permission_mode("auto")
+                        event_type = event.get("type", "")
+                        tool_name = event.get("tool", {}).get("name", "")
+                        mode = PLAN_MODE_TRANSITIONS.get((event_type, tool_name))
+                        if mode:
+                            await client.set_permission_mode(mode)
                 if processor.usage is not prev_usage:
-                    self._usage = processor.usage
+                    result.usage = processor.usage
 
-            self._total_cost_usd = processor.total_cost_usd
-            self._usage = processor.usage
+            result.total_cost_usd = processor.total_cost_usd
+            result.usage = processor.usage
 
         except ClaudeSDKError as e:
             raise ClaudeAgentException(f"Claude SDK error: {str(e)}") from e
 
-    def get_total_cost_usd(self) -> float:
-        return self._total_cost_usd
-
-    def get_usage(self) -> dict[str, Any] | None:
-        return self._usage
-
     def _build_auth_env(
         self, model_id: str, user_settings: UserSettings
-    ) -> tuple[dict[str, str], str | None]:
+    ) -> tuple[dict[str, str], str | None, str]:
+        # Build env vars that authenticate the SDK against the user's configured
+        # provider (Anthropic, OpenRouter, Copilot, etc.). Returns the env dict,
+        # the provider type, and the resolved model ID.
         provider, actual_model_id = self._provider_service.get_provider_for_model(
             user_settings, model_id
         )
 
         env: dict[str, str] = {}
         if not provider:
-            return env, None
+            return env, None, actual_model_id
 
         provider_type = provider.get("provider_type", "custom")
         auth_token = provider.get("auth_token")
 
         if provider_type == ProviderType.ANTHROPIC.value:
+            # Direct Anthropic API — use OAuth token for authentication
             if auth_token:
                 env["CLAUDE_CODE_OAUTH_TOKEN"] = auth_token
         elif provider_type in (
             ProviderType.OPENROUTER.value,
             ProviderType.OPENAI.value,
+            ProviderType.COPILOT.value,
         ):
+            # Non-Anthropic providers route through our local bridge
+            # (https://github.com/Mng-dev-ai/anthropic-bridge) that translates
+            # Anthropic API calls to the provider's format.
             if auth_token and provider_type == ProviderType.OPENROUTER.value:
                 env["OPENROUTER_API_KEY"] = auth_token
-            env["ANTHROPIC_BASE_URL"] = "http://127.0.0.1:3456"
-            env["ANTHROPIC_AUTH_TOKEN"] = "placeholder"
-            env["CLAUDE_CODE_SUBAGENT_MODEL"] = actual_model_id
-        elif provider_type == ProviderType.COPILOT.value:
-            if auth_token:
+            elif auth_token and provider_type == ProviderType.COPILOT.value:
                 env["GITHUB_COPILOT_TOKEN"] = auth_token
+            # Point the SDK at our local bridge instead of the real Anthropic API
             env["ANTHROPIC_BASE_URL"] = "http://127.0.0.1:3456"
+            # Placeholder token — the bridge handles real auth via provider keys
             env["ANTHROPIC_AUTH_TOKEN"] = "placeholder"
+            # Tell subagents which model to use on this provider
             env["CLAUDE_CODE_SUBAGENT_MODEL"] = actual_model_id
         elif provider_type == ProviderType.CUSTOM.value:
+            # Custom provider — user supplies their own base URL and token
             if provider.get("base_url"):
                 env["ANTHROPIC_BASE_URL"] = provider["base_url"]
             if auth_token:
                 env["ANTHROPIC_AUTH_TOKEN"] = auth_token
 
-        return env, provider_type
+        return env, provider_type, actual_model_id
 
     async def enhance_prompt(self, prompt: str, model_id: str, user: User) -> str:
+        # Use the SDK to rewrite the user's prompt into a more effective version.
         user_settings = await UserService(
             session_factory=self.session_factory
         ).get_user_settings(user.id)
 
-        _, actual_model_id = self._provider_service.get_provider_for_model(
-            user_settings, model_id
-        )
-
-        env, _ = self._build_auth_env(model_id, user_settings)
+        env, _, actual_model_id = self._build_auth_env(model_id, user_settings)
 
         options = ClaudeAgentOptions(
             system_prompt=ENHANCE_PROMPT,
-            permission_mode="bypassPermissions",
+            permission_mode="default",
             model=actual_model_id,
             max_turns=1,
             env=env,
@@ -316,15 +283,16 @@ class ClaudeAgentService:
             return enhanced_text or prompt
 
         except ClaudeSDKError as e:
-            raise ClaudeAgentException(f"Failed to enhance prompt: {str(e)}")
+            raise ClaudeAgentException(f"Failed to enhance prompt: {str(e)}") from e
 
     async def generate_title(self, prompt: str, user: User) -> str | None:
+        # Ask Haiku to produce a short chat title from the first user message.
         user_settings = await UserService(
             session_factory=self.session_factory
         ).get_user_settings(user.id)
 
-        # Build auth env for the default Anthropic provider (Haiku)
-        env, _ = self._build_auth_env("claude-haiku-4-5-20251001", user_settings)
+        model_id = "claude-haiku-4-5-20251001"
+        env, _, actual_model_id = self._build_auth_env(model_id, user_settings)
 
         options = ClaudeAgentOptions(
             system_prompt=(
@@ -332,7 +300,7 @@ class ClaudeAgentService:
                 "user's message. Reply with ONLY the title, nothing else."
             ),
             permission_mode="default",
-            model="haiku",
+            model=actual_model_id,
             max_turns=1,
             env=env,
         )
@@ -345,38 +313,36 @@ class ClaudeAgentService:
                     if isinstance(message, ResultMessage) and message.result:
                         title = message.result.strip().strip('"')
 
-            return title or None
+            return title
         except ClaudeSDKError:
             logger.debug("Title generation SDK call failed for user %s", user.id)
             return None
 
+    @staticmethod
     def _build_permission_server(
-        self, permission_mode: str, chat_id: str, sandbox_provider: str = "docker"
+        permission_mode: str, chat_id: str, sandbox_provider: str = "docker"
     ) -> dict[str, Any]:
+        # Build the MCP server config for the permission prompt sidecar
+        # (backend/permission_server.py) that intercepts Claude's tool calls
+        # and routes them to our API for approval.
+        # CHAT_TOKEN is a short-lived JWT scoped to this chat_id — the permission
+        # server sends it back to our API on each tool approval request so the API
+        # can verify the request belongs to this chat without exposing user credentials.
+        # CHAT_ID tells the permission server which chat the approval belongs to.
         chat_token = create_chat_scoped_token(chat_id)
-        permission_server_command = "python3"
-        permission_server_script = "/usr/local/bin/permission_server.py"
 
         if sandbox_provider == SandboxProviderType.HOST.value:
+            # Host mode: run the script from the backend repo using the current Python
             permission_server_command = sys.executable
             permission_server_script = str(
                 Path(__file__).resolve().parents[2] / "permission_server.py"
             )
-            api_base_url = (
-                settings.HOST_PERMISSION_API_URL.rstrip("/")
-                if settings.HOST_PERMISSION_API_URL
-                else settings.BASE_URL.rstrip("/")
-            )
-        elif settings.DOCKER_PERMISSION_API_URL:
-            api_base_url = settings.DOCKER_PERMISSION_API_URL
+            api_base_url = settings.HOST_PERMISSION_API_URL.rstrip("/")
         else:
-            base_url = settings.BASE_URL
-            port = (
-                base_url.rsplit(":", maxsplit=1)[-1].rstrip("/")
-                if ":" in base_url
-                else "8080"
-            )
-            api_base_url = f"http://host.docker.internal:{port}"
+            # Docker mode: the script is baked into the sandbox image
+            permission_server_command = "python3"
+            permission_server_script = "/usr/local/bin/permission_server.py"
+            api_base_url = settings.DOCKER_PERMISSION_API_URL.rstrip("/")
 
         return {
             "command": permission_server_command,
@@ -390,56 +356,51 @@ class ClaudeAgentService:
             },
         }
 
-    def build_custom_mcps(self, custom_mcps: list[Any]) -> dict[str, Any]:
-        servers = {}
-        for mcp in custom_mcps:
-            if not mcp.get("enabled", True):
-                continue
-
-            mcp_name = mcp.get("name")
-            command_type = mcp.get("command_type")
-
-            if not mcp_name or not command_type:
-                continue
-
-            try:
-                servers[mcp_name] = self.build_mcp_config(mcp, command_type)
-            except ClaudeAgentException as e:
-                logger.error(
-                    f"Failed to configure MCP '{mcp_name}': {e}", exc_info=True
-                )
-        return servers
-
     async def _get_mcp_servers(
         self,
-        user: User,
+        user_settings: UserSettings,
         permission_mode: str,
         chat_id: str,
         sandbox_provider: str,
     ) -> dict[str, Any]:
-        user_settings = await UserService(
-            session_factory=self.session_factory
-        ).get_user_settings(user.id)
-
+        # Assemble the MCP servers dict passed to the SDK: the permission
+        # server is always included, plus any user-configured MCPs and Gmail.
         servers: dict[str, Any] = {}
         servers["permission"] = self._build_permission_server(
             permission_mode, chat_id, sandbox_provider
         )
 
-        if user_settings.custom_mcps:
-            servers.update(self.build_custom_mcps(user_settings.custom_mcps))
+        for mcp in user_settings.custom_mcps or []:
+            if not mcp.get("enabled", True):
+                continue
+            mcp_name = mcp.get("name")
+            command_type = mcp.get("command_type")
+            if not mcp_name or not command_type:
+                continue
+            try:
+                servers[mcp_name] = self._build_mcp_config(mcp, command_type)
+            except ClaudeAgentException:
+                logger.error("Failed to configure MCP '%s'", mcp_name, exc_info=True)
 
+        # gmail-mcp is a built-in MCP that reads/sends email — only enabled
+        # when the user has linked their Google account via OAuth.
+        # In host mode, skip if the binary isn't installed.
         if user_settings.gmail_oauth_tokens:
-            servers["gmail"] = {
-                "command": "gmail-mcp",
-                "args": [],
-            }
+            if sandbox_provider != SandboxProviderType.HOST.value or shutil.which(
+                "gmail-mcp"
+            ):
+                servers["gmail"] = {
+                    "command": "gmail-mcp",
+                    "args": [],
+                }
 
         return servers
 
-    def build_mcp_config(
-        self, mcp: dict[str, Any], command_type: str
-    ) -> dict[str, Any]:
+    @staticmethod
+    def _build_mcp_config(mcp: dict[str, Any], command_type: str) -> dict[str, Any]:
+        # Turn a user-defined MCP entry into the SDK server config format.
+        # HTTP MCPs become {type, url, headers}, command MCPs become
+        # {command, args, env}.
         type_config = MCP_TYPE_CONFIGS.get(command_type)
         if not type_config:
             raise ClaudeAgentException(f"Unknown MCP command type: {command_type}")
@@ -453,10 +414,11 @@ class ClaudeAgentService:
             )
 
         if type_config.get("is_http"):
-            config = {
+            config: dict[str, Any] = {
                 "type": type_config["type"],
                 "url": mcp[required_field],
             }
+            # For HTTP MCPs, env_vars are sent as HTTP headers (e.g. auth tokens)
             if mcp.get("env_vars"):
                 config["headers"] = mcp["env_vars"]
         else:
@@ -467,6 +429,7 @@ class ClaudeAgentService:
                 "command": type_config["command"],
                 "args": args,
             }
+            # For command MCPs, env_vars are passed as process environment variables
             if mcp.get("env_vars"):
                 config["env"] = mcp["env_vars"]
 
@@ -475,7 +438,6 @@ class ClaudeAgentService:
     async def _build_claude_options(
         self,
         *,
-        user: User,
         user_settings: UserSettings,
         system_prompt: str,
         permission_mode: str,
@@ -487,8 +449,14 @@ class ClaudeAgentService:
         cwd: str = SANDBOX_HOME_DIR,
         sandbox_provider: str = "docker",
     ) -> ClaudeAgentOptions:
-        env, provider_type = self._build_auth_env(model_id, user_settings)
+        # Assemble the full ClaudeAgentOptions passed to the SDK client,
+        # combining auth, env vars, MCP servers, and prompt configuration.
+        env, provider_type, actual_model_id = self._build_auth_env(
+            model_id, user_settings
+        )
 
+        # Set up git credentials inside the sandbox — GIT_ASKPASS points to a
+        # helper script that echoes the PAT so git never prompts interactively.
         if user_settings.github_personal_access_token:
             env["GITHUB_TOKEN"] = user_settings.github_personal_access_token
             env["GIT_ASKPASS"] = SANDBOX_GIT_ASKPASS_PATH
@@ -501,6 +469,7 @@ class ClaudeAgentService:
             for env_var in user_settings.custom_env_vars:
                 env[env_var["key"]] = env_var["value"]
 
+        # WebSearch is an Anthropic-only tool — non-Anthropic providers don't support it
         disallowed_tools: list[str] = []
         if provider_type != ProviderType.ANTHROPIC.value:
             disallowed_tools.append("WebSearch")
@@ -509,6 +478,8 @@ class ClaudeAgentService:
             permission_mode, "bypassPermissions"
         )
 
+        # Custom prompts are sent as-is; otherwise use the SDK's built-in
+        # claude_code preset and append our system prompt to it.
         system_prompt_config: str | dict[str, str]
         if is_custom_prompt:
             system_prompt_config = system_prompt
@@ -519,26 +490,25 @@ class ClaudeAgentService:
                 "append": system_prompt,
             }
 
-        _, actual_model_id = self._provider_service.get_provider_for_model(
-            user_settings, model_id
-        )
-
         options = ClaudeAgentOptions(
             system_prompt=system_prompt_config,
             permission_mode=sdk_permission_mode,
             model=actual_model_id,
             disallowed_tools=disallowed_tools,
             mcp_servers=await self._get_mcp_servers(
-                user,
+                user_settings,
                 permission_mode,
                 chat_id,
                 sandbox_provider,
             ),
             cwd=cwd,
+            # OS user inside the sandbox container
             user="user",
             resume=session_id,
             env=env,
+            # Load .claude config from local dir, user home, and project root
             setting_sources=["local", "user", "project"],
+            # Route permission prompts through our MCP permission server
             permission_prompt_tool_name="mcp__permission__approval_prompt",
         )
 
@@ -547,12 +517,17 @@ class ClaudeAgentService:
 
         return options
 
+    @staticmethod
     def prepare_user_prompt(
-        self,
         prompt: str,
         custom_instructions: str | None,
         attachments: list[dict[str, Any]] | None = None,
     ) -> str:
+        # Wrap the raw user prompt with XML-tagged context (instructions,
+        # attachments) so the SDK can distinguish each section.
+
+        # Slash commands (e.g. /compact, /review) are SDK builtins —
+        # pass them through unmodified so the SDK handles them directly.
         if any(prompt.startswith(cmd) for cmd in ALLOWED_SLASH_COMMANDS):
             return prompt
 
@@ -564,6 +539,8 @@ class ClaudeAgentService:
             )
 
         if attachments:
+            # Uploaded files are copied to the sandbox home dir with their
+            # original filename — reference that path so Claude can find them.
             files_list = "\n".join(
                 f"- {SANDBOX_HOME_DIR}/{attachment['file_path'].split('/')[-1]}"
                 for attachment in attachments
@@ -579,4 +556,5 @@ class ClaudeAgentService:
     async def _create_prompt_iterable(
         prompt_message: dict[str, Any],
     ) -> AsyncIterator[dict[str, Any]]:
+        # client.query() expects an async iterable of messages.
         yield prompt_message

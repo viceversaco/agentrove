@@ -24,6 +24,7 @@ from app.services.claude_agent import (
     SDK_PERMISSION_MODE_MAP,
     ClaudeAgentService,
     SessionParams,
+    StreamResult,
 )
 from app.services.claude_session_registry import session_registry
 from app.services.db import SessionFactoryType
@@ -157,7 +158,10 @@ class ChatStreamRuntime:
         self._send_now_pending: bool = False
 
     async def run(
-        self, ai_service: ClaudeAgentService, stream: AsyncIterator[StreamEvent]
+        self,
+        ai_service: ClaudeAgentService,
+        stream_result: StreamResult,
+        stream: AsyncIterator[StreamEvent],
     ) -> str:
         try:
             start_seq = await self.emit_event(
@@ -173,18 +177,18 @@ class ChatStreamRuntime:
                     last_seq=start_seq,
                     active_stream_id=self.stream_id,
                 )
-            await self._consume_stream(ai_service, stream)
+            await self._consume_stream(ai_service, stream_result, stream)
 
             if self._cancelled:
                 return await self._complete_stream(
-                    ai_service, MessageStreamStatus.INTERRUPTED
+                    stream_result, MessageStreamStatus.INTERRUPTED
                 )
 
             if self.last_seq <= start_seq:
                 raise ClaudeAgentException("Stream completed without any events")
 
             return await self._complete_stream(
-                ai_service, MessageStreamStatus.COMPLETED
+                stream_result, MessageStreamStatus.COMPLETED
             )
 
         except Exception as exc:
@@ -194,12 +198,13 @@ class ChatStreamRuntime:
                 {"error": str(exc)},
                 apply_snapshot=False,
             )
-            await self._save_final_snapshot(ai_service, MessageStreamStatus.FAILED)
+            await self._save_final_snapshot(stream_result, MessageStreamStatus.FAILED)
             raise
 
     async def _consume_stream(
         self,
         ai_service: ClaudeAgentService,
+        stream_result: StreamResult,
         stream: AsyncIterator[StreamEvent],
     ) -> None:
         stream_iter = aiter(stream)
@@ -224,10 +229,10 @@ class ChatStreamRuntime:
                 if not self._send_now_pending and self._is_send_now_eligible(event):
                     self._send_now_pending = True
 
-                current_usage = ai_service.get_usage()
+                current_usage = stream_result.usage
                 if current_usage is not None and current_usage is not last_usage:
                     last_usage = current_usage
-                    await self._emit_context_usage(ai_service)
+                    await self._emit_context_usage(stream_result)
         except asyncio.CancelledError:
             if not (self._cancel_event and self._cancel_event.is_set()):
                 raise
@@ -355,7 +360,7 @@ class ChatStreamRuntime:
 
     async def _save_final_snapshot(
         self,
-        ai_service: ClaudeAgentService,
+        stream_result: StreamResult,
         stream_status: MessageStreamStatus,
     ) -> None:
         if not self.assistant_message_id:
@@ -368,15 +373,15 @@ class ChatStreamRuntime:
             last_seq=self.last_seq,
             active_stream_id=None,
             stream_status=stream_status,
-            total_cost_usd=ai_service.get_total_cost_usd(),
+            total_cost_usd=stream_result.total_cost_usd,
         )
 
     async def _complete_stream(
         self,
-        ai_service: ClaudeAgentService,
+        stream_result: StreamResult,
         status: MessageStreamStatus,
     ) -> str:
-        await self._save_final_snapshot(ai_service, status)
+        await self._save_final_snapshot(stream_result, status)
         final_content = self.snapshot.content_text
 
         if status != MessageStreamStatus.COMPLETED and self.cache:
@@ -391,14 +396,14 @@ class ChatStreamRuntime:
             await self._generate_title()
             queue_processed = await self._process_next_queued()
             if not queue_processed:
-                await self._emit_context_usage(ai_service)
+                await self._emit_context_usage(stream_result)
                 await self.emit_event(
                     "complete",
                     {"status": "completed"},
                     apply_snapshot=False,
                 )
         else:
-            await self._emit_context_usage(ai_service)
+            await self._emit_context_usage(stream_result)
             terminal_kind = (
                 "cancelled" if status == MessageStreamStatus.INTERRUPTED else "complete"
             )
@@ -647,8 +652,8 @@ class ChatStreamRuntime:
         except Exception as requeue_exc:
             logger.error("Failed to re-queue message: %s", requeue_exc)
 
-    async def _emit_context_usage(self, ai_service: ClaudeAgentService) -> None:
-        usage = ai_service.get_usage()
+    async def _emit_context_usage(self, stream_result: StreamResult) -> None:
+        usage = stream_result.usage
         if not usage or not self.cache:
             return
 
@@ -989,7 +994,6 @@ class ChatStreamRuntime:
                     user=user,
                     chat=runtime.chat,
                     system_prompt=request.system_prompt,
-                    custom_instructions=request.custom_instructions,
                     model_id=request.model_id,
                     permission_mode=request.permission_mode,
                     session_id=request.session_id,
@@ -999,9 +1003,6 @@ class ChatStreamRuntime:
 
                 session = await session_registry.get_or_create(
                     chat_id=runtime.chat_id,
-                    sandbox_id=params.sandbox_id,
-                    provider=params.sandbox_provider,
-                    max_thinking_tokens=params.options.max_thinking_tokens,
                     options=params.options,
                     transport_factory=params.transport_factory,
                 )
@@ -1013,55 +1014,56 @@ class ChatStreamRuntime:
                     session_container=runtime.session_container,
                 )
 
-                async with session.lock:
-                    session.cancel_event.clear()
-                    if session_registry.consume_pending_cancel(runtime.chat_id):
-                        session.cancel_event.set()
-                    runtime._cancel_event = session.cancel_event
-                    session.active_generation_task = asyncio.current_task()
-                    runtime.transport = session.transport
-                    runtime.client = session.client
-                    stream: AsyncIterator[StreamEvent] | None = None
-                    try:
-                        if params.options.model:
-                            await session.client.set_model(params.options.model)
-                        if params.options.permission_mode:
-                            await session.client.set_permission_mode(
-                                params.options.permission_mode
-                            )
-                        stream = ai_service.stream_with_client(
-                            client=session.client,
-                            prompt=request.prompt,
-                            custom_instructions=request.custom_instructions,
-                            session_id=request.session_id,
-                            session_callback=session_callback,
-                            attachments=request.attachments,
+                session.cancel_event.clear()
+                if session_registry.consume_pending_cancel(runtime.chat_id):
+                    session.cancel_event.set()
+                runtime._cancel_event = session.cancel_event
+                session.active_generation_task = asyncio.current_task()
+                runtime.transport = session.transport
+                runtime.client = session.client
+                stream: AsyncIterator[StreamEvent] | None = None
+                try:
+                    if params.options.model:
+                        await session.client.set_model(params.options.model)
+                    if params.options.permission_mode:
+                        await session.client.set_permission_mode(
+                            params.options.permission_mode
                         )
-                        return await runtime.run(ai_service, stream)
-                    except (
-                        ClaudeAgentException,
-                        asyncio.CancelledError,
-                    ) as exc:
-                        if cls._is_transport_fatal(exc):
-                            session.active_generation_task = None
-                            await session_registry.terminate(runtime.chat_id)
-                        raise
-                    except Exception:
+                    stream_result = StreamResult()
+                    stream = ai_service.stream_response(
+                        client=session.client,
+                        prompt=request.prompt,
+                        custom_instructions=request.custom_instructions,
+                        session_id=request.session_id,
+                        result=stream_result,
+                        session_callback=session_callback,
+                        attachments=request.attachments,
+                    )
+                    return await runtime.run(ai_service, stream_result, stream)
+                except (
+                    ClaudeAgentException,
+                    asyncio.CancelledError,
+                ) as exc:
+                    if cls._is_transport_fatal(exc):
                         session.active_generation_task = None
                         await session_registry.terminate(runtime.chat_id)
-                        raise
-                    finally:
-                        if stream is not None and hasattr(stream, "aclose"):
-                            await stream.aclose()
-                        if runtime._cancelled:
-                            try:
-                                async with asyncio.timeout(5.0):
-                                    async for _ in session.client.receive_response():
-                                        pass
-                            except Exception:
-                                pass
-                        session.active_generation_task = None
-                        session.last_used_at = time.monotonic()
+                    raise
+                except Exception:
+                    session.active_generation_task = None
+                    await session_registry.terminate(runtime.chat_id)
+                    raise
+                finally:
+                    if stream is not None and hasattr(stream, "aclose"):
+                        await stream.aclose()
+                    if runtime._cancelled:
+                        try:
+                            async with asyncio.timeout(5.0):
+                                async for _ in session.client.receive_response():
+                                    pass
+                        except Exception:
+                            pass
+                    session.active_generation_task = None
+                    session.last_used_at = time.monotonic()
 
         except asyncio.CancelledError:
             await cls._mark_message_failed(
