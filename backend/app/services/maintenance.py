@@ -74,7 +74,9 @@ class MaintenanceService:
 
     @staticmethod
     async def _reap_idle_sessions() -> dict[str, Any]:
-        await session_registry.close_idle_sessions(settings.CHAT_PROCESS_IDLE_TTL_SECONDS)
+        await session_registry.close_idle_sessions(
+            settings.CHAT_PROCESS_IDLE_TTL_SECONDS
+        )
         return {}
 
     async def _run_job_loop(self, job: MaintenanceJob) -> None:

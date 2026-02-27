@@ -6,11 +6,18 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Literal, NamedTuple
 
-from claude_agent_sdk import (ClaudeAgentOptions, ClaudeSDKClient,
-                              ClaudeSDKError, ResultMessage)
+from claude_agent_sdk import (
+    ClaudeAgentOptions,
+    ClaudeSDKClient,
+    ClaudeSDKError,
+    ResultMessage,
+)
 
-from app.constants import (SANDBOX_GIT_ASKPASS_PATH, SANDBOX_HOME_DIR,
-                           SANDBOX_WORKSPACE_DIR)
+from app.constants import (
+    SANDBOX_GIT_ASKPASS_PATH,
+    SANDBOX_HOME_DIR,
+    SANDBOX_WORKSPACE_DIR,
+)
 from app.core.config import get_settings
 from app.core.security import create_chat_scoped_token
 from app.db.session import SessionLocal
@@ -379,7 +386,9 @@ class ClaudeAgentService:
         # when the user has linked their Google account via OAuth.
         # In host mode, skip if the binary isn't installed.
         if user_settings.gmail_oauth_tokens:
-            if sandbox_provider != SandboxProviderType.HOST.value or shutil.which("gmail-mcp"):
+            if sandbox_provider != SandboxProviderType.HOST.value or shutil.which(
+                "gmail-mcp"
+            ):
                 servers["gmail"] = {
                     "command": "gmail-mcp",
                     "args": [],
@@ -442,7 +451,9 @@ class ClaudeAgentService:
     ) -> ClaudeAgentOptions:
         # Assemble the full ClaudeAgentOptions passed to the SDK client,
         # combining auth, env vars, MCP servers, and prompt configuration.
-        env, provider_type, actual_model_id = self._build_auth_env(model_id, user_settings)
+        env, provider_type, actual_model_id = self._build_auth_env(
+            model_id, user_settings
+        )
 
         # Set up git credentials inside the sandbox — GIT_ASKPASS points to a
         # helper script that echoes the PAT so git never prompts interactively.

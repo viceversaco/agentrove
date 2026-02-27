@@ -1022,48 +1022,48 @@ class ChatStreamRuntime:
                 runtime.transport = session.transport
                 runtime.client = session.client
                 stream: AsyncIterator[StreamEvent] | None = None
-                    try:
-                        if params.options.model:
-                            await session.client.set_model(params.options.model)
-                        if params.options.permission_mode:
-                            await session.client.set_permission_mode(
-                                params.options.permission_mode
-                            )
-                        stream_result = StreamResult()
-                        stream = ai_service.stream_response(
-                            client=session.client,
-                            prompt=request.prompt,
-                            custom_instructions=request.custom_instructions,
-                            session_id=request.session_id,
-                            result=stream_result,
-                            session_callback=session_callback,
-                            attachments=request.attachments,
+                try:
+                    if params.options.model:
+                        await session.client.set_model(params.options.model)
+                    if params.options.permission_mode:
+                        await session.client.set_permission_mode(
+                            params.options.permission_mode
                         )
-                        return await runtime.run(ai_service, stream_result, stream)
-                    except (
-                        ClaudeAgentException,
-                        asyncio.CancelledError,
-                    ) as exc:
-                        if cls._is_transport_fatal(exc):
-                            session.active_generation_task = None
-                            await session_registry.terminate(runtime.chat_id)
-                        raise
-                    except Exception:
+                    stream_result = StreamResult()
+                    stream = ai_service.stream_response(
+                        client=session.client,
+                        prompt=request.prompt,
+                        custom_instructions=request.custom_instructions,
+                        session_id=request.session_id,
+                        result=stream_result,
+                        session_callback=session_callback,
+                        attachments=request.attachments,
+                    )
+                    return await runtime.run(ai_service, stream_result, stream)
+                except (
+                    ClaudeAgentException,
+                    asyncio.CancelledError,
+                ) as exc:
+                    if cls._is_transport_fatal(exc):
                         session.active_generation_task = None
                         await session_registry.terminate(runtime.chat_id)
-                        raise
-                    finally:
-                        if stream is not None and hasattr(stream, "aclose"):
-                            await stream.aclose()
-                        if runtime._cancelled:
-                            try:
-                                async with asyncio.timeout(5.0):
-                                    async for _ in session.client.receive_response():
-                                        pass
-                            except Exception:
-                                pass
-                        session.active_generation_task = None
-                        session.last_used_at = time.monotonic()
+                    raise
+                except Exception:
+                    session.active_generation_task = None
+                    await session_registry.terminate(runtime.chat_id)
+                    raise
+                finally:
+                    if stream is not None and hasattr(stream, "aclose"):
+                        await stream.aclose()
+                    if runtime._cancelled:
+                        try:
+                            async with asyncio.timeout(5.0):
+                                async for _ in session.client.receive_response():
+                                    pass
+                        except Exception:
+                            pass
+                    session.active_generation_task = None
+                    session.last_used_at = time.monotonic()
 
         except asyncio.CancelledError:
             await cls._mark_message_failed(

@@ -158,7 +158,9 @@ class SessionRegistry:
             {
                 "system_prompt": options.system_prompt,
                 "env": options.env,
-                "mcp_servers": SessionRegistry._remove_per_request_mcp_env(options.mcp_servers),
+                "mcp_servers": SessionRegistry._remove_per_request_mcp_env(
+                    options.mcp_servers
+                ),
                 "disallowed_tools": options.disallowed_tools,
                 "max_thinking_tokens": options.max_thinking_tokens,
             },
@@ -214,7 +216,9 @@ class SessionRegistry:
         try:
             await session.transport.close()
         except Exception as exc:
-            logger.debug("Error closing transport for chat %s: %s", session.chat_id, exc)
+            logger.debug(
+                "Error closing transport for chat %s: %s", session.chat_id, exc
+            )
 
 
 session_registry = SessionRegistry()
