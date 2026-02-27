@@ -194,9 +194,9 @@ class ClaudeAgentService:
                 for event in processor.emit_events_for_message(message):
                     if event:
                         yield event
-                        mode = PLAN_MODE_TRANSITIONS.get(
-                            (event.get("type"), event.get("tool", {}).get("name"))
-                        )
+                        event_type = event.get("type", "")
+                        tool_name = event.get("tool", {}).get("name", "")
+                        mode = PLAN_MODE_TRANSITIONS.get((event_type, tool_name))
                         if mode:
                             await client.set_permission_mode(mode)
                 if processor.usage is not prev_usage:
