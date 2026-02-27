@@ -92,8 +92,6 @@ class StreamResult:
 
 class SessionParams(NamedTuple):
     options: ClaudeAgentOptions
-    sandbox_id: str
-    sandbox_provider: str
     transport_factory: Callable[[], SandboxTransport]
 
 
@@ -128,7 +126,6 @@ class ClaudeAgentService:
         claude_cwd = SANDBOX_HOME_DIR
         if workspace_path and sandbox_provider == SandboxProviderType.DOCKER.value:
             claude_cwd = SANDBOX_WORKSPACE_DIR
-        sandbox_id_str = str(sandbox_id)
 
         options = await self._build_claude_options(
             user_settings=user_settings,
@@ -146,15 +143,13 @@ class ClaudeAgentService:
         transport_factory = partial(
             create_sandbox_transport,
             sandbox_provider=sandbox_provider,
-            sandbox_id=sandbox_id_str,
+            sandbox_id=sandbox_id,
             workspace_path=workspace_path,
             options=options,
         )
 
         return SessionParams(
             options=options,
-            sandbox_id=sandbox_id_str,
-            sandbox_provider=sandbox_provider,
             transport_factory=transport_factory,
         )
 

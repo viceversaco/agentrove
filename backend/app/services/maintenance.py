@@ -10,7 +10,7 @@ from typing import Any
 
 from app.core.config import get_settings
 from app.services.claude_session_registry import (
-    REAPER_INTERVAL_SECONDS,
+    IDLE_CHECK_INTERVAL_SECONDS,
     session_registry,
 )
 from app.services.refresh_token import RefreshTokenService
@@ -38,7 +38,7 @@ class MaintenanceService:
         self._tasks = [
             asyncio.create_task(self._run_job_loop(self._scheduled_tasks_job())),
             asyncio.create_task(self._run_job_loop(self._refresh_tokens_job())),
-            asyncio.create_task(self._run_job_loop(self._session_reaper_job())),
+            asyncio.create_task(self._run_job_loop(self._idle_session_cleanup_job())),
         ]
 
     async def stop(self) -> None:
@@ -65,16 +65,16 @@ class MaintenanceService:
             run=RefreshTokenService.cleanup_expired_tokens_job,
         )
 
-    def _session_reaper_job(self) -> MaintenanceJob:
+    def _idle_session_cleanup_job(self) -> MaintenanceJob:
         return MaintenanceJob(
-            name="chat_session_reaper",
-            interval_seconds=REAPER_INTERVAL_SECONDS,
+            name="idle_session_cleanup",
+            interval_seconds=IDLE_CHECK_INTERVAL_SECONDS,
             run=self._reap_idle_sessions,
         )
 
     @staticmethod
     async def _reap_idle_sessions() -> dict[str, Any]:
-        await session_registry.reap_idle(settings.CHAT_PROCESS_IDLE_TTL_SECONDS)
+        await session_registry.close_idle_sessions(settings.CHAT_PROCESS_IDLE_TTL_SECONDS)
         return {}
 
     async def _run_job_loop(self, job: MaintenanceJob) -> None:

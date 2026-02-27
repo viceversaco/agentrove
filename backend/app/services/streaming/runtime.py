@@ -1003,9 +1003,6 @@ class ChatStreamRuntime:
 
                 session = await session_registry.get_or_create(
                     chat_id=runtime.chat_id,
-                    sandbox_id=params.sandbox_id,
-                    provider=params.sandbox_provider,
-                    max_thinking_tokens=params.options.max_thinking_tokens,
                     options=params.options,
                     transport_factory=params.transport_factory,
                 )
@@ -1017,15 +1014,14 @@ class ChatStreamRuntime:
                     session_container=runtime.session_container,
                 )
 
-                async with session.lock:
-                    session.cancel_event.clear()
-                    if session_registry.consume_pending_cancel(runtime.chat_id):
-                        session.cancel_event.set()
-                    runtime._cancel_event = session.cancel_event
-                    session.active_generation_task = asyncio.current_task()
-                    runtime.transport = session.transport
-                    runtime.client = session.client
-                    stream: AsyncIterator[StreamEvent] | None = None
+                session.cancel_event.clear()
+                if session_registry.consume_pending_cancel(runtime.chat_id):
+                    session.cancel_event.set()
+                runtime._cancel_event = session.cancel_event
+                session.active_generation_task = asyncio.current_task()
+                runtime.transport = session.transport
+                runtime.client = session.client
+                stream: AsyncIterator[StreamEvent] | None = None
                     try:
                         if params.options.model:
                             await session.client.set_model(params.options.model)
