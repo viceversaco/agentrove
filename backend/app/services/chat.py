@@ -860,6 +860,17 @@ class ChatService(BaseDbService[Chat]):
             result = await db.execute(query)
             return bool(result.scalar())
 
+    async def set_title(self, chat_id: UUID, title: str) -> bool:
+        async with self.session_factory() as db:
+            result = await db.execute(select(Chat).filter(Chat.id == chat_id))
+            chat = result.scalar_one_or_none()
+            if not chat:
+                return False
+            chat.title = title
+            db.add(chat)
+            await db.commit()
+            return True
+
     def _validate_api_keys(self, user_settings: UserSettings, model_id: str) -> None:
         try:
             validate_model_api_keys(user_settings, model_id)

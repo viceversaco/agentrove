@@ -713,19 +713,11 @@ class ChatStreamRuntime:
         if not title:
             return
 
-        try:
-            async with self.session_factory() as db:
-                result = await db.execute(
-                    select(Chat).filter(Chat.id == self.chat.id)
-                )
-                chat = result.scalar_one_or_none()
-                if not chat:
-                    return
-                chat.title = title
-                db.add(chat)
-                await db.commit()
-        except SQLAlchemyError as exc:
-            logger.debug("Title DB update failed for chat %s: %s", self.chat_id, exc)
+        # Inline import to avoid circular: chat.py imports streaming.runtime
+        from app.services.chat import ChatService
+
+        chat_service = ChatService(session_factory=self.session_factory)
+        if not await chat_service.set_title(self.chat.id, title):
             return
 
         await self.emit_event(
