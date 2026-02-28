@@ -17,7 +17,7 @@ from app.models.schemas.workspace import WorkspaceCreate, WorkspaceUpdate
 from app.models.schemas.workspace import Workspace as WorkspaceSchema
 from app.models.schemas.pagination import PaginatedResponse, PaginationParams
 from app.services.db import BaseDbService, SessionFactoryType
-from app.services.exceptions import ChatException, ErrorCode
+from app.services.exceptions import ErrorCode, WorkspaceException
 from app.services.sandbox import SandboxService
 from app.services.sandbox_providers.factory import SandboxProviderFactory
 from app.services.sandbox_providers.types import SandboxProviderType
@@ -51,7 +51,7 @@ class WorkspaceService(BaseDbService[Workspace]):
 
         if data.source_type == "git":
             if not data.git_url:
-                raise ChatException(
+                raise WorkspaceException(
                     "git_url is required for git workspace",
                     error_code=ErrorCode.VALIDATION_ERROR,
                     status_code=400,
@@ -63,14 +63,14 @@ class WorkspaceService(BaseDbService[Workspace]):
             source_url = normalized_url
         elif data.source_type == "local":
             if not data.workspace_path:
-                raise ChatException(
+                raise WorkspaceException(
                     "workspace_path is required for local workspace",
                     error_code=ErrorCode.VALIDATION_ERROR,
                     status_code=400,
                 )
             resolved = Path(data.workspace_path).expanduser().resolve()
             if not resolved.exists() or not resolved.is_dir():
-                raise ChatException(
+                raise WorkspaceException(
                     "workspace_path must be an existing directory",
                     error_code=ErrorCode.VALIDATION_ERROR,
                     status_code=400,
@@ -180,7 +180,7 @@ class WorkspaceService(BaseDbService[Workspace]):
             )
             workspace: Workspace | None = result.scalar_one_or_none()
             if not workspace:
-                raise ChatException(
+                raise WorkspaceException(
                     "Workspace not found",
                     error_code=ErrorCode.WORKSPACE_NOT_FOUND,
                     details={"workspace_id": str(workspace_id)},
@@ -271,7 +271,7 @@ class WorkspaceService(BaseDbService[Workspace]):
             process.kill()
             await process.wait()
             await asyncio.to_thread(shutil.rmtree, workspace_dir, True)
-            raise ChatException(
+            raise WorkspaceException(
                 "Git clone timed out",
                 error_code=ErrorCode.VALIDATION_ERROR,
                 status_code=400,
@@ -284,7 +284,7 @@ class WorkspaceService(BaseDbService[Workspace]):
                 or stdout.decode("utf-8", errors="replace").strip()
                 or "Failed to clone repository"
             )
-            raise ChatException(
+            raise WorkspaceException(
                 error_output,
                 error_code=ErrorCode.VALIDATION_ERROR,
                 status_code=400,
@@ -296,7 +296,7 @@ class WorkspaceService(BaseDbService[Workspace]):
     def _normalize_git_url(git_url: str) -> str:
         candidate = git_url.strip()
         if not candidate:
-            raise ChatException(
+            raise WorkspaceException(
                 "git_url is required for git workspace",
                 error_code=ErrorCode.VALIDATION_ERROR,
                 status_code=400,
@@ -307,13 +307,13 @@ class WorkspaceService(BaseDbService[Workspace]):
 
         parsed = urlparse(candidate)
         if parsed.scheme != "https":
-            raise ChatException(
+            raise WorkspaceException(
                 "git_url must be an HTTPS or git@... SSH URL",
                 error_code=ErrorCode.VALIDATION_ERROR,
                 status_code=400,
             )
         if parsed.username or parsed.password:
-            raise ChatException(
+            raise WorkspaceException(
                 "git_url must not contain embedded credentials",
                 error_code=ErrorCode.VALIDATION_ERROR,
                 status_code=400,

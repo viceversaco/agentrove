@@ -14,14 +14,14 @@ from app.models.schemas.workspace import (
     WorkspaceCreate,
     WorkspaceUpdate,
 )
-from app.services.exceptions import ChatException
+from app.services.exceptions import WorkspaceException
 from app.services.workspace import WorkspaceService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-def _raise_workspace_http_exception(exc: ChatException) -> NoReturn:
+def _raise_workspace_http_exception(exc: WorkspaceException) -> NoReturn:
     raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
 
@@ -37,7 +37,7 @@ async def create_workspace(
 ) -> WorkspaceSchema:
     try:
         return await workspace_service.create_workspace(current_user, data)
-    except ChatException as e:
+    except WorkspaceException as e:
         _raise_workspace_http_exception(e)
     except SQLAlchemyError as e:
         logger.error("Database error creating workspace: %s", e, exc_info=True)
@@ -63,7 +63,7 @@ async def get_workspace(
 ) -> WorkspaceSchema:
     try:
         return await workspace_service.get_workspace(workspace_id, current_user)
-    except ChatException as e:
+    except WorkspaceException as e:
         _raise_workspace_http_exception(e)
 
 
@@ -78,7 +78,7 @@ async def update_workspace(
         return await workspace_service.update_workspace(
             workspace_id, current_user, data
         )
-    except ChatException as e:
+    except WorkspaceException as e:
         _raise_workspace_http_exception(e)
 
 
@@ -90,5 +90,5 @@ async def delete_workspace(
 ) -> None:
     try:
         await workspace_service.delete_workspace(workspace_id, current_user)
-    except ChatException as e:
+    except WorkspaceException as e:
         _raise_workspace_http_exception(e)
