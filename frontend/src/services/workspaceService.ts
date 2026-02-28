@@ -1,22 +1,48 @@
 import { apiClient } from '@/lib/api';
-import { ensureResponse, serviceCall } from '@/services/base/BaseService';
+import { ensureResponse, serviceCall, buildQueryString } from '@/services/base/BaseService';
 import type {
-  WorkspaceBootstrapRequest,
-  WorkspaceBootstrapResponse,
+  Workspace,
+  CreateWorkspaceRequest,
+  UpdateWorkspaceRequest,
 } from '@/types/workspace.types';
+import type { PaginationParams, PaginatedResponse } from '@/types/api.types';
 
-async function bootstrapWorkspace(
-  payload: WorkspaceBootstrapRequest,
-): Promise<WorkspaceBootstrapResponse> {
+async function listWorkspaces(
+  pagination?: PaginationParams,
+): Promise<PaginatedResponse<Workspace>> {
   return serviceCall(async () => {
-    const response = await apiClient.post<WorkspaceBootstrapResponse>(
-      '/chat/workspaces/bootstrap',
-      payload,
-    );
-    return ensureResponse(response, 'Failed to initialize workspace');
+    const queryString = buildQueryString(pagination as Record<string, number>);
+    const response = await apiClient.get<PaginatedResponse<Workspace>>(`/workspaces${queryString}`);
+    return ensureResponse(response, 'Failed to fetch workspaces');
+  });
+}
+
+async function createWorkspace(data: CreateWorkspaceRequest): Promise<Workspace> {
+  return serviceCall(async () => {
+    const response = await apiClient.post<Workspace>('/workspaces', data);
+    return ensureResponse(response, 'Failed to create workspace');
+  });
+}
+
+async function updateWorkspace(
+  workspaceId: string,
+  data: UpdateWorkspaceRequest,
+): Promise<Workspace> {
+  return serviceCall(async () => {
+    const response = await apiClient.patch<Workspace>(`/workspaces/${workspaceId}`, data);
+    return ensureResponse(response, 'Failed to update workspace');
+  });
+}
+
+async function deleteWorkspace(workspaceId: string): Promise<void> {
+  await serviceCall(async () => {
+    await apiClient.delete(`/workspaces/${workspaceId}`);
   });
 }
 
 export const workspaceService = {
-  bootstrapWorkspace,
+  listWorkspaces,
+  createWorkspace,
+  updateWorkspace,
+  deleteWorkspace,
 };

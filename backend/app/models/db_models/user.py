@@ -56,6 +56,9 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
         DateTime(timezone=True), nullable=True
     )
     chats = relationship("Chat", back_populates="user", cascade="all, delete-orphan")
+    workspaces = relationship(
+        "Workspace", back_populates="user", cascade="all, delete-orphan"
+    )
     settings = relationship(
         "UserSettings",
         back_populates="user",

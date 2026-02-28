@@ -16,6 +16,7 @@ import { useEditorState } from '@/hooks/useEditorState';
 import { useChatData } from '@/hooks/useChatData';
 import { useSandboxFiles } from '@/hooks/useSandboxFiles';
 import { useModelSelection } from '@/hooks/queries/useModelQueries';
+import { useWorkspacesQuery } from '@/hooks/queries/useWorkspaceQueries';
 import { useSettingsQuery } from '@/hooks/queries/useSettingsQueries';
 import { mergeAgents } from '@/utils/settings';
 import { ChatProvider } from '@/contexts/ChatContext';
@@ -104,6 +105,9 @@ export function ChatPage() {
     };
   }, [currentView, secondaryView, currentChat?.sandbox_id, refetchFilesMetadata]);
 
+  const { data: workspacesData } = useWorkspacesQuery();
+  const workspaces = workspacesData?.items ?? [];
+
   const { data: settings } = useSettingsQuery();
 
   const allAgents = useMemo(() => mergeAgents(settings?.custom_agents), [settings?.custom_agents]);
@@ -140,6 +144,7 @@ export function ChatPage() {
     return (
       <Sidebar
         chats={chats}
+        workspaces={workspaces}
         selectedChatId={chatId || null}
         onChatSelect={handleChatSelect}
         hasNextPage={chatsQueryMeta.hasNextPage}
@@ -150,6 +155,7 @@ export function ChatPage() {
   }, [
     currentView,
     chats,
+    workspaces,
     chatId,
     chatsQueryMeta.fetchNextPage,
     handleChatSelect,

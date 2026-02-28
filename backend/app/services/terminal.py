@@ -5,14 +5,14 @@ import shlex
 from asyncio import QueueEmpty, QueueFull
 from dataclasses import dataclass
 from functools import partial
-from typing import Callable, TypeVar, cast
+from typing import Callable, TypeVar
 
 from fastapi import WebSocket
 
 from app.constants import PTY_INPUT_QUEUE_SIZE, PTY_OUTPUT_QUEUE_SIZE
 from app.services.exceptions import SandboxException
 from app.services.sandbox import SandboxService
-from app.services.sandbox_providers import LocalHostProvider, SandboxProviderType
+from app.services.sandbox_providers import SandboxProviderType
 from app.services.sandbox_providers.factory import SandboxProviderFactory
 
 logger = logging.getLogger(__name__)
@@ -233,13 +233,11 @@ class TerminalSessionRegistry:
             if existing:
                 return existing
 
-            provider = SandboxProviderFactory.create(provider_type)
-            if provider_type == SandboxProviderType.HOST and workspace_path:
-                host_provider = cast(LocalHostProvider, provider)
-                host_provider.bind_workspace(
-                    sandbox_id=sandbox_id,
-                    workspace_path=workspace_path,
-                )
+            provider = SandboxProviderFactory.create_bound(
+                provider_type,
+                sandbox_id=sandbox_id,
+                workspace_path=workspace_path,
+            )
             service = SandboxService(provider)
 
             record = TerminalSessionRecord(

@@ -8,6 +8,7 @@ import { WorkspaceSelector } from '@/components/chat/WorkspaceSelector';
 import { useChatStore } from '@/store/chatStore';
 import { useAuthStore } from '@/store/authStore';
 import { useInfiniteChatsQuery, useCreateChatMutation } from '@/hooks/queries/useChatQueries';
+import { useWorkspacesQuery } from '@/hooks/queries/useWorkspaceQueries';
 import { useModelSelection } from '@/hooks/queries/useModelQueries';
 import { useSettingsQuery } from '@/hooks/queries/useSettingsQueries';
 import { mergeAgents } from '@/utils/settings';
@@ -34,15 +35,36 @@ export function LandingPage() {
     enabled: isAuthenticated,
   });
 
+  const { data: workspacesData } = useWorkspacesQuery({ enabled: isAuthenticated });
+  const workspaces = workspacesData?.items ?? [];
+
   const chats = useMemo(() => {
     if (!isAuthenticated || !chatsData?.pages?.length) return [];
     return chatsData.pages.flatMap((page) => page.items);
   }, [chatsData?.pages, isAuthenticated]);
 
+  const chatCountByWorkspace = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const chat of chats) {
+      counts.set(chat.workspace_id, (counts.get(chat.workspace_id) ?? 0) + 1);
+    }
+    return counts;
+  }, [chats]);
+
   const createChat = useCreateChatMutation();
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [workspacePath, setWorkspacePath] = useState('');
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (
+      selectedWorkspaceId &&
+      workspaces.length &&
+      !workspaces.some((ws) => ws.id === selectedWorkspaceId)
+    ) {
+      setSelectedWorkspaceId(null);
+    }
+  }, [workspaces, selectedWorkspaceId]);
 
   const { data: settings } = useSettingsQuery({
     enabled: isAuthenticated,
@@ -56,11 +78,6 @@ export function LandingPage() {
   );
 
   const customPrompts = useMemo(() => settings?.custom_prompts || [], [settings?.custom_prompts]);
-
-  const supportsWorkspace =
-    !settings?.sandbox_provider ||
-    settings.sandbox_provider === 'docker' ||
-    settings.sandbox_provider === 'host';
 
   useEffect(() => {
     useChatStore.getState().setCurrentChat(null);
@@ -86,14 +103,18 @@ export function LandingPage() {
         return;
       }
 
+      if (!selectedWorkspaceId) {
+        toast.error('Please select a workspace');
+        return;
+      }
+
       setIsLoading(true);
       try {
         const title = trimmedPrompt.replace(/\s+/g, ' ').slice(0, 80) || 'New Chat';
-        const trimmedWorkspace = supportsWorkspace ? workspacePath.trim() : '';
         const newChat = await createChat.mutateAsync({
           title,
           model_id: selectedModelId,
-          ...(trimmedWorkspace ? { workspace_path: trimmedWorkspace } : {}),
+          workspace_id: selectedWorkspaceId,
         });
         setMessage('');
         navigate(`/chat/${newChat.id}`, { state: { initialPrompt: trimmedPrompt } });
@@ -110,8 +131,7 @@ export function LandingPage() {
       message,
       navigate,
       selectedModelId,
-      supportsWorkspace,
-      workspacePath,
+      selectedWorkspaceId,
     ],
   );
 
@@ -128,6 +148,7 @@ export function LandingPage() {
     return (
       <Sidebar
         chats={chats}
+        workspaces={workspaces}
         selectedChatId={null}
         onChatSelect={handleChatSelect}
         hasNextPage={hasNextPage}
@@ -135,7 +156,15 @@ export function LandingPage() {
         isFetchingNextPage={isFetchingNextPage}
       />
     );
-  }, [chats, fetchNextPage, handleChatSelect, hasNextPage, isAuthenticated, isFetchingNextPage]);
+  }, [
+    chats,
+    workspaces,
+    fetchNextPage,
+    handleChatSelect,
+    hasNextPage,
+    isAuthenticated,
+    isFetchingNextPage,
+  ]);
 
   useLayoutSidebar(sidebarContent);
 
@@ -144,13 +173,12 @@ export function LandingPage() {
       <div className="relative flex flex-1">
         <div className="flex flex-1 items-center justify-center px-4 pb-10">
           <div className="w-full max-w-2xl">
-            {supportsWorkspace && (
-              <WorkspaceSelector
-                workspacePath={workspacePath}
-                onWorkspaceChange={setWorkspacePath}
-                enabled={isAuthenticated}
-              />
-            )}
+            <WorkspaceSelector
+              selectedWorkspaceId={selectedWorkspaceId}
+              onWorkspaceChange={setSelectedWorkspaceId}
+              enabled={isAuthenticated}
+              chatCountByWorkspace={chatCountByWorkspace}
+            />
 
             <ChatProvider
               customAgents={allAgents}

@@ -1,3 +1,5 @@
+from typing import cast
+
 from app.core.config import get_settings
 from app.services.sandbox_providers.base import SandboxProvider
 from app.services.sandbox_providers.docker_provider import LocalDockerProvider
@@ -44,3 +46,19 @@ class SandboxProviderFactory:
             )
 
         raise ValueError(f"Unknown provider type: {provider_type}")
+
+    @staticmethod
+    def create_bound(
+        provider_type: SandboxProviderType | str,
+        sandbox_id: str,
+        workspace_path: str | None = None,
+    ) -> SandboxProvider:
+        if isinstance(provider_type, str):
+            provider_type = SandboxProviderType(provider_type)
+        provider = SandboxProviderFactory.create(provider_type)
+        if provider_type == SandboxProviderType.HOST and workspace_path:
+            cast(LocalHostProvider, provider).bind_workspace(
+                sandbox_id=sandbox_id,
+                workspace_path=workspace_path,
+            )
+        return provider

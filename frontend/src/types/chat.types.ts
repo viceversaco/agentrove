@@ -53,10 +53,10 @@ export interface Chat {
   id: string;
   user_id: string;
   title: string;
+  workspace_id: string;
+  sandbox_id?: string;
   created_at: string;
   updated_at: string;
-  sandbox_id?: string;
-  workspace_path?: string | null;
   context_token_usage?: number;
   pinned_at?: string | null;
 }
@@ -79,7 +79,7 @@ export interface ChatRequest {
 export interface CreateChatRequest {
   title: string;
   model_id: string;
-  workspace_path?: string;
+  workspace_id: string;
 }
 
 export interface PreviewLinksResponse {

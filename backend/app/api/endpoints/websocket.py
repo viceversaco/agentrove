@@ -23,8 +23,8 @@ from app.constants import (
 )
 from app.core.security import get_user_from_token
 from app.db.session import SessionLocal
-from app.models.db_models.chat import Chat
 from app.models.db_models.user import User
+from app.models.db_models.workspace import Workspace
 from app.services.exceptions import UserException
 from app.services.sandbox_providers import SandboxProviderType
 from app.services.terminal import terminal_session_registry
@@ -106,10 +106,10 @@ async def terminal_websocket(
         return
 
     async with SessionLocal() as db:
-        query = select(Chat.sandbox_provider, Chat.workspace_path).where(
-            Chat.sandbox_id == sandbox_id,
-            Chat.user_id == user.id,
-            Chat.deleted_at.is_(None),
+        query = select(Workspace.sandbox_provider, Workspace.workspace_path).where(
+            Workspace.sandbox_id == sandbox_id,
+            Workspace.user_id == user.id,
+            Workspace.deleted_at.is_(None),
         )
         result = await db.execute(query)
         row = result.one_or_none()

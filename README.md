@@ -6,11 +6,13 @@ Self-hosted Claude Code workspace with multi-provider routing, sandboxed executi
 [![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/)
 [![React 19](https://img.shields.io/badge/React-19-61DAFB.svg)](https://reactjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
-[![Discord](https://img.shields.io/badge/Discord-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/cp3sBgEX)
+[![Discord](https://img.shields.io/badge/Discord-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/HvkJU8dcBA)
+
+> **Note:** Claudex is under active development. Expect breaking changes between releases.
 
 ## Community
 
-Join the [Discord server](https://discord.gg/cp3sBgEX).
+Join the [Discord server](https://discord.gg/HvkJU8dcBA).
 
 ## Why Claudex
 
@@ -58,11 +60,35 @@ For Anthropic providers, Claudex uses your Claude auth token directly. For custo
 
 - Claude Code-native chat execution through `claude-agent-sdk`
 - Anthropic Bridge provider routing with provider-scoped models (`openai/*`, `openrouter/*`, `copilot/*`)
+- Workspace-based project organization with per-workspace sandboxes
 - Multi-sandbox runtime (Docker/Host)
 - MCP + custom skills/agents/commands + plugin marketplace
 - Checkpoint restore and chat forking from any prior message state
 - Streaming architecture with resumable SSE events and explicit cancellation
 - Built-in recurring task scheduler (in-process async, no worker service)
+
+## Workspaces
+
+Workspaces are the top-level organizational unit. Each workspace owns a dedicated sandbox and groups all related chats under one project context.
+
+### Source types
+
+- **Empty** — creates a new empty directory in the sandbox
+- **Git clone** — clones a repository (HTTPS or SSH) into a fresh sandbox
+- **Local folder** — mounts an existing directory from the host filesystem (host sandbox only)
+
+### Sandbox isolation
+
+Each workspace gets its own sandbox instance (Docker container or host process). Chats within a workspace share the same filesystem, installed tools, and `.claude` configuration. Switching between workspaces switches the entire execution environment.
+
+### Per-workspace sandbox provider
+
+When creating a workspace you can override the default sandbox provider (Docker or Host). The provider is locked at creation time — all chats in that workspace use the same provider.
+
+### Workspace lifecycle
+
+- Creating a workspace provisions the sandbox and initializes it with your settings (GitHub token, env vars, skills, agents, slash commands)
+- Deleting a workspace soft-deletes all its chats and destroys the sandbox container
 
 ## Quick Start (Web)
 
@@ -160,12 +186,12 @@ Configure providers in `Settings -> Providers`.
 
 ## Shared Working Context
 
-Switching providers does not require a new workflow:
+Switching providers within a workspace does not require a new workflow:
 
 - Same sandbox filesystem/workdir
 - Same `.claude` resources (skills, agents, commands)
 - Same MCP configuration in Claudex
-- Same chat-level execution flow
+- Same workspace and chat history
 
 This is the main value of using Claude Code as the harness while changing inference providers behind Anthropic Bridge.
 
@@ -204,8 +230,8 @@ This is the main value of using Claude Code as the harness while changing infere
 ## Tech Stack
 
 - Frontend: React 19, TypeScript, Vite, TailwindCSS, Zustand, React Query
-- Backend: FastAPI, SQLAlchemy, Redis, PostgreSQL/SQLite, Granian
-- Runtime: Claude Code CLI, claude-agent-sdk, anthropic-bridge
+- Backend: FastAPI, SQLAlchemy, Redis, PostgreSQL/SQLite
+- Runtime: Claude Code CLI, claude-agent-sdk, anthropic-bridge, uvicorn
 
 ## License
 

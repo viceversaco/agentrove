@@ -17,6 +17,7 @@ export const queryKeys = {
     vncUrl: (sandboxId: string) => ['sandbox', sandboxId, 'vnc-url'] as const,
     browserStatus: (sandboxId: string) => ['sandbox', sandboxId, 'browser-status'] as const,
   },
+  workspaces: ['workspaces'] as const,
   models: 'models',
   scheduler: {
     tasks: ['scheduler', 'tasks'] as const,

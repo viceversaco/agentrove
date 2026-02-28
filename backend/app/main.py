@@ -24,6 +24,7 @@ from app.api.endpoints import (
     permissions,
     sandbox,
     scheduler,
+    workspace,
 )
 from app.api.endpoints import settings as settings_router
 from app.api.endpoints import skills, websocket
@@ -171,6 +172,11 @@ def create_application() -> FastAPI:
         ai_model.router,
         prefix=f"{settings.API_V1_STR}/models",
         tags=["Models"],
+    )
+    application.include_router(
+        workspace.router,
+        prefix=f"{settings.API_V1_STR}/workspaces",
+        tags=["Workspaces"],
     )
     application.include_router(
         marketplace.router,

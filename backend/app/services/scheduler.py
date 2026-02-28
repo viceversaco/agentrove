@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.models.db_models.chat import Chat, Message
+from app.models.db_models.workspace import Workspace
 from app.models.db_models.enums import (
     MessageRole,
     MessageStreamStatus,
@@ -670,11 +671,21 @@ class SchedulerService(BaseDbService[ScheduledTask]):
             )
 
             async with self.session_factory() as db:
-                chat = Chat(
-                    title=task_name,
+                workspace = Workspace(
+                    name=task_name,
                     user_id=user_id,
                     sandbox_id=sandbox_id,
                     sandbox_provider=sandbox_provider,
+                    workspace_path="",
+                    source_type="empty",
+                )
+                db.add(workspace)
+                await db.flush()
+
+                chat = Chat(
+                    title=task_name,
+                    user_id=user_id,
+                    workspace_id=workspace.id,
                 )
                 db.add(chat)
                 await db.flush()
@@ -704,6 +715,7 @@ class SchedulerService(BaseDbService[ScheduledTask]):
 
                 chat_id = chat.id
                 chat_title = chat.title
+                workspace_id = workspace.id
                 assistant_message_id = assistant_message.id
 
                 execution = await db.get(TaskExecution, execution_id)
@@ -715,6 +727,7 @@ class SchedulerService(BaseDbService[ScheduledTask]):
                 "id": str(chat_id),
                 "user_id": str(user_id),
                 "title": chat_title,
+                "workspace_id": str(workspace_id),
                 "sandbox_id": sandbox_id,
                 "sandbox_provider": sandbox_provider,
                 "session_id": None,

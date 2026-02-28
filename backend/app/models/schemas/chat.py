@@ -59,17 +59,7 @@ class ChatBase(BaseModel):
 
 class ChatCreate(ChatBase):
     model_id: str = Field(..., min_length=1, max_length=255)
-    workspace_path: str | None = Field(None, max_length=2048)
-
-
-class WorkspaceBootstrapRequest(BaseModel):
-    source_type: Literal["git"]
-    git_url: str = Field(..., min_length=1, max_length=2048)
-
-
-class WorkspaceBootstrapResponse(BaseModel):
-    source_type: Literal["git"]
-    workspace_path: str
+    workspace_id: UUID
 
 
 class ChatUpdate(BaseModel):
@@ -82,10 +72,10 @@ class Chat(ChatBase):
 
     id: UUID
     user_id: UUID
+    workspace_id: UUID
+    sandbox_id: str | None = None
     created_at: datetime
     updated_at: datetime
-    sandbox_id: str | None = None
-    workspace_path: str | None = None
     context_token_usage: int | None = None
     pinned_at: datetime | None = None
 

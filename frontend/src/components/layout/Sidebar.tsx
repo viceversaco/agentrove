@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { Plus, FolderOpen, ChevronRight, MoreHorizontal } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useInView } from 'react-intersection-observer';
 import type { FetchNextPageOptions } from '@tanstack/react-query';
 import type { Chat } from '@/types/chat.types';
+import type { Workspace } from '@/types/workspace.types';
 import { Button } from '@/components/ui/primitives/Button';
 import { Spinner } from '@/components/ui/primitives/Spinner';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -14,6 +15,10 @@ import {
   useUpdateChatMutation,
   usePinChatMutation,
 } from '@/hooks/queries/useChatQueries';
+import {
+  useDeleteWorkspaceMutation,
+  useUpdateWorkspaceMutation,
+} from '@/hooks/queries/useWorkspaceQueries';
 import { cn } from '@/utils/cn';
 import { useUIStore } from '@/store/uiStore';
 import { useStreamStore } from '@/store/streamStore';
@@ -21,36 +26,6 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import { SidebarChatItem } from './SidebarChatItem';
 import { ChatDropdown } from './ChatDropdown';
 import { DROPDOWN_WIDTH, DROPDOWN_HEIGHT, DROPDOWN_MARGIN } from '@/config/constants';
-
-function getDateGroup(dateStr: string): string {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const weekAgo = new Date(today);
-  weekAgo.setDate(weekAgo.getDate() - 7);
-
-  if (date >= today) return 'Today';
-  if (date >= yesterday) return 'Yesterday';
-  if (date >= weekAgo) return 'Previous 7 days';
-  return 'Older';
-}
-
-function groupChatsByDate(chats: Chat[]): { label: string; chats: Chat[] }[] {
-  const order = ['Today', 'Yesterday', 'Previous 7 days', 'Older'];
-  const groups = new Map<string, Chat[]>();
-
-  for (const chat of chats) {
-    const group = getDateGroup(chat.updated_at || chat.created_at);
-    if (!groups.has(group)) groups.set(group, []);
-    groups.get(group)!.push(chat);
-  }
-
-  return order
-    .filter((label) => groups.has(label))
-    .map((label) => ({ label, chats: groups.get(label)! }));
-}
 
 function calculateDropdownPosition(buttonRect: DOMRect): { top: number; left: number } {
   const isMobile = window.innerWidth < 640;
@@ -89,8 +64,52 @@ function calculateDropdownPosition(buttonRect: DOMRect): { top: number; left: nu
   return { top, left };
 }
 
+interface WorkspaceGroup {
+  workspace: Workspace;
+  chats: Chat[];
+  latestActivity: number;
+}
+
+function groupChatsByWorkspace(chats: Chat[], workspaces: Workspace[]): WorkspaceGroup[] {
+  const workspaceMap = new Map<string, Workspace>();
+  for (const ws of workspaces) {
+    workspaceMap.set(ws.id, ws);
+  }
+
+  const groups = new Map<string, Chat[]>();
+  for (const chat of chats) {
+    if (!chat.workspace_id) continue;
+    if (!groups.has(chat.workspace_id)) groups.set(chat.workspace_id, []);
+    groups.get(chat.workspace_id)!.push(chat);
+  }
+
+  const result: WorkspaceGroup[] = [];
+  for (const [workspaceId, groupChats] of groups) {
+    const workspace = workspaceMap.get(workspaceId);
+    if (!workspace) continue;
+    const latestActivity = Math.max(
+      ...groupChats.map((c) => new Date(c.updated_at || c.created_at).getTime()),
+    );
+    result.push({ workspace, chats: groupChats, latestActivity });
+  }
+
+  for (const ws of workspaces) {
+    if (!groups.has(ws.id)) {
+      result.push({
+        workspace: ws,
+        chats: [],
+        latestActivity: new Date(ws.updated_at || ws.created_at).getTime(),
+      });
+    }
+  }
+
+  result.sort((a, b) => b.latestActivity - a.latestActivity);
+  return result;
+}
+
 export interface SidebarProps {
   chats: Chat[];
+  workspaces: Workspace[];
   selectedChatId: string | null;
   onChatSelect: (chatId: string) => void;
   onDeleteChat?: (chatId: string) => void;
@@ -101,6 +120,7 @@ export interface SidebarProps {
 
 export function Sidebar({
   chats,
+  workspaces,
   selectedChatId,
   onChatSelect,
   onDeleteChat,
@@ -116,20 +136,30 @@ export function Sidebar({
     () => new Set(activeStreamMetadata.map((meta) => meta.chatId)),
     [activeStreamMetadata],
   );
+  const [collapsedWorkspaces, setCollapsedWorkspaces] = useState<Set<string>>(new Set());
   const [hoveredChatId, setHoveredChatId] = useState<string | null>(null);
   const [chatToDelete, setChatToDelete] = useState<string | null>(null);
   const [chatToRename, setChatToRename] = useState<Chat | null>(null);
+  const [workspaceToDelete, setWorkspaceToDelete] = useState<string | null>(null);
+  const [workspaceToRename, setWorkspaceToRename] = useState<Workspace | null>(null);
   const [dropdown, setDropdown] = useState<{
     chatId: string;
+    position: { top: number; left: number };
+  } | null>(null);
+  const [workspaceDropdown, setWorkspaceDropdown] = useState<{
+    workspaceId: string;
     position: { top: number; left: number };
   } | null>(null);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const workspaceDropdownRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const deleteChat = useDeleteChatMutation();
   const updateChat = useUpdateChatMutation();
   const pinChat = usePinChatMutation();
+  const deleteWorkspace = useDeleteWorkspaceMutation();
+  const updateWorkspace = useUpdateWorkspaceMutation();
 
   const dropdownChat = useMemo(() => {
     if (!dropdown) return null;
@@ -144,14 +174,16 @@ export function Sidebar({
     }
   }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const { pinnedChats, unpinnedGroups } = useMemo(() => {
+  const { pinnedChats, workspaceGroups } = useMemo(() => {
+    const pinned = chats.filter((chat) => !!chat.pinned_at);
+    const unpinned = chats.filter((chat) => !chat.pinned_at);
     return {
-      pinnedChats: chats.filter((chat) => !!chat.pinned_at),
-      unpinnedGroups: groupChatsByDate(chats.filter((chat) => !chat.pinned_at)),
+      pinnedChats: pinned,
+      workspaceGroups: groupChatsByWorkspace(unpinned, workspaces),
     };
-  }, [chats]);
+  }, [chats, workspaces]);
 
-  const hasAnyChats = pinnedChats.length > 0 || unpinnedGroups.length > 0;
+  const hasAnyChats = pinnedChats.length > 0 || workspaceGroups.length > 0;
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -170,6 +202,13 @@ export function Sidebar({
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setDropdown(null);
       }
+      if (
+        workspaceDropdownRef.current &&
+        !workspaceDropdownRef.current.contains(event.target as Node) &&
+        !(event.target as HTMLElement).closest('[data-ws-dropdown-trigger]')
+      ) {
+        setWorkspaceDropdown(null);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -178,15 +217,16 @@ export function Sidebar({
 
   const dropdownStateRef = useRef(dropdown);
   dropdownStateRef.current = dropdown;
+  const wsDropdownStateRef = useRef(workspaceDropdown);
+  wsDropdownStateRef.current = workspaceDropdown;
 
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer) return;
 
     const handleScroll = () => {
-      if (dropdownStateRef.current) {
-        setDropdown(null);
-      }
+      if (dropdownStateRef.current) setDropdown(null);
+      if (wsDropdownStateRef.current) setWorkspaceDropdown(null);
     };
 
     scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
@@ -300,6 +340,78 @@ export function Sidebar({
     [pinChat],
   );
 
+  const toggleWorkspaceCollapse = useCallback((workspaceId: string) => {
+    setCollapsedWorkspaces((prev) => {
+      const next = new Set(prev);
+      if (next.has(workspaceId)) {
+        next.delete(workspaceId);
+      } else {
+        next.add(workspaceId);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleWorkspaceContextMenu = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>, workspaceId: string) => {
+      e.stopPropagation();
+      const rect = e.currentTarget.getBoundingClientRect();
+      setWorkspaceDropdown((prev) => {
+        if (prev?.workspaceId === workspaceId) return null;
+        const position = calculateDropdownPosition(rect);
+        return { workspaceId, position };
+      });
+    },
+    [],
+  );
+
+  const handleRenameWorkspace = useCallback((workspace: Workspace) => {
+    setWorkspaceToRename(workspace);
+    setWorkspaceDropdown(null);
+  }, []);
+
+  const handleSaveWorkspaceRename = useCallback(
+    async (newName: string) => {
+      if (!workspaceToRename) return;
+      try {
+        await updateWorkspace.mutateAsync({
+          workspaceId: workspaceToRename.id,
+          data: { name: newName },
+        });
+        toast.success('Workspace renamed');
+        setWorkspaceToRename(null);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to rename workspace');
+        throw error;
+      }
+    },
+    [workspaceToRename, updateWorkspace],
+  );
+
+  const handleDeleteWorkspace = useCallback((workspaceId: string) => {
+    setWorkspaceToDelete(workspaceId);
+    setWorkspaceDropdown(null);
+  }, []);
+
+  const confirmDeleteWorkspace = useCallback(async () => {
+    if (!workspaceToDelete) return;
+    try {
+      await deleteWorkspace.mutateAsync(workspaceToDelete);
+      toast.success('Workspace deleted');
+
+      if (selectedChatId) {
+        const selectedChat = chats.find((c) => c.id === selectedChatId);
+        if (selectedChat?.workspace_id === workspaceToDelete) {
+          navigate('/');
+        }
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete workspace');
+    } finally {
+      setWorkspaceToDelete(null);
+    }
+  }, [workspaceToDelete, deleteWorkspace, chats, selectedChatId, navigate]);
+
   return (
     <>
       <aside
@@ -362,31 +474,63 @@ export function Sidebar({
                 </div>
               )}
 
-              {unpinnedGroups.map((group) => (
-                <div key={group.label} className="mb-1">
-                  <div className="px-2.5 pb-1 pt-2">
-                    <span className="text-2xs font-medium uppercase tracking-widest text-text-quaternary dark:text-text-dark-quaternary">
-                      {group.label}
-                    </span>
+              {workspaceGroups.map((group) => {
+                const isCollapsed = collapsedWorkspaces.has(group.workspace.id);
+                return (
+                  <div key={group.workspace.id} className="mb-1">
+                    <div className="group flex items-center gap-0.5 px-1 pb-0.5 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleWorkspaceCollapse(group.workspace.id)}
+                        className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-colors duration-200 hover:bg-surface-hover dark:hover:bg-surface-dark-hover"
+                      >
+                        <ChevronRight
+                          className={cn(
+                            'h-3 w-3 shrink-0 text-text-quaternary transition-transform duration-200 dark:text-text-dark-quaternary',
+                            !isCollapsed && 'rotate-90',
+                          )}
+                        />
+                        <FolderOpen className="h-3.5 w-3.5 shrink-0 text-text-tertiary dark:text-text-dark-tertiary" />
+                        <span className="truncate text-xs font-medium text-text-secondary dark:text-text-dark-secondary">
+                          {group.workspace.name}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        data-ws-dropdown-trigger
+                        onClick={(e) => handleWorkspaceContextMenu(e, group.workspace.id)}
+                        className="flex shrink-0 items-center justify-center rounded p-0.5 text-text-quaternary opacity-0 transition-all duration-200 hover:text-text-primary group-hover:opacity-100 dark:text-text-dark-quaternary dark:hover:text-text-dark-primary"
+                      >
+                        <MoreHorizontal className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    {!isCollapsed && (
+                      <div className="space-y-px pl-6">
+                        {group.chats.length === 0 ? (
+                          <p className="px-2.5 py-1 text-2xs text-text-quaternary dark:text-text-dark-quaternary">
+                            No threads
+                          </p>
+                        ) : (
+                          group.chats.map((chat) => (
+                            <SidebarChatItem
+                              key={chat.id}
+                              chat={chat}
+                              isSelected={chat.id === selectedChatId}
+                              isHovered={hoveredChatId === chat.id}
+                              isDropdownOpen={dropdown?.chatId === chat.id}
+                              isChatStreaming={streamingChatIdSet.has(chat.id)}
+                              onSelect={handleChatSelect}
+                              onDropdownClick={handleDropdownClick}
+                              onMouseEnter={handleMouseEnter}
+                              onMouseLeave={handleMouseLeave}
+                            />
+                          ))
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="space-y-px">
-                    {group.chats.map((chat) => (
-                      <SidebarChatItem
-                        key={chat.id}
-                        chat={chat}
-                        isSelected={chat.id === selectedChatId}
-                        isHovered={hoveredChatId === chat.id}
-                        isDropdownOpen={dropdown?.chatId === chat.id}
-                        isChatStreaming={streamingChatIdSet.has(chat.id)}
-                        onSelect={handleChatSelect}
-                        onDropdownClick={handleDropdownClick}
-                        onMouseEnter={handleMouseEnter}
-                        onMouseLeave={handleMouseLeave}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
 
               {hasNextPage && (
                 <div ref={loadMoreRef} className="py-2 text-center">
@@ -416,6 +560,35 @@ export function Sidebar({
         />
       )}
 
+      {workspaceDropdown && (
+        <div
+          ref={workspaceDropdownRef}
+          className="fixed z-50 w-40 rounded-xl border border-border/50 bg-surface-secondary p-1 shadow-medium backdrop-blur-xl dark:border-border-dark/50 dark:bg-surface-dark-secondary"
+          style={{
+            top: workspaceDropdown.position.top,
+            left: workspaceDropdown.position.left,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              const ws = workspaces.find((w) => w.id === workspaceDropdown.workspaceId);
+              if (ws) handleRenameWorkspace(ws);
+            }}
+            className="w-full rounded-md px-2.5 py-1.5 text-left text-xs text-text-secondary transition-colors duration-200 hover:bg-surface-hover dark:text-text-dark-secondary dark:hover:bg-surface-dark-hover"
+          >
+            Rename
+          </button>
+          <button
+            type="button"
+            onClick={() => handleDeleteWorkspace(workspaceDropdown.workspaceId)}
+            className="text-error dark:text-error-dark w-full rounded-md px-2.5 py-1.5 text-left text-xs transition-colors duration-200 hover:bg-surface-hover dark:hover:bg-surface-dark-hover"
+          >
+            Delete
+          </button>
+        </div>
+      )}
+
       <ConfirmDialog
         isOpen={!!chatToDelete}
         onClose={() => setChatToDelete(null)}
@@ -426,12 +599,30 @@ export function Sidebar({
         cancelLabel="Cancel"
       />
 
+      <ConfirmDialog
+        isOpen={!!workspaceToDelete}
+        onClose={() => setWorkspaceToDelete(null)}
+        onConfirm={confirmDeleteWorkspace}
+        title="Delete Workspace"
+        message="Are you sure you want to delete this workspace and all its chats? This action cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+      />
+
       <RenameModal
         isOpen={!!chatToRename}
         onClose={() => setChatToRename(null)}
         onSave={handleSaveRename}
         currentTitle={chatToRename?.title || ''}
         isLoading={updateChat.isPending}
+      />
+
+      <RenameModal
+        isOpen={!!workspaceToRename}
+        onClose={() => setWorkspaceToRename(null)}
+        onSave={handleSaveWorkspaceRename}
+        currentTitle={workspaceToRename?.name || ''}
+        isLoading={updateWorkspace.isPending}
       />
     </>
   );

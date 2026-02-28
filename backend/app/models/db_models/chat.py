@@ -18,6 +18,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base, PG_GEN_UUID
 from app.db.types import GUID, enum_values
+from app.services.sandbox_providers.types import SandboxProviderType
 
 from .enums import AttachmentType, MessageRole, MessageStreamStatus
 
@@ -35,10 +36,8 @@ class Chat(Base):
     user_id: Mapped[UUID] = mapped_column(
         GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    sandbox_id: Mapped[str] = mapped_column(String(128), nullable=False)
-    workspace_path: Mapped[str | None] = mapped_column(String(2048), nullable=True)
-    sandbox_provider: Mapped[str] = mapped_column(
-        String(32), default="docker", server_default="docker", nullable=False
+    workspace_id: Mapped[UUID] = mapped_column(
+        GUID(), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False
     )
     session_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     context_token_usage: Mapped[int] = mapped_column(
@@ -55,27 +54,57 @@ class Chat(Base):
     )
 
     user = relationship("User", back_populates="chats")
+    workspace = relationship("Workspace", back_populates="chats")
     messages = relationship(
         "Message", back_populates="chat", cascade="all, delete-orphan"
     )
 
     __table_args__ = (
-        Index("idx_chats_user_id_sandbox_id", "user_id", "sandbox_id"),
+        Index("idx_chats_workspace_id_deleted_at", "workspace_id", "deleted_at"),
         Index("idx_chats_user_id_deleted_at", "user_id", "deleted_at"),
         Index("idx_chats_user_id_updated_at_desc", "user_id", "updated_at"),
     )
 
+    @property
+    def sandbox_id(self) -> str | None:
+        if self.workspace:
+            sid: str = self.workspace.sandbox_id
+            return sid
+        val: str | None = getattr(self, "_sandbox_id", None)
+        return val
+
+    @property
+    def workspace_path(self) -> str | None:
+        if self.workspace:
+            wp: str = self.workspace.workspace_path
+            return wp
+        val: str | None = getattr(self, "_workspace_path", None)
+        return val
+
+    @property
+    def sandbox_provider(self) -> str:
+        if self.workspace:
+            sp: str = self.workspace.sandbox_provider
+            return sp
+        val: str = getattr(self, "_sandbox_provider", SandboxProviderType.DOCKER.value)
+        return val
+
     @classmethod
     def from_dict(cls, data: dict[str, str | None]) -> "Chat":
-        return cls(
+        chat = cls(
             id=UUID(str(data["id"])),
             user_id=UUID(str(data["user_id"])),
             title=str(data["title"]),
-            sandbox_id=data.get("sandbox_id"),
-            workspace_path=data.get("workspace_path"),
-            sandbox_provider=str(data.get("sandbox_provider", "docker")),
+            workspace_id=UUID(str(data["workspace_id"])),
             session_id=data.get("session_id"),
         )
+        # Stash sandbox fields for streaming runtime (workspace not loaded from DB)
+        chat._sandbox_id = data.get("sandbox_id")
+        chat._workspace_path = data.get("workspace_path")
+        chat._sandbox_provider = str(
+            data.get("sandbox_provider", SandboxProviderType.DOCKER.value)
+        )
+        return chat
 
 
 class Message(Base):

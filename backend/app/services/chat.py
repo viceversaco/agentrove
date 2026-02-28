@@ -4,7 +4,6 @@ import logging
 import math
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -16,6 +15,7 @@ from app.core.config import get_settings
 from app.models.db_models.chat import Chat, Message, MessageAttachment
 from app.models.db_models.enums import MessageRole, MessageStreamStatus, StreamEventKind
 from app.models.db_models.user import User, UserSettings
+from app.models.db_models.workspace import Workspace
 from app.models.schemas.chat import ChatCreate, ChatRequest, ChatUpdate
 from app.models.schemas.pagination import (
     CursorPaginatedResponse,
@@ -28,7 +28,7 @@ from app.models.types import ChatCompletionResult, MessageAttachmentDict
 from app.prompts.system_prompt import build_system_prompt_for_chat
 from app.services.db import BaseDbService, SessionFactoryType
 from app.services.provider import ProviderService
-from app.services.exceptions import ChatException, ErrorCode, SandboxException
+from app.services.exceptions import ChatException, ErrorCode
 from app.services.message import MessageService
 from app.services.sandbox import SandboxService
 from app.services.sandbox_providers import (
@@ -68,6 +68,15 @@ class ChatService(BaseDbService[Chat]):
         self.message_service = MessageService(session_factory=self._session_factory)
         self._provider_service = ProviderService()
 
+    @staticmethod
+    def _sandbox_for_workspace(workspace: Workspace) -> SandboxService:
+        provider = SandboxProviderFactory.create_bound(
+            workspace.sandbox_provider,
+            sandbox_id=workspace.sandbox_id,
+            workspace_path=workspace.workspace_path,
+        )
+        return SandboxService(provider)
+
     @property
     def session_factory(self) -> SessionFactoryType:
         return self._session_factory
@@ -94,6 +103,7 @@ class ChatService(BaseDbService[Chat]):
 
             query = (
                 select(Chat)
+                .options(selectinload(Chat.workspace))
                 .filter(Chat.user_id == user.id, Chat.deleted_at.is_(None))
                 .order_by(Chat.pinned_at.desc().nulls_last(), Chat.updated_at.desc())
                 .offset(offset)
@@ -114,64 +124,28 @@ class ChatService(BaseDbService[Chat]):
         user_settings = await self.user_service.get_user_settings(user.id)
         self._validate_api_keys(user_settings, chat_data.model_id)
 
-        workspace_path = (chat_data.workspace_path or "").strip() or None
-
-        if workspace_path and user_settings.sandbox_provider not in (
-            SandboxProviderType.DOCKER.value,
-            SandboxProviderType.HOST.value,
-        ):
-            raise ChatException(
-                "workspace selection is only supported for Docker and Host providers",
-                error_code=ErrorCode.VALIDATION_ERROR,
-                status_code=400,
-            )
-
-        if workspace_path:
-            resolved_workspace = Path(workspace_path).expanduser().resolve()
-            if not settings.DESKTOP_MODE:
-                workspaces_root = (
-                    Path(settings.STORAGE_PATH) / "workspaces" / str(user.id)
-                ).resolve()
-                if not resolved_workspace.is_relative_to(workspaces_root):
-                    raise ChatException(
-                        "workspace_path must be under the managed workspaces directory",
-                        error_code=ErrorCode.VALIDATION_ERROR,
-                        status_code=400,
-                    )
-            if not resolved_workspace.exists() or not resolved_workspace.is_dir():
-                raise ChatException(
-                    "workspace_path must be an existing directory",
-                    error_code=ErrorCode.VALIDATION_ERROR,
-                    status_code=400,
-                )
-            workspace_path = str(resolved_workspace)
-
-        sandbox_id = await self.sandbox_service.provider.create_sandbox(
-            workspace_path=workspace_path,
-        )
-
-        await self.sandbox_service.initialize_sandbox(
-            sandbox_id=sandbox_id,
-            github_token=user_settings.github_personal_access_token,
-            custom_env_vars=user_settings.custom_env_vars,
-            custom_skills=user_settings.custom_skills,
-            custom_slash_commands=user_settings.custom_slash_commands,
-            custom_agents=user_settings.custom_agents,
-            user_id=str(user.id),
-            auto_compact_disabled=user_settings.auto_compact_disabled,
-            attribution_disabled=user_settings.attribution_disabled,
-            custom_providers=user_settings.custom_providers,
-            gmail_oauth_client=user_settings.gmail_oauth_client,
-            gmail_oauth_tokens=user_settings.gmail_oauth_tokens,
-        )
-
+        # Verify workspace exists and belongs to user
         async with self.session_factory() as db:
+            ws_result = await db.execute(
+                select(Workspace).filter(
+                    Workspace.id == chat_data.workspace_id,
+                    Workspace.user_id == user.id,
+                    Workspace.deleted_at.is_(None),
+                )
+            )
+            workspace = ws_result.scalar_one_or_none()
+            if not workspace:
+                raise ChatException(
+                    "Workspace not found",
+                    error_code=ErrorCode.WORKSPACE_NOT_FOUND,
+                    details={"workspace_id": str(chat_data.workspace_id)},
+                    status_code=404,
+                )
+
             chat = Chat(
                 title=chat_data.title,
                 user_id=user.id,
-                sandbox_id=sandbox_id,
-                workspace_path=workspace_path,
-                sandbox_provider=user_settings.sandbox_provider,
+                workspace_id=workspace.id,
             )
 
             db.add(chat)
@@ -179,7 +153,7 @@ class ChatService(BaseDbService[Chat]):
 
             query = (
                 select(Chat)
-                .options(selectinload(Chat.messages))
+                .options(selectinload(Chat.messages), selectinload(Chat.workspace))
                 .filter(Chat.id == chat.id)
             )
             result = await db.execute(query)
@@ -192,7 +166,9 @@ class ChatService(BaseDbService[Chat]):
     ) -> Chat:
         async with self.session_factory() as db:
             result = await db.execute(
-                select(Chat).filter(
+                select(Chat)
+                .options(selectinload(Chat.workspace))
+                .filter(
                     Chat.id == chat_id,
                     Chat.user_id == user.id,
                     Chat.deleted_at.is_(None),
@@ -233,7 +209,8 @@ class ChatService(BaseDbService[Chat]):
                 .options(
                     selectinload(
                         Chat.messages.and_(Message.deleted_at.is_(None))
-                    ).selectinload(Message.attachments)
+                    ).selectinload(Message.attachments),
+                    selectinload(Chat.workspace),
                 )
             )
             result = await db.execute(query)
@@ -282,21 +259,16 @@ class ChatService(BaseDbService[Chat]):
 
             asyncio.create_task(session_registry.terminate(str(chat_id)))
 
-            if chat.sandbox_id:
-                asyncio.create_task(
-                    self.sandbox_service.delete_sandbox(chat.sandbox_id)
-                )
-
     async def get_chat_sandbox_id(self, chat_id: UUID, user: User) -> str | None:
         async with self.session_factory() as db:
             result = await db.execute(
-                select(Chat)
+                select(Workspace.sandbox_id)
+                .join(Chat, Chat.workspace_id == Workspace.id)
                 .filter(
                     Chat.id == chat_id,
                     Chat.user_id == user.id,
                     Chat.deleted_at.is_(None),
                 )
-                .with_only_columns(Chat.sandbox_id)
             )
             row = result.one_or_none()
 
@@ -308,30 +280,27 @@ class ChatService(BaseDbService[Chat]):
                     status_code=403,
                 )
 
-            sandbox_id_value: str | None = row[0]
-            return sandbox_id_value
+            sandbox_id: str | None = row[0]
+            return sandbox_id
 
     async def delete_all_chats(self, user: User) -> int:
         async with self.session_factory() as db:
-            chat_query = select(Chat.id, Chat.sandbox_id).filter(
+            chat_query = select(Chat.id).filter(
                 Chat.user_id == user.id,
                 Chat.deleted_at.is_(None),
             )
             result = await db.execute(chat_query)
-            rows = result.fetchall()
-            chat_ids = [str(row[0]) for row in rows]
-            sandbox_ids = [row[1] for row in rows if row[1] is not None]
+            chat_ids = [str(row[0]) for row in result.fetchall()]
 
             now = datetime.now(timezone.utc)
 
-            chats_update = (
+            await db.execute(
                 update(Chat)
                 .where(Chat.user_id == user.id, Chat.deleted_at.is_(None))
                 .values(deleted_at=now)
             )
-            await db.execute(chats_update)
 
-            messages_update = (
+            await db.execute(
                 update(Message)
                 .where(
                     Message.chat_id.in_(
@@ -341,17 +310,13 @@ class ChatService(BaseDbService[Chat]):
                 )
                 .values(deleted_at=now)
             )
-            await db.execute(messages_update)
 
             await db.commit()
 
             for cid in chat_ids:
                 asyncio.create_task(session_registry.terminate(cid))
 
-            for sandbox_id in sandbox_ids:
-                asyncio.create_task(self.sandbox_service.delete_sandbox(sandbox_id))
-
-            return len(sandbox_ids)
+            return len(chat_ids)
 
     async def get_chat_messages(
         self, chat_id: UUID, user: User, cursor: str | None = None, limit: int = 20
@@ -364,8 +329,6 @@ class ChatService(BaseDbService[Chat]):
                 details={"chat_id": str(chat_id)},
                 status_code=403,
             )
-
-        asyncio.create_task(self._resume_sandbox(chat_id, user))
 
         return await self.message_service.get_chat_messages(chat_id, cursor, limit)
 
@@ -623,20 +586,32 @@ class ChatService(BaseDbService[Chat]):
 
         chat_id = chat.id
 
+        ws_sandbox = self._sandbox_for_workspace(chat.workspace)
+
         attachments: list[MessageAttachmentDict] | None = None
         if request.attached_files:
+            file_storage = StorageService(ws_sandbox)
             attachments = list(
                 await asyncio.gather(
                     *[
-                        self.storage_service.save_file(
+                        file_storage.save_file(
                             file,
-                            sandbox_id=chat.sandbox_id,
+                            sandbox_id=chat.workspace.sandbox_id,
                             user_id=str(current_user.id),
                         )
                         for file in request.attached_files
                     ]
                 )
             )
+
+        session_id = chat.session_id
+        if session_id and chat.workspace.sandbox_id:
+            if await self._needs_session_cleaning(
+                chat.id, request.model_id, current_user.id
+            ):
+                await ws_sandbox.clean_session_thinking_blocks(
+                    chat.workspace.sandbox_id, session_id
+                )
 
         user_prompt = self._extract_user_prompt(request.prompt)
         ai_prompt = user_prompt
@@ -648,19 +623,10 @@ class ChatService(BaseDbService[Chat]):
             attachments=attachments,
         )
 
-        session_id = chat.session_id
-        if session_id and chat.sandbox_id:
-            if await self._needs_session_cleaning(
-                chat.id, request.model_id, current_user.id
-            ):
-                await self.sandbox_service.clean_session_thinking_blocks(
-                    chat.sandbox_id, session_id
-                )
-
         assistant_message = await self._create_assistant_message(chat, request.model_id)
 
         system_prompt = build_system_prompt_for_chat(
-            chat.sandbox_id or "",
+            chat.workspace.sandbox_id,
             user_settings,
             selected_prompt_name=request.selected_prompt_name,
         )
@@ -698,7 +664,7 @@ class ChatService(BaseDbService[Chat]):
         self, chat_id: UUID, message_id: UUID, current_user: User
     ) -> None:
         chat = await self.get_chat(chat_id, current_user)
-        sandbox_id = chat.sandbox_id
+        sandbox_id = chat.workspace.sandbox_id
 
         async with self.session_factory() as db:
             result = await db.execute(select(Message).filter(Message.id == message_id))
@@ -713,9 +679,8 @@ class ChatService(BaseDbService[Chat]):
                 )
 
             if sandbox_id and message.checkpoint_id:
-                await self.sandbox_service.restore_checkpoint(
-                    sandbox_id, str(message.id)
-                )
+                ws_sandbox = self._sandbox_for_workspace(chat.workspace)
+                await ws_sandbox.restore_checkpoint(sandbox_id, str(message.id))
 
             await self.message_service.delete_messages_after(chat_id, message)
 
@@ -731,8 +696,9 @@ class ChatService(BaseDbService[Chat]):
         self, source_chat_id: UUID, message_id: UUID, user: User
     ) -> tuple[Chat, int]:
         source_chat = await self.get_chat(source_chat_id, user)
+        source_workspace = source_chat.workspace
 
-        if not source_chat.sandbox_id:
+        if not source_workspace.sandbox_id:
             raise ChatException(
                 "Source chat has no sandbox",
                 error_code=ErrorCode.VALIDATION_ERROR,
@@ -751,15 +717,14 @@ class ChatService(BaseDbService[Chat]):
 
         target_message = messages[-1]
 
-        user_settings = await self.user_service.get_user_settings(user.id)
-
-        sandbox_provider = user_settings.sandbox_provider
-        if sandbox_provider != SandboxProviderType.DOCKER.value:
+        if source_workspace.sandbox_provider != SandboxProviderType.DOCKER.value:
             raise ChatException(
                 "Fork is only supported with Docker sandbox provider",
                 error_code=ErrorCode.VALIDATION_ERROR,
                 status_code=400,
             )
+
+        user_settings = await self.user_service.get_user_settings(user.id)
 
         provider = LocalDockerProvider(
             config=SandboxProviderFactory.create_docker_config()
@@ -769,7 +734,7 @@ class ChatService(BaseDbService[Chat]):
         new_sandbox_id: str | None = None
         try:
             new_sandbox_id = await fork_sandbox_service.provider.clone_sandbox(
-                source_chat.sandbox_id,
+                source_workspace.sandbox_id,
                 checkpoint_id=target_message.checkpoint_id,
             )
 
@@ -780,11 +745,23 @@ class ChatService(BaseDbService[Chat]):
             )
 
             async with self.session_factory() as db:
-                new_chat = Chat(
-                    title=f"Fork of {source_chat.title}"[:255],
+                # Create a new workspace for the fork
+                new_workspace = Workspace(
+                    name=f"Fork of {source_workspace.name}"[:255],
                     user_id=user.id,
                     sandbox_id=new_sandbox_id,
                     sandbox_provider=SandboxProviderType.DOCKER.value,
+                    workspace_path=source_workspace.workspace_path,
+                    source_type=source_workspace.source_type,
+                    source_url=source_workspace.source_url,
+                )
+                db.add(new_workspace)
+                await db.flush()
+
+                new_chat = Chat(
+                    title=f"Fork of {source_chat.title}"[:255],
+                    user_id=user.id,
+                    workspace_id=new_workspace.id,
                     session_id=target_message.session_id,
                 )
                 db.add(new_chat)
@@ -831,9 +808,15 @@ class ChatService(BaseDbService[Chat]):
                         att.file_url = AttachmentURL.build_preview_url(att.id)
 
                 await db.commit()
-                await db.refresh(new_chat)
 
-            return (new_chat, len(messages))
+                result = await db.execute(
+                    select(Chat)
+                    .options(selectinload(Chat.workspace))
+                    .filter(Chat.id == new_chat.id)
+                )
+                loaded_chat = result.scalar_one()
+
+            return (loaded_chat, len(messages))
         except Exception:
             if new_sandbox_id:
                 try:
@@ -895,6 +878,7 @@ class ChatService(BaseDbService[Chat]):
         stream_attachments = (
             [dict(item) for item in attachments] if attachments else None
         )
+        workspace = chat.workspace
         request = ChatStreamRequest(
             prompt=prompt,
             system_prompt=system_prompt,
@@ -903,9 +887,10 @@ class ChatService(BaseDbService[Chat]):
                 "id": str(chat.id),
                 "user_id": str(chat.user_id),
                 "title": chat.title,
-                "sandbox_id": chat.sandbox_id,
-                "workspace_path": chat.workspace_path,
-                "sandbox_provider": chat.sandbox_provider,
+                "workspace_id": str(chat.workspace_id),
+                "sandbox_id": workspace.sandbox_id,
+                "workspace_path": workspace.workspace_path,
+                "sandbox_provider": workspace.sandbox_provider,
                 "session_id": chat.session_id,
             },
             permission_mode=permission_mode,
@@ -917,14 +902,6 @@ class ChatService(BaseDbService[Chat]):
             is_custom_prompt=is_custom_prompt,
         )
         ChatStreamRuntime.start_background_chat(request=request)
-
-    async def _resume_sandbox(self, chat_id: UUID, user: User) -> None:
-        try:
-            sandbox_id = await self.get_chat_sandbox_id(chat_id, user)
-            if sandbox_id:
-                await self.sandbox_service.provider.connect_sandbox(sandbox_id)
-        except (ChatException, SandboxException) as e:
-            logger.warning("Failed to resume sandbox for chat %s: %s", chat_id, e)
 
     @staticmethod
     def _extract_user_prompt(message_content: str | None) -> str:
