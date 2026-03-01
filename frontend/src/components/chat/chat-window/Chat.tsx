@@ -3,13 +3,12 @@ import React, {
   useState,
   useCallback,
   useEffect,
+  useLayoutEffect,
   memo,
   useMemo,
-  type ReactNode,
 } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useShallow } from 'zustand/react/shallow';
-import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { isBrowserObjectUrl } from '@/utils/attachmentUrl';
 import { UserMessage, AssistantMessage } from '@/components/chat/message-bubble/Message';
 import { QueueMessageCard } from './QueueMessageCard';
@@ -32,7 +31,7 @@ import { useChatInputMessageContext } from '@/hooks/useChatInputMessageContext';
 import { queryKeys } from '@/hooks/queries/queryKeys';
 
 const AT_BOTTOM_THRESHOLD_PX = 200;
-const INITIAL_FIRST_ITEM_INDEX = 1_000_000;
+const TOP_PAGINATION_TRIGGER_PX = 50;
 const TOP_PAGINATION_ARM_VIEWPORT_MULTIPLIER = 1.5;
 
 const MessageInlinePermission = memo(function MessageInlinePermission() {
@@ -64,11 +63,6 @@ const MessageInlinePermission = memo(function MessageInlinePermission() {
     </div>
   );
 });
-
-interface VirtuosoContextValue {
-  header: ReactNode;
-  footer: ReactNode;
-}
 
 export const Chat = memo(function Chat() {
   const { chatId } = useChatContext();
@@ -155,65 +149,47 @@ export const Chat = memo(function Chat() {
     [chatId, isStreaming, queryClient],
   );
 
-  const virtuosoRef = useRef<VirtuosoHandle | null>(null);
-  const scrollerRef = useRef<HTMLElement | null>(null);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
   const hasInitializedToBottomRef = useRef(false);
   const topPaginationArmedRef = useRef(false);
   const lastScrollTopRef = useRef<number | null>(null);
-  const lastPaginatedMessageIdRef = useRef<string | null>(null);
-  const prependAnchorMessageIdRef = useRef<string | null>(null);
+  const isAtBottomRef = useRef(true);
+  const prevScrollHeightRef = useRef<number | null>(null);
 
-  const [firstItemIndex, setFirstItemIndex] = useState(INITIAL_FIRST_ITEM_INDEX);
   const [showScrollButton, setShowScrollButton] = useState(false);
-  const [scrollerElement, setScrollerElement] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     hasInitializedToBottomRef.current = false;
     topPaginationArmedRef.current = false;
     lastScrollTopRef.current = null;
-    lastPaginatedMessageIdRef.current = null;
-    prependAnchorMessageIdRef.current = null;
+    isAtBottomRef.current = true;
+    prevScrollHeightRef.current = null;
     setShowScrollButton(false);
-    setFirstItemIndex(INITIAL_FIRST_ITEM_INDEX);
   }, [chatId]);
 
-  useEffect(() => {
-    const prependAnchorId = prependAnchorMessageIdRef.current;
-    if (!prependAnchorId || isFetchingNextPage) {
-      return;
-    }
-
-    if (chatId && messages.length > 0 && messages[0]?.chat_id !== chatId) {
-      return;
-    }
-
-    const anchorIndexInCurrent = messages.findIndex((message) => message.id === prependAnchorId);
-    if (anchorIndexInCurrent > 0) {
-      setFirstItemIndex((currentIndex) => currentIndex - anchorIndexInCurrent);
-    }
-
-    prependAnchorMessageIdRef.current = null;
-    lastPaginatedMessageIdRef.current = null;
-  }, [chatId, isFetchingNextPage, messages]);
-
-  const setVirtualScrollerRef = useCallback((ref: HTMLElement | null | Window) => {
-    if (ref instanceof HTMLElement) {
-      scrollerRef.current = ref;
-      lastScrollTopRef.current = ref.scrollTop;
-      setScrollerElement(ref);
-      return;
-    }
-
-    scrollerRef.current = null;
-    lastScrollTopRef.current = null;
-    setScrollerElement(null);
-  }, []);
+  const fetchNextPageRef = useRef(fetchNextPage);
+  const hasNextPageRef = useRef(hasNextPage);
+  const isFetchingNextPageRef = useRef(isFetchingNextPage);
+  fetchNextPageRef.current = fetchNextPage;
+  hasNextPageRef.current = hasNextPage;
+  isFetchingNextPageRef.current = isFetchingNextPage;
 
   const handleScroll = useCallback(() => {
     const container = scrollerRef.current;
     if (!container) return;
 
-    const { scrollTop, clientHeight } = container;
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    const atBottom = distanceFromBottom <= AT_BOTTOM_THRESHOLD_PX;
+
+    if (isAtBottomRef.current !== atBottom) {
+      isAtBottomRef.current = atBottom;
+      setShowScrollButton(!atBottom);
+    }
+
+    if (atBottom) {
+      hasInitializedToBottomRef.current = true;
+    }
 
     if (!hasInitializedToBottomRef.current) {
       lastScrollTopRef.current = scrollTop;
@@ -227,69 +203,68 @@ export const Chat = memo(function Chat() {
       topPaginationArmedRef.current = true;
     }
 
+    if (
+      topPaginationArmedRef.current &&
+      scrollTop < TOP_PAGINATION_TRIGGER_PX &&
+      hasNextPageRef.current &&
+      !isFetchingNextPageRef.current &&
+      fetchNextPageRef.current
+    ) {
+      topPaginationArmedRef.current = false;
+      prevScrollHeightRef.current = container.scrollHeight;
+      void fetchNextPageRef.current();
+    }
+
     lastScrollTopRef.current = scrollTop;
   }, []);
 
+  // Initial scroll to bottom when messages first load
   useEffect(() => {
-    if (!scrollerElement) return;
+    if (hasInitializedToBottomRef.current || messages.length === 0) return;
 
-    scrollerElement.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
+    const container = scrollerRef.current;
+    if (!container) return;
 
-    return () => {
-      scrollerElement.removeEventListener('scroll', handleScroll);
-    };
-  }, [handleScroll, scrollerElement]);
+    // Use requestAnimationFrame to ensure DOM has rendered
+    requestAnimationFrame(() => {
+      container.scrollTop = container.scrollHeight;
+      hasInitializedToBottomRef.current = true;
+    });
+  }, [messages]);
+
+  // Prepend anchoring: restore scroll position after older messages are prepended
+  useLayoutEffect(() => {
+    const prevHeight = prevScrollHeightRef.current;
+    if (prevHeight === null) return;
+
+    const container = scrollerRef.current;
+    if (!container) return;
+
+    container.scrollTop = container.scrollHeight - prevHeight;
+    prevScrollHeightRef.current = null;
+  }, [messages]);
+
+  // Follow output during streaming
+  useEffect(() => {
+    if (isStreaming && isAtBottomRef.current) {
+      const container = scrollerRef.current;
+      if (container) {
+        container.scrollTop = container.scrollHeight;
+      }
+    }
+  }, [messages, isStreaming]);
 
   const scrollToBottom = useCallback(() => {
     setShowScrollButton(false);
-    virtuosoRef.current?.scrollToIndex({
-      index: 'LAST',
-      align: 'end',
-      behavior: 'smooth',
-    });
+    scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: 'smooth' });
   }, []);
 
-  const followOutput = useCallback(
-    (isAtBottom: boolean) => {
-      if (isStreaming && isAtBottom) {
-        return 'auto';
-      }
-
-      return false;
-    },
-    [isStreaming],
-  );
-
-  const handleAtBottomStateChange = useCallback((isAtBottom: boolean) => {
-    setShowScrollButton(!isAtBottom);
-
-    if (isAtBottom) {
-      hasInitializedToBottomRef.current = true;
+  const containerRefCallback = useCallback((node: HTMLDivElement | null) => {
+    scrollerRef.current = node;
+    if (node) {
+      lastScrollTopRef.current = node.scrollTop;
     }
   }, []);
-
-  const handleStartReached = useCallback(() => {
-    if (
-      !topPaginationArmedRef.current ||
-      !hasInitializedToBottomRef.current ||
-      !hasNextPage ||
-      isFetchingNextPage ||
-      !fetchNextPage
-    ) {
-      return;
-    }
-
-    const firstMessageId = messages[0]?.id;
-    if (!firstMessageId || lastPaginatedMessageIdRef.current === firstMessageId) {
-      return;
-    }
-
-    topPaginationArmedRef.current = false;
-    lastPaginatedMessageIdRef.current = firstMessageId;
-    prependAnchorMessageIdRef.current = firstMessageId;
-    void fetchNextPage();
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage, messages]);
 
   const { lastBotMessage, latestUserMessageId } = useMemo(() => {
     let latestAssistantMessage: (typeof messages)[number] | undefined;
@@ -331,7 +306,7 @@ export const Chat = memo(function Chat() {
   const showPermissionAtEnd = canShowPermissionInline && (!lastBotMessageId || lastBotIsStreaming);
 
   const renderMessage = useCallback(
-    (_index: number, msg: (typeof messages)[number]) => {
+    (msg: (typeof messages)[number]) => {
       const messageIsStreaming = streamingMessageIdSet.has(msg.id);
       const isBotMessage = msg.is_bot ?? msg.role === 'assistant';
       const isLastBotMessage = isBotMessage && msg.id === lastBotMessageId;
@@ -411,42 +386,26 @@ export const Chat = memo(function Chat() {
     );
   }, [error, onDismissError, showPermissionAtEnd, showThinking]);
 
-  const virtuosoContext = useMemo<VirtuosoContextValue>(
-    () => ({ header: listHeader, footer: listFooter }),
-    [listFooter, listHeader],
-  );
-
-  const virtuosoComponents = useMemo(
-    () => ({
-      Header: ({ context }: { context: VirtuosoContextValue }) => <>{context.header}</>,
-      Footer: ({ context }: { context: VirtuosoContextValue }) => <>{context.footer}</>,
-    }),
-    [],
-  );
-
   return (
     <div className="relative flex min-w-0 flex-1 flex-col">
       <div className="flex-1 overflow-hidden">
         {isInitialLoading && messages.length === 0 ? (
           <ChatSkeleton messageCount={3} className="py-4" />
         ) : (
-          <Virtuoso
+          <div
             key={chatId ?? 'chat'}
-            ref={virtuosoRef}
+            ref={containerRefCallback}
+            onScroll={handleScroll}
             className="scrollbar-thin scrollbar-thumb-border-secondary dark:scrollbar-thumb-border-dark hover:scrollbar-thumb-text-quaternary dark:hover:scrollbar-thumb-border-dark-hover scrollbar-track-transparent h-full overflow-y-auto overflow-x-hidden"
-            data={messages}
-            firstItemIndex={firstItemIndex}
-            initialTopMostItemIndex={{ index: 'LAST', align: 'end' }}
-            atBottomThreshold={AT_BOTTOM_THRESHOLD_PX}
-            context={virtuosoContext}
-            computeItemKey={(_index, msg) => msg.id}
-            itemContent={renderMessage}
-            startReached={handleStartReached}
-            followOutput={followOutput}
-            atBottomStateChange={handleAtBottomStateChange}
-            scrollerRef={setVirtualScrollerRef}
-            components={virtuosoComponents}
-          />
+          >
+            {listHeader}
+
+            {messages.map((msg) => (
+              <div key={msg.id}>{renderMessage(msg)}</div>
+            ))}
+
+            {listFooter}
+          </div>
         )}
       </div>
       <div className="relative">
