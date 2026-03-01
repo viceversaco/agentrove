@@ -124,7 +124,7 @@ def validate_chat_scoped_token(token: str, expected_chat_id: str) -> bool:
     if payload.get("purpose") != "permission_server":
         return False
 
-    return payload.get("chat_id") == expected_chat_id
+    return bool(payload.get("chat_id") == expected_chat_id)
 
 
 def generate_refresh_token() -> str:
