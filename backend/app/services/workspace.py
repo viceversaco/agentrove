@@ -1,7 +1,10 @@
 import asyncio
+import contextlib
 import logging
 import math
+import os
 import shutil
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
@@ -58,7 +61,9 @@ class WorkspaceService(BaseDbService[Workspace]):
                 )
             normalized_url = self._normalize_git_url(data.git_url)
             workspace_path = await self._clone_git_workspace(
-                user_workspace_dir, normalized_url
+                user_workspace_dir,
+                normalized_url,
+                github_token=user_settings.github_personal_access_token,
             )
             source_url = normalized_url
         elif data.source_type == "local":
@@ -248,9 +253,37 @@ class WorkspaceService(BaseDbService[Workspace]):
                     sandbox_service.delete_sandbox(workspace.sandbox_id)
                 )
 
-    async def _clone_git_workspace(self, user_workspace_dir: Path, git_url: str) -> str:
+    async def _clone_git_workspace(
+        self,
+        user_workspace_dir: Path,
+        git_url: str,
+        github_token: str | None = None,
+    ) -> str:
         repo_name = self._extract_repo_name(git_url)
         workspace_dir = user_workspace_dir / f"{repo_name}-{uuid4().hex[:8]}"
+
+        env = None
+        askpass_path = None
+        if github_token and git_url.startswith("https://"):
+            parsed = urlparse(git_url)
+            if parsed.hostname in ("github.com", "www.github.com"):
+                fd, askpass_path = tempfile.mkstemp(prefix="git-askpass-", suffix=".sh")
+                script = (
+                    "#!/bin/sh\n"
+                    'case "$1" in\n'
+                    '*Username*) echo "x-access-token" ;;\n'
+                    '*Password*) echo "$GIT_PASSWORD" ;;\n'
+                    "esac\n"
+                )
+                os.write(fd, script.encode())
+                os.close(fd)
+                os.chmod(askpass_path, 0o700)
+                env = {
+                    **os.environ,
+                    "GIT_ASKPASS": askpass_path,
+                    "GIT_TERMINAL_PROMPT": "0",
+                    "GIT_PASSWORD": github_token,
+                }
 
         process = await asyncio.create_subprocess_exec(
             "git",
@@ -261,6 +294,7 @@ class WorkspaceService(BaseDbService[Workspace]):
             str(workspace_dir),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            env=env,
         )
 
         try:
@@ -276,6 +310,10 @@ class WorkspaceService(BaseDbService[Workspace]):
                 error_code=ErrorCode.VALIDATION_ERROR,
                 status_code=400,
             ) from exc
+        finally:
+            if askpass_path:
+                with contextlib.suppress(OSError):
+                    os.unlink(askpass_path)
 
         if process.returncode != 0:
             await asyncio.to_thread(shutil.rmtree, workspace_dir, True)
@@ -284,6 +322,8 @@ class WorkspaceService(BaseDbService[Workspace]):
                 or stdout.decode("utf-8", errors="replace").strip()
                 or "Failed to clone repository"
             )
+            if github_token:
+                error_output = error_output.replace(github_token, "***")
             raise WorkspaceException(
                 error_output,
                 error_code=ErrorCode.VALIDATION_ERROR,

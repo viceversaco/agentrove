@@ -29,4 +29,7 @@ export const queryKeys = {
     pluginDetails: (pluginName: string) => ['marketplace', 'plugin', pluginName] as const,
     installed: ['marketplace', 'installed'] as const,
   },
+  github: {
+    repos: (query: string) => ['github-repos', query] as const,
+  },
 } as const;

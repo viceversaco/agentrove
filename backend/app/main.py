@@ -18,6 +18,7 @@ from app.api.endpoints import (
     auth,
     chat,
     commands,
+    github,
     integrations,
     marketplace,
     mcps,
@@ -187,6 +188,11 @@ def create_application() -> FastAPI:
         integrations.router,
         prefix=f"{settings.API_V1_STR}/integrations",
         tags=["Integrations"],
+    )
+    application.include_router(
+        github.router,
+        prefix=f"{settings.API_V1_STR}/github",
+        tags=["GitHub"],
     )
     application.openapi = partial(custom_openapi, application)
 

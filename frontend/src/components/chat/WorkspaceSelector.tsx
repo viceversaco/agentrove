@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, memo } from 'react';
 import toast from 'react-hot-toast';
-import { FolderOpen, Search, GitBranch, Plus, Box, HardDrive } from 'lucide-react';
+import { FolderOpen, Search, GitBranch, Plus, Box, HardDrive, Lock, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/primitives/Button';
 import { BaseModal } from '@/components/ui/shared/BaseModal';
 import { ModalHeader } from '@/components/ui/shared/ModalHeader';
@@ -9,7 +9,9 @@ import {
   useCreateWorkspaceMutation,
 } from '@/hooks/queries/useWorkspaceQueries';
 import { useSettingsQuery } from '@/hooks/queries/useSettingsQueries';
+import { useGitHubReposQuery } from '@/hooks/queries/useGitHubQueries';
 import type { Workspace } from '@/types/workspace.types';
+import type { GitHubRepo } from '@/types/github.types';
 import { formatRelativeTime } from '@/utils/date';
 import { cn } from '@/utils/cn';
 import { isTauri } from '@tauri-apps/api/core';
@@ -64,6 +66,72 @@ function sourceIcon(sourceType: string | null | undefined) {
   }
 }
 
+const GitHubRepoItem = memo(function GitHubRepoItem({
+  repo,
+  onSelect,
+  isCloning,
+}: {
+  repo: GitHubRepo;
+  onSelect: (cloneUrl: string, name: string) => void | Promise<void>;
+  isCloning: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={isCloning}
+      onClick={() => onSelect(repo.clone_url, repo.name)}
+      className="flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors duration-200 hover:bg-surface-hover disabled:opacity-50 dark:hover:bg-surface-dark-hover"
+    >
+      <GitBranch className="mt-0.5 h-3.5 w-3.5 shrink-0 text-text-quaternary dark:text-text-dark-quaternary" />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <span className="truncate text-xs text-text-primary dark:text-text-dark-primary">
+            {repo.full_name}
+          </span>
+          {repo.private && (
+            <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-surface-tertiary px-1.5 py-0.5 text-2xs text-text-tertiary dark:bg-surface-dark-tertiary dark:text-text-dark-tertiary">
+              <Lock className="h-2.5 w-2.5" />
+              private
+            </span>
+          )}
+        </div>
+        {repo.description && (
+          <p className="truncate text-2xs text-text-quaternary dark:text-text-dark-quaternary">
+            {repo.description}
+          </p>
+        )}
+        <div className="flex items-center gap-1.5 text-2xs text-text-quaternary dark:text-text-dark-quaternary">
+          {repo.language && <span>{repo.language}</span>}
+          {repo.pushed_at && (
+            <>
+              {repo.language && <span>·</span>}
+              <span>{formatRelativeTime(repo.pushed_at)}</span>
+            </>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+});
+
+const SKELETON_ITEMS = [0, 1, 2];
+
+function RepoListSkeleton() {
+  return (
+    <div className="flex flex-col gap-2">
+      {SKELETON_ITEMS.map((i) => (
+        <div key={i} className="flex items-start gap-2.5 px-2.5 py-2">
+          <div className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-pulse rounded bg-surface-tertiary dark:bg-surface-dark-tertiary" />
+          <div className="flex-1 space-y-1.5">
+            <div className="h-3 w-2/3 animate-pulse rounded bg-surface-tertiary dark:bg-surface-dark-tertiary" />
+            <div className="h-2.5 w-full animate-pulse rounded bg-surface-tertiary dark:bg-surface-dark-tertiary" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 interface WorkspaceSelectorProps {
   selectedWorkspaceId: string | null;
   onWorkspaceChange: (workspaceId: string | null) => void;
@@ -83,6 +151,7 @@ export function WorkspaceSelector({
   const createWorkspace = useCreateWorkspaceMutation();
 
   const defaultProvider = settings?.sandbox_provider ?? 'docker';
+  const hasGitHubToken = Boolean(settings?.github_personal_access_token);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -90,10 +159,23 @@ export function WorkspaceSelector({
   const [emptyName, setEmptyName] = useState('');
   const [gitUrl, setGitUrl] = useState('');
   const [sandboxProvider, setSandboxProvider] = useState<'docker' | 'host'>(defaultProvider);
+  const [repoSearchQuery, setRepoSearchQuery] = useState('');
+  const [debouncedRepoQuery, setDebouncedRepoQuery] = useState('');
+  const [showUrlInput, setShowUrlInput] = useState(false);
 
   useEffect(() => {
     setSandboxProvider(defaultProvider);
   }, [defaultProvider]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedRepoQuery(repoSearchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [repoSearchQuery]);
+
+  const { data: reposData, isLoading: reposLoading } = useGitHubReposQuery(
+    debouncedRepoQuery,
+    creationMode === 'git' && hasGitHubToken && !showUrlInput,
+  );
 
   const workspaces = workspacesData?.items ?? [];
   const selectedWorkspace = workspaces.find((ws) => ws.id === selectedWorkspaceId);
@@ -112,6 +194,9 @@ export function WorkspaceSelector({
     setEmptyName('');
     setGitUrl('');
     setSandboxProvider(defaultProvider);
+    setRepoSearchQuery('');
+    setDebouncedRepoQuery('');
+    setShowUrlInput(false);
   }, [defaultProvider]);
 
   const selectWorkspace = useCallback(
@@ -161,26 +246,34 @@ export function WorkspaceSelector({
     }
   }, [createWorkspace, sandboxProvider, onWorkspaceChange, closeModal]);
 
+  const cloneRepo = useCallback(
+    async (url: string, name: string) => {
+      try {
+        const workspace = await createWorkspace.mutateAsync({
+          name,
+          source_type: 'git',
+          git_url: url,
+          sandbox_provider: sandboxProvider,
+        });
+        onWorkspaceChange(workspace.id);
+        closeModal();
+        toast.success('Repository cloned');
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to clone repository');
+      }
+    },
+    [createWorkspace, sandboxProvider, onWorkspaceChange, closeModal],
+  );
+
   const handleCloneGit = useCallback(async () => {
     const normalizedGitUrl = gitUrl.trim();
     if (!normalizedGitUrl) {
       toast.error('Enter a Git repository URL');
       return;
     }
-    try {
-      const workspace = await createWorkspace.mutateAsync({
-        name: normalizedGitUrl.split('/').pop()?.replace('.git', '') || 'Git Project',
-        source_type: 'git',
-        git_url: normalizedGitUrl,
-        sandbox_provider: sandboxProvider,
-      });
-      onWorkspaceChange(workspace.id);
-      closeModal();
-      toast.success('Repository cloned');
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to clone repository');
-    }
-  }, [createWorkspace, gitUrl, sandboxProvider, onWorkspaceChange, closeModal]);
+    const name = normalizedGitUrl.split('/').pop()?.replace('.git', '') || 'Git Project';
+    await cloneRepo(normalizedGitUrl, name);
+  }, [gitUrl, cloneRepo]);
 
   const label = selectedWorkspace?.name || 'Select workspace';
 
@@ -327,20 +420,87 @@ export function WorkspaceSelector({
               </div>
             ) : creationMode === 'git' ? (
               <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2 text-xs text-text-secondary dark:text-text-dark-secondary">
-                  <GitBranch className="h-3.5 w-3.5 text-text-quaternary dark:text-text-dark-quaternary" />
-                  Clone Git repo
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs text-text-secondary dark:text-text-dark-secondary">
+                    <GitBranch className="h-3.5 w-3.5 text-text-quaternary dark:text-text-dark-quaternary" />
+                    Clone Git repo
+                  </div>
+                  {hasGitHubToken && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowUrlInput(!showUrlInput);
+                        setRepoSearchQuery('');
+                        setGitUrl('');
+                      }}
+                      className="text-2xs text-text-quaternary transition-colors duration-200 hover:text-text-secondary dark:text-text-dark-quaternary dark:hover:text-text-dark-secondary"
+                    >
+                      {showUrlInput ? 'Browse repos' : 'Paste URL'}
+                    </button>
+                  )}
                 </div>
-                <input
-                  value={gitUrl}
-                  onChange={(e) => setGitUrl(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') void handleCloneGit();
-                  }}
-                  placeholder="https://github.com/org/repo.git"
-                  autoFocus
-                  className="bg-surface-primary dark:bg-surface-dark-primary h-8 w-full rounded-lg border border-border/50 px-3 font-mono text-xs text-text-primary outline-none placeholder:text-text-quaternary focus-visible:border-border-hover dark:border-border-dark/50 dark:text-text-dark-primary dark:placeholder:text-text-dark-quaternary dark:focus-visible:border-border-dark-hover"
-                />
+
+                {hasGitHubToken && !showUrlInput ? (
+                  <>
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-quaternary dark:text-text-dark-quaternary" />
+                      <input
+                        value={repoSearchQuery}
+                        onChange={(e) => setRepoSearchQuery(e.target.value)}
+                        placeholder="Search repositories…"
+                        autoFocus
+                        className="bg-surface-primary dark:bg-surface-dark-primary h-8 w-full rounded-lg border border-border/50 pl-8 pr-3 text-xs text-text-primary outline-none placeholder:text-text-quaternary focus-visible:border-border-hover dark:border-border-dark/50 dark:text-text-dark-primary dark:placeholder:text-text-dark-quaternary dark:focus-visible:border-border-dark-hover"
+                      />
+                    </div>
+                    <div className="max-h-[12rem] overflow-y-auto">
+                      {createWorkspace.isPending ? (
+                        <div className="flex items-center justify-center gap-2 px-2.5 py-6">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-text-quaternary dark:text-text-dark-quaternary" />
+                          <span className="text-xs text-text-tertiary dark:text-text-dark-tertiary">
+                            Cloning repository…
+                          </span>
+                        </div>
+                      ) : reposLoading ? (
+                        <RepoListSkeleton />
+                      ) : !reposData?.items.length ? (
+                        <p className="px-2.5 py-4 text-center text-2xs text-text-quaternary dark:text-text-dark-quaternary">
+                          {debouncedRepoQuery ? 'No repositories found' : 'No repositories'}
+                        </p>
+                      ) : (
+                        <div className="flex flex-col gap-0.5">
+                          {reposData.items.map((repo) => (
+                            <GitHubRepoItem
+                              key={repo.full_name}
+                              repo={repo}
+                              onSelect={cloneRepo}
+                              isCloning={createWorkspace.isPending}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <input
+                      value={gitUrl}
+                      onChange={(e) => setGitUrl(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') void handleCloneGit();
+                      }}
+                      placeholder="https://github.com/org/repo.git"
+                      autoFocus
+                      disabled={createWorkspace.isPending}
+                      className="bg-surface-primary dark:bg-surface-dark-primary h-8 w-full rounded-lg border border-border/50 px-3 font-mono text-xs text-text-primary outline-none placeholder:text-text-quaternary focus-visible:border-border-hover disabled:opacity-50 dark:border-border-dark/50 dark:text-text-dark-primary dark:placeholder:text-text-dark-quaternary dark:focus-visible:border-border-dark-hover"
+                    />
+                    {!hasGitHubToken && (
+                      <p className="text-2xs text-text-quaternary dark:text-text-dark-quaternary">
+                        Add a GitHub token in Settings to browse repos
+                      </p>
+                    )}
+                  </>
+                )}
+
                 <ProviderToggle value={sandboxProvider} onChange={setSandboxProvider} />
                 <div className="flex items-center justify-end gap-2">
                   <Button
@@ -350,18 +510,22 @@ export function WorkspaceSelector({
                     onClick={() => {
                       setCreationMode('menu');
                       setGitUrl('');
+                      setRepoSearchQuery('');
+                      setShowUrlInput(false);
                     }}
                   >
                     Cancel
                   </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => void handleCloneGit()}
-                    isLoading={createWorkspace.isPending}
-                  >
-                    Clone
-                  </Button>
+                  {(showUrlInput || !hasGitHubToken) && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => void handleCloneGit()}
+                      isLoading={createWorkspace.isPending}
+                    >
+                      Clone
+                    </Button>
+                  )}
                 </div>
               </div>
             ) : (
