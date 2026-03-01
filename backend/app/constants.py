@@ -1,4 +1,9 @@
+from pathlib import Path
 from typing import Final
+
+HOST_REQUIRED_PATH_PREFIX: Final[str] = (
+    f"{Path.home()}/.local/bin:/opt/homebrew/bin:/usr/local/bin"
+)
 
 MAX_RESOURCE_NAME_LENGTH: Final[int] = 50
 MIN_RESOURCE_NAME_LENGTH: Final[int] = 2

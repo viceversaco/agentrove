@@ -22,6 +22,7 @@ from app.constants import (
     CHECKPOINT_BASE_DIR,
     DOCKER_AVAILABLE_PORTS,
     EXCLUDED_PREVIEW_PORTS,
+    HOST_REQUIRED_PATH_PREFIX,
     OPENVSCODE_PORT,
     SANDBOX_BASHRC_PATH,
     SANDBOX_BINARY_EXTENSIONS,
@@ -66,7 +67,6 @@ LISTENING_PORTS_COMMAND = (
         " | grep -E '^[0-9]+$' | sort -u"
     )
 )
-HOST_REQUIRED_PATH_PREFIX = f"{Path.home()}/.local/bin:/opt/homebrew/bin:/usr/local/bin"
 
 
 class LocalHostProvider(SandboxProvider):

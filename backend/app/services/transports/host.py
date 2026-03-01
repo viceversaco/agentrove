@@ -10,7 +10,7 @@ from pathlib import Path
 from claude_agent_sdk._errors import CLIConnectionError, ProcessError
 from claude_agent_sdk.types import ClaudeAgentOptions
 
-from app.constants import SANDBOX_HOME_DIR
+from app.constants import HOST_REQUIRED_PATH_PREFIX, SANDBOX_HOME_DIR
 from app.core.config import get_settings
 from app.services.transports.base import BaseSandboxTransport
 
@@ -80,11 +80,13 @@ class HostSandboxTransport(BaseSandboxTransport):
 
         command_args = shlex.split(self._build_command())
         envs, cwd, requested_user = self._prepare_environment()
+        current_path = os.environ.get("PATH", "")
         env = {
             **os.environ,
             **envs,
             "HOME": str(self._sandbox_dir),
             "USER": requested_user,
+            "PATH": f"{HOST_REQUIRED_PATH_PREFIX}:{current_path}",
         }
         run_user = self._resolve_run_user(requested_user)
 
