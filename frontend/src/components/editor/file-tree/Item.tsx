@@ -22,7 +22,7 @@ export const Item = memo(function Item({ item, level, searchQuery = '', matchedP
   const isExpanded = isFolder && !!expandedFolders[item.path];
   const isSelected = selectedFile?.path === item.path;
 
-  const indentStyle = useMemo(() => ({ paddingLeft: `${level * 10 + 6}px` }), [level]);
+  const indentStyle = useMemo(() => ({ paddingLeft: `${level * 8 + 4}px` }), [level]);
 
   const handleClick = useCallback(() => {
     if (isFolder) {
@@ -39,7 +39,7 @@ export const Item = memo(function Item({ item, level, searchQuery = '', matchedP
         onClick={handleClick}
         variant="unstyled"
         className={cn(
-          'flex w-full items-center gap-1.5 px-1.5 py-[3px] text-left',
+          'flex w-full items-center gap-1 px-1.5 py-[3px] text-left',
           'rounded-md transition-colors duration-150',
           'hover:bg-surface-hover dark:hover:bg-surface-dark-hover',
           isSelected &&

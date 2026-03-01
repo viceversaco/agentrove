@@ -1,5 +1,6 @@
-import { memo, useState, useCallback } from 'react';
+import { memo, useState, useCallback, useRef } from 'react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
+import type { ImperativePanelHandle } from 'react-resizable-panels';
 import { Tree } from '../file-tree/Tree';
 import { View } from '../editor-view/View';
 import type { FileStructure } from '@/types/file-system.types';
@@ -40,6 +41,18 @@ export const CodeView = memo(function CodeView({
   const backgroundClass = theme === 'light' ? 'bg-surface-secondary' : 'bg-surface-dark-secondary';
   const isMobile = useIsMobile();
   const [showMobileTree, setShowMobileTree] = useState(false);
+  const fileTreePanelRef = useRef<ImperativePanelHandle>(null);
+  const [isFileTreeCollapsed, setIsFileTreeCollapsed] = useState(false);
+
+  const handleToggleFileTree = useCallback(() => {
+    const panel = fileTreePanelRef.current;
+    if (!panel) return;
+    if (panel.isCollapsed()) {
+      panel.expand();
+    } else {
+      panel.collapse();
+    }
+  }, []);
 
   const handleMobileFileSelect = useCallback(
     (file: FileStructure | null) => {
@@ -104,7 +117,16 @@ export const CodeView = memo(function CodeView({
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden">
       <PanelGroup direction="horizontal" autoSaveId="code-view-layout">
-        <Panel defaultSize={20} minSize={15} maxSize={40}>
+        <Panel
+          ref={fileTreePanelRef}
+          defaultSize={20}
+          minSize={15}
+          maxSize={40}
+          collapsible
+          collapsedSize={0}
+          onCollapse={() => setIsFileTreeCollapsed(true)}
+          onExpand={() => setIsFileTreeCollapsed(false)}
+        >
           <div
             className={`h-full overflow-hidden border-r border-border dark:border-border-dark ${backgroundClass}`}
           >
@@ -119,6 +141,7 @@ export const CodeView = memo(function CodeView({
               isSandboxSyncing={isSandboxSyncing}
               onRefresh={onRefresh}
               isRefreshing={isRefreshing}
+              onClose={handleToggleFileTree}
             />
           </div>
         </Panel>
@@ -141,6 +164,7 @@ export const CodeView = memo(function CodeView({
               fileStructure={files}
               sandboxId={sandboxId}
               chatId={chatId}
+              onToggleFileTree={isFileTreeCollapsed ? handleToggleFileTree : undefined}
             />
           </div>
         </Panel>

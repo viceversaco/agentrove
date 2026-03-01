@@ -1,4 +1,4 @@
-import { Download, Loader2, RefreshCw, X } from 'lucide-react';
+import { Download, Loader2, PanelLeftClose, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/primitives/Button';
 import { SearchInput } from './SearchInput';
 
@@ -70,10 +70,10 @@ export function Header({
               onClick={onClose}
               variant="unstyled"
               className="rounded-md p-1 text-text-quaternary transition-colors duration-200 hover:text-text-secondary dark:text-text-dark-quaternary dark:hover:text-text-dark-secondary"
-              title="Close"
+              title="Close file tree"
               aria-label="Close file tree"
             >
-              <X className="h-3 w-3" />
+              <PanelLeftClose className="h-3 w-3" />
             </Button>
           )}
         </div>
