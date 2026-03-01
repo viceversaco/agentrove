@@ -125,12 +125,12 @@ function DropdownInner<T>({
   const labelClasses = showIconOnly
     ? forceCompact
       ? 'hidden whitespace-nowrap text-2xs font-medium text-text-primary dark:text-text-dark-secondary'
-      : 'hidden lg:inline whitespace-nowrap text-2xs font-medium text-text-primary dark:text-text-dark-secondary'
+      : 'hidden sm:inline whitespace-nowrap text-2xs font-medium text-text-primary dark:text-text-dark-secondary'
     : 'whitespace-nowrap text-2xs font-medium text-text-primary dark:text-text-dark-secondary';
   const chevronClasses = showIconOnly
     ? forceCompact
       ? 'hidden'
-      : 'hidden lg:block h-3 w-3 flex-shrink-0 text-text-quaternary dark:text-text-dark-quaternary transition-transform duration-200'
+      : 'hidden sm:block h-3 w-3 flex-shrink-0 text-text-quaternary dark:text-text-dark-quaternary transition-transform duration-200'
     : 'h-3 w-3 flex-shrink-0 text-text-quaternary dark:text-text-dark-quaternary transition-transform duration-200';
 
   return (
@@ -146,7 +146,7 @@ function DropdownInner<T>({
       >
         {LeftIcon && (
           <LeftIcon
-            className={`h-3 w-3 text-text-tertiary dark:text-text-dark-tertiary${forceCompact ? '' : 'lg:hidden'}`}
+            className={`h-3 w-3 text-text-tertiary dark:text-text-dark-tertiary${forceCompact ? '' : 'sm:hidden'}`}
           />
         )}
         <span className={labelClasses}>
