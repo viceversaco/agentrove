@@ -58,6 +58,13 @@ class SessionRegistry:
         session = self._sessions.get(chat_id)
         fingerprint = self._compute_fingerprint(options)
 
+        # Transport may be dead if the underlying container vanished
+        # (e.g. removed externally). Reuse would leave stale callbacks
+        # spinning in the event loop — tear down and recreate instead.
+        if session is not None and not session.transport.is_ready():
+            await self._close_session(session)
+            session = None
+
         if session is not None and session.fingerprint != fingerprint:
             await self._close_session(session)
             session = None

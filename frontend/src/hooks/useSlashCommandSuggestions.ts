@@ -30,6 +30,21 @@ const SLASH_COMMANDS: SlashCommand[] = [
     label: 'Init',
     description: 'Initialize a new CLAUDE.md file with codebase documentation',
   },
+  {
+    value: '/debug',
+    label: 'Debug',
+    description: 'Debug you current Claude code session',
+  },
+  {
+    value: '/security-review',
+    label: 'Security Review',
+    description: 'Complete a security review of the pending changes on the current branch',
+  },
+  {
+    value: '/insights',
+    label: 'Insights',
+    description: 'Generate a report analyzing your Claude code sessions',
+  },
 ];
 
 interface UseSlashCommandOptions {

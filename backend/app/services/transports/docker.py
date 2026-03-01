@@ -199,3 +199,4 @@ class DockerSandboxTransport(BaseSandboxTransport):
             )
         finally:
             self._ready = False
+            await self._put_sentinel()
