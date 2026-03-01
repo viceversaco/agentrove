@@ -9,7 +9,7 @@ from uuid import UUID
 from cryptography.fernet import Fernet
 from fastapi import Depends, HTTPException, Query, status
 from fastapi_users.password import PasswordHelper
-from jose import jwt
+from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -52,16 +52,10 @@ def get_password_hash(password: str) -> str:
     return str(password_helper.hash(password))
 
 
-def create_chat_scoped_token(chat_id: str, expires_minutes: int | None = None) -> str:
-    if expires_minutes is None:
-        expires_minutes = settings.CHAT_SCOPED_TOKEN_EXPIRE_MINUTES
-    expires_delta = timedelta(minutes=expires_minutes)
-    expire = datetime.now(timezone.utc) + expires_delta
-
+def create_chat_scoped_token(chat_id: str) -> str:
     token_data = {
         "chat_id": chat_id,
         "purpose": "permission_server",
-        "exp": expire,
     }
 
     return cast(
@@ -123,19 +117,14 @@ def validate_chat_scoped_token(token: str, expected_chat_id: str) -> bool:
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
-
-        if payload.get("purpose") != "permission_server":
-            return False
-
-        token_chat_id = payload.get("chat_id")
-        if token_chat_id != expected_chat_id:
-            return False
-
-        return True
-
-    except Exception as e:
-        logger.warning("Chat-scoped token validation failed: %s", e)
+    except JWTError as e:
+        logger.warning("Chat-scoped token decode failed: %s", e)
         return False
+
+    if payload.get("purpose") != "permission_server":
+        return False
+
+    return bool(payload.get("chat_id") == expected_chat_id)
 
 
 def generate_refresh_token() -> str:

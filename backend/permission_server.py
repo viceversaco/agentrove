@@ -95,9 +95,10 @@ async def handle_call_tool(
                 )
 
                 if create_response.status_code != 200:
+                    detail = create_response.text[:200]
                     response = {
                         "behavior": "deny",
-                        "message": f"Failed to create permission request: {create_response.status_code}",
+                        "message": f"Failed to create permission request: {create_response.status_code} - {detail}",
                     }
                     return [types.TextContent(type="text", text=json.dumps(response))]
 
@@ -117,9 +118,10 @@ async def handle_call_tool(
                     return [types.TextContent(type="text", text=json.dumps(response))]
 
                 if get_response.status_code != 200:
+                    detail = get_response.text[:200]
                     response = {
                         "behavior": "deny",
-                        "message": f"Failed to get permission response: {get_response.status_code}",
+                        "message": f"Failed to get permission response: {get_response.status_code} - {detail}",
                     }
                     return [types.TextContent(type="text", text=json.dumps(response))]
 

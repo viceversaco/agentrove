@@ -697,7 +697,7 @@ CONTEXT_USAGE_CACHE_TTL_SECONDS=600
 | `CONTEXT_WINDOW_TOKENS` | `200000` | Maximum context window size in tokens |
 | `TASK_TTL_SECONDS` | `3600` | Background task TTL (1 hour) |
 | `PERMISSION_REQUEST_TTL_SECONDS` | `300` | Permission request expiration (5 minutes) |
-| `CHAT_SCOPED_TOKEN_EXPIRE_MINUTES` | `1440` | Chat-scoped token expiration (24 hours) |
+
 | `CHAT_REVOKED_KEY_TTL_SECONDS` | `3600` | Revoked chat key TTL (1 hour) |
 | `USER_SETTINGS_CACHE_TTL_SECONDS` | `300` | User settings cache TTL (5 minutes) |
 | `MODELS_CACHE_TTL_SECONDS` | `3600` | AI models cache TTL (1 hour) |
