@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import fnmatch
 import logging
 import posixpath
 import shlex
@@ -132,33 +133,87 @@ class SandboxProvider(ABC):
             logger.error("Error cleaning up PTY session %s", session_id)
 
     @staticmethod
-    def _build_gitignore_patterns(gitignore_content: str) -> list[str]:
-        patterns: list[str] = []
+    def _build_gitignore_patterns(
+        gitignore_content: str,
+    ) -> tuple[list[str], list[str]]:
+        # Gitignore-like (not strict Git) negation handling: we allow
+        # negations to re-include children of excluded parent directories
+        # (e.g. ".claude/" + "!.claude/plans/" shows plans/), which real
+        # Git does not support without first un-ignoring the parent.
+        # Directory-only semantics (trailing /) are also not enforced.
+        rules: list[tuple[bool, str]] = []
         for raw_line in gitignore_content.splitlines():
             line = raw_line.strip()
-            if not line or line.startswith("#") or line.startswith("!"):
+            if not line or line.startswith("#"):
                 continue
+            if line.startswith("!"):
+                neg = line[1:].strip().lstrip("/").rstrip("/")
+                if neg:
+                    rules.append((True, neg))
+            else:
+                normalized = line.lstrip("/")
+                if normalized:
+                    rules.append((False, normalized))
 
-            normalized = line.lstrip("/")
-            if not normalized:
+        patterns = SandboxProvider._expand_ignore_rules(rules)
+        exceptions = SandboxProvider._build_negation_exceptions(rules)
+        return patterns, exceptions
+
+    @staticmethod
+    def _expand_ignore_rules(rules: list[tuple[bool, str]]) -> list[str]:
+        patterns: list[str] = []
+        for is_neg, rule in rules:
+            if is_neg:
                 continue
-
-            if normalized.startswith("*."):
-                patterns.append(normalized)
+            if rule.startswith("*."):
+                patterns.append(rule)
                 continue
-
-            if normalized.endswith("/"):
-                folder = normalized.rstrip("/")
+            if rule.endswith("/"):
+                folder = rule.rstrip("/")
                 if not folder:
                     continue
                 patterns.extend([folder, f"{folder}/*", f"*/{folder}", f"*/{folder}/*"])
                 continue
-
-            patterns.extend(
-                [normalized, f"{normalized}/*", f"*/{normalized}", f"*/{normalized}/*"]
-            )
-
+            patterns.extend([rule, f"{rule}/*", f"*/{rule}", f"*/{rule}/*"])
         return list(dict.fromkeys(patterns))
+
+    @staticmethod
+    def _build_negation_exceptions(rules: list[tuple[bool, str]]) -> list[str]:
+        # A negation is only active if no later ignore rule
+        # re-matches the negated path (last rule wins).
+        active: list[str] = []
+        for idx, (is_neg, rule) in enumerate(rules):
+            if not is_neg:
+                continue
+            neg_basename = rule.rsplit("/", 1)[-1]
+            overridden = False
+            for later_is_neg, later in rules[idx + 1 :]:
+                if later_is_neg:
+                    continue
+                later_norm = later.rstrip("/")
+                if (
+                    fnmatch.fnmatch(rule, later_norm)
+                    or fnmatch.fnmatch(neg_basename, later_norm)
+                    or rule.startswith(f"{later_norm}/")
+                ):
+                    overridden = True
+                    break
+            if not overridden:
+                active.append(rule)
+
+        exceptions: list[str] = []
+        for neg in active:
+            if "/" in neg:
+                # Path negation: include ancestors so find can descend
+                # into parent dirs before reaching the negated subtree.
+                parts = neg.split("/")
+                for i in range(len(parts)):
+                    exceptions.append("/".join(parts[: i + 1]))
+                exceptions.append(f"{neg}/*")
+            else:
+                # Basename negation: match in any subdirectory.
+                exceptions.extend([neg, f"*/{neg}", f"{neg}/*", f"*/{neg}/*"])
+        return exceptions
 
     @staticmethod
     def _read_global_gitignore() -> str:
@@ -189,7 +244,7 @@ class SandboxProvider(ABC):
 
     async def _get_gitignore_patterns(
         self, sandbox_id: str, path: str = SANDBOX_HOME_DIR
-    ) -> list[str]:
+    ) -> tuple[list[str], list[str]]:
         cmd = f"cd {shlex.quote(path)} && {GITIGNORE_CMD}"
         result = await self.execute_command(
             sandbox_id,
@@ -201,7 +256,7 @@ class SandboxProvider(ABC):
         if global_ignore:
             parts = f"{parts}\n{global_ignore}"
         if not parts.strip():
-            return []
+            return [], []
         return self._build_gitignore_patterns(parts)
 
     @abstractmethod
@@ -255,27 +310,47 @@ class SandboxProvider(ABC):
     ) -> FileContent:
         pass
 
+    @staticmethod
+    def _find_prune_condition(p: str) -> str:
+        if p.startswith("*.") or p.startswith("."):
+            return f"-name {shlex.quote(p)}"
+        return f"-path {shlex.quote(p)}"
+
     async def list_files(
         self,
         sandbox_id: str,
         path: str = SANDBOX_HOME_DIR,
         excluded_patterns: list[str] | None = None,
     ) -> list[FileMetadata]:
-        patterns = list(excluded_patterns or [])
-        patterns.extend(await self._get_gitignore_patterns(sandbox_id, path))
-        patterns = list(dict.fromkeys(patterns))
+        caller_patterns = list(dict.fromkeys(excluded_patterns or []))
+        gitignore_patterns, exceptions = await self._get_gitignore_patterns(
+            sandbox_id, path
+        )
 
-        if patterns:
-            prune_conditions = [
-                f"-name {shlex.quote(p)}"
-                if p.startswith("*.") or p.startswith(".")
-                else f"-path {shlex.quote(p)}"
-                for p in patterns
-            ]
-            prune_expr = " -o ".join(prune_conditions)
+        prune_parts: list[str] = []
+        if caller_patterns:
+            caller_expr = " -o ".join(
+                self._find_prune_condition(p) for p in caller_patterns
+            )
+            prune_parts.append(f"\\( {caller_expr} \\)")
+        if gitignore_patterns:
+            gi_expr = " -o ".join(
+                self._find_prune_condition(p) for p in gitignore_patterns
+            )
+            exception_expr = ""
+            if exceptions:
+                exception_parts = [
+                    f"! -path {shlex.quote(f'{path}/{e}')}" for e in exceptions
+                ]
+                exception_expr = " " + " ".join(exception_parts)
+            prune_parts.append(f"\\( {gi_expr} \\){exception_expr}")
+
+        if prune_parts:
+            combined = " -o ".join(prune_parts)
             find_command = (
                 f"find {shlex.quote(path)} "
-                f"\\( {prune_expr} \\) -prune -o -printf '%p\\t%y\\t%s\\t%T@\\n'"
+                f"\\( {combined} \\) "
+                f"-prune -o -printf '%p\\t%y\\t%s\\t%T@\\n'"
             )
         else:
             find_command = f"find {shlex.quote(path)} -printf '%p\\t%y\\t%s\\t%T@\\n'"

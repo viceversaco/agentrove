@@ -267,17 +267,37 @@ class LocalHostProvider(SandboxProvider):
         return FileContent(path=path, content=content, type="file", is_binary=is_binary)
 
     @staticmethod
-    def _is_excluded_path(rel_path: str, name: str, patterns: list[str]) -> bool:
+    def _is_excluded_path(
+        rel_path: str,
+        name: str,
+        caller_patterns: list[str],
+        gitignore_patterns: list[str],
+        exceptions: list[str],
+    ) -> bool:
         full_path = f"{SANDBOX_HOME_DIR}/{rel_path}"
+        if any(
+            fnmatch.fnmatch(full_path, p)
+            or fnmatch.fnmatch(rel_path, p)
+            or fnmatch.fnmatch(name, p)
+            for p in caller_patterns
+        ):
+            return True
+        if any(fnmatch.fnmatch(rel_path, exc) for exc in exceptions):
+            return False
         return any(
-            fnmatch.fnmatch(full_path, pattern)
-            or fnmatch.fnmatch(rel_path, pattern)
-            or fnmatch.fnmatch(name, pattern)
-            for pattern in patterns
+            fnmatch.fnmatch(full_path, p)
+            or fnmatch.fnmatch(rel_path, p)
+            or fnmatch.fnmatch(name, p)
+            for p in gitignore_patterns
         )
 
     @staticmethod
-    def _walk_files(sandbox_dir: Path, patterns: list[str]) -> list[FileMetadata]:
+    def _walk_files(
+        sandbox_dir: Path,
+        caller_patterns: list[str],
+        gitignore_patterns: list[str],
+        exceptions: list[str],
+    ) -> list[FileMetadata]:
         items: list[FileMetadata] = []
         for root, dirnames, filenames in os.walk(sandbox_dir, topdown=True):
             root_path = Path(root)
@@ -287,7 +307,9 @@ class LocalHostProvider(SandboxProvider):
             kept_dirnames: list[str] = []
             for dirname in dirnames:
                 rel = f"{root_rel}/{dirname}" if root_rel else dirname
-                if LocalHostProvider._is_excluded_path(rel, dirname, patterns):
+                if LocalHostProvider._is_excluded_path(
+                    rel, dirname, caller_patterns, gitignore_patterns, exceptions
+                ):
                     continue
 
                 dir_path = root_path / dirname
@@ -310,7 +332,9 @@ class LocalHostProvider(SandboxProvider):
 
             for filename in filenames:
                 rel = f"{root_rel}/{filename}" if root_rel else filename
-                if LocalHostProvider._is_excluded_path(rel, filename, patterns):
+                if LocalHostProvider._is_excluded_path(
+                    rel, filename, caller_patterns, gitignore_patterns, exceptions
+                ):
                     continue
 
                 file_path = root_path / filename
@@ -339,12 +363,17 @@ class LocalHostProvider(SandboxProvider):
         excluded_patterns: list[str] | None = None,
     ) -> list[FileMetadata]:
         sandbox_dir = self._resolve_sandbox_dir(sandbox_id)
-        patterns = list(excluded_patterns or [])
-        patterns.extend(
-            await self._get_gitignore_patterns(sandbox_id, str(sandbox_dir))
+        caller_patterns = list(dict.fromkeys(excluded_patterns or []))
+        gitignore_patterns, exceptions = await self._get_gitignore_patterns(
+            sandbox_id, str(sandbox_dir)
         )
-        patterns = list(dict.fromkeys(patterns))
-        return await asyncio.to_thread(self._walk_files, sandbox_dir, patterns)
+        return await asyncio.to_thread(
+            self._walk_files,
+            sandbox_dir,
+            caller_patterns,
+            gitignore_patterns,
+            exceptions,
+        )
 
     @staticmethod
     def _resize_fd(fd: int, rows: int, cols: int) -> None:
