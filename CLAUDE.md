@@ -23,17 +23,6 @@
 - Manual edits to generated Alembic migrations are allowed when necessary for correctness
 - Run Alembic migration commands inside the Docker backend container (not on host)
 
-## Test Workflow
-
-- Run all backend test commands inside the Docker backend container (not on host)
-- Do not run `pytest` directly on the host machine
-- Run backend static checks (`ruff`, `mypy`) inside the Docker backend container (not on host)
-- Do not run `ruff` or `mypy` directly on the host machine
-- Use Docker-based commands such as `docker compose exec api pytest ...`
-- Use Docker-based commands such as `docker compose exec api ruff check ...`
-- Run frontend type checks via `docker compose exec frontend npx tsc --noEmit`
-- Run frontend lint via `docker compose exec frontend npx eslint src/`
-
 ## Code Style
 
 - Always choose the smallest, simplest fix that solves the problem — do not refactor, restructure, or add abstractions as part of a bug fix; if a one-line guard or a single conditional handles it, prefer that over reworking control flow
@@ -218,6 +207,10 @@
 ### Complexity test
 Before flagging or fixing an issue, ask: "If this fails, does the user lose data or get stuck?" If the answer is no (e.g., an orphaned row, a briefly stale UI element), skip it. If the answer is yes (e.g., a queued message is silently dropped, the stream appears frozen), fix it.
 
+## Verification
+
+- Do not run tests, lints, type checks, or any similar verification commands unless explicitly asked
+
 ## Completion Quality Gate
 
 - Do not leave dead code behind. If a change makes code unused, remove it in the same task (unused functions, exports, imports, constants, types, files, and stale wrappers).
@@ -225,5 +218,4 @@ Before flagging or fixing an issue, ask: "If this fails, does the user lose data
 - Before finishing, verify all newly created or modified code paths:
   - Confirm new symbols are referenced (or intentionally public and documented).
   - Confirm replaced symbols were removed and references updated.
-  - Run relevant checks (at minimum targeted type/lint/test commands for the changed area).
 - If something is intentionally left unused for compatibility, state that explicitly in the final summary.
