@@ -1,10 +1,12 @@
 import { apiClient } from '@/lib/api';
-import { ensureResponse, serviceCall } from '@/services/base/BaseService';
+import { buildQueryString, ensureResponse, serviceCall } from '@/services/base/BaseService';
 import { NotFoundError, ValidationError } from '@/services/base/ServiceError';
 import type { PreviewLinksResponse } from '@/types/chat.types';
 import type {
+  DiffMode,
   FileContent,
   FileMetadata,
+  GitDiffData,
   PortInfo,
   Secret,
   UpdateFileResult,
@@ -215,6 +217,16 @@ async function getBrowserStatus(sandboxId: string): Promise<BrowserStatus> {
   });
 }
 
+async function getGitDiff(sandboxId: string, mode: DiffMode = 'all'): Promise<GitDiffData> {
+  validateRequired(sandboxId, 'Sandbox ID');
+
+  return serviceCall(async () => {
+    const qs = buildQueryString({ mode });
+    const response = await apiClient.get<GitDiffData>(`/sandbox/${sandboxId}/git/diff${qs}`);
+    return response ?? { diff: '', has_changes: false, is_git_repo: false };
+  });
+}
+
 export const sandboxService = {
   getPreviewLinks,
   getSandboxFilesMetadata,
@@ -231,4 +243,5 @@ export const sandboxService = {
   startBrowser,
   stopBrowser,
   getBrowserStatus,
+  getGitDiff,
 };

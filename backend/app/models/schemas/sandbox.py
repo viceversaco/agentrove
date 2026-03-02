@@ -67,3 +67,10 @@ class StartBrowserRequest(BaseModel):
 class BrowserStatusResponse(BaseModel):
     running: bool
     current_url: str | None = None
+
+
+class GitDiffResponse(BaseModel):
+    diff: str
+    has_changes: bool
+    is_git_repo: bool
+    error: str | None = None

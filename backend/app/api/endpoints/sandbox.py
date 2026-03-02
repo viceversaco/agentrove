@@ -1,5 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from typing import Literal
 
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+
+from app.constants import SANDBOX_HOME_DIR, SANDBOX_WORKSPACE_DIR
 from app.core.deps import get_sandbox_service, validate_sandbox_ownership
 from app.models.schemas.chat import PortPreviewLink, PreviewLinksResponse
 from app.models.schemas.sandbox import (
@@ -7,6 +10,7 @@ from app.models.schemas.sandbox import (
     BrowserStatusResponse,
     FileContentResponse,
     FileMetadata,
+    GitDiffResponse,
     IDEUrlResponse,
     SandboxFilesMetadataResponse,
     StartBrowserRequest,
@@ -240,6 +244,72 @@ async def download_sandbox_files(
             headers={
                 "Content-Disposition": f'attachment; filename="sandbox_{sandbox_id}.zip"'
             },
+        )
+    except SandboxException as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+
+
+@router.get("/{sandbox_id}/git/diff", response_model=GitDiffResponse)
+async def get_git_diff(
+    sandbox_id: str = Depends(validate_sandbox_ownership),
+    sandbox_service: SandboxService = Depends(get_sandbox_service),
+    mode: Literal["all", "staged", "unstaged", "branch"] = Query("all"),
+) -> GitDiffResponse:
+    # Workspace is mounted at /home/user/workspace in Docker containers;
+    # cd there first, falling back to /home/user for non-Docker sandboxes.
+    cd_prefix = f"cd {SANDBOX_WORKSPACE_DIR} 2>/dev/null || cd {SANDBOX_HOME_DIR}; "
+    try:
+        check = await sandbox_service.execute_command(
+            sandbox_id,
+            f"{cd_prefix}git rev-parse --is-inside-work-tree 2>/dev/null",
+        )
+        if check.exit_code != 0:
+            return GitDiffResponse(diff="", has_changes=False, is_git_repo=False)
+
+        untracked_diff = (
+            " git ls-files --others --exclude-standard -z"
+            " | xargs -0 -I{} git diff --no-index -- /dev/null {} 2>/dev/null"
+        )
+
+        if mode == "branch":
+            # Diff current HEAD against the merge-base with the default branch.
+            # Detect default branch via the remote HEAD symref, falling back to main/master.
+            cmd = (
+                "base=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/||');"
+                " [ -z \"$base\" ] && base=$(git branch -r 2>/dev/null | grep -oE 'origin/(main|master|develop|trunk)' | head -1 | tr -d ' ');"
+                ' [ -z "$base" ] && for b in main master develop trunk; do'
+                " git rev-parse --verify $b >/dev/null 2>&1 && base=$b && break; done;"
+                ' if [ -z "$base" ]; then exit 2; fi;'
+                ' merge_base=$(git merge-base "$base" HEAD 2>/dev/null || echo "$base");'
+                ' git diff "$merge_base" HEAD 2>/dev/null'
+            )
+        elif mode == "staged":
+            cmd = "git diff --cached 2>/dev/null"
+        elif mode == "unstaged":
+            cmd = f"git diff 2>/dev/null;{untracked_diff}"
+        else:
+            cmd = (
+                "{ git diff HEAD 2>/dev/null"
+                " || { git diff --cached 2>/dev/null; git diff 2>/dev/null; }; };"
+                f"{untracked_diff}"
+            )
+
+        result = await sandbox_service.execute_command(sandbox_id, f"{cd_prefix}{cmd}")
+        if mode == "branch" and result.exit_code == 2:
+            return GitDiffResponse(
+                diff="",
+                has_changes=False,
+                is_git_repo=True,
+                error="Could not determine base branch",
+            )
+        diff_output = result.stdout
+        return GitDiffResponse(
+            diff=diff_output,
+            has_changes=bool(diff_output.strip()),
+            is_git_repo=True,
         )
     except SandboxException as e:
         raise HTTPException(

@@ -39,6 +39,7 @@ export interface ThinkingModeState {
 export type ViewType =
   | 'agent'
   | 'browser'
+  | 'diff'
   | 'editor'
   | 'ide'
   | 'terminal'

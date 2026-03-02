@@ -40,6 +40,9 @@ const MobilePreviewView = lazy(() =>
 const BrowserView = lazy(() =>
   import('@/components/views/BrowserView').then((m) => ({ default: m.BrowserView })),
 );
+const DiffView = lazy(() =>
+  import('@/components/views/DiffView').then((m) => ({ default: m.DiffView })),
+);
 const TerminalContainer = lazy(() =>
   import('@/components/sandbox/terminal/Container').then((m) => ({ default: m.Container })),
 );
@@ -226,6 +229,12 @@ export function ChatPage() {
           return (
             <Suspense fallback={viewLoadingFallback}>
               <BrowserView sandboxId={currentChat?.sandbox_id} isActive={true} />
+            </Suspense>
+          );
+        case 'diff':
+          return (
+            <Suspense fallback={viewLoadingFallback}>
+              <DiffView sandboxId={currentChat?.sandbox_id} />
             </Suspense>
           );
         default:

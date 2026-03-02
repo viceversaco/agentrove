@@ -37,3 +37,12 @@ export interface UpdateFileResult {
   success: boolean;
   message: string;
 }
+
+export type DiffMode = 'all' | 'staged' | 'unstaged' | 'branch';
+
+export interface GitDiffData {
+  diff: string;
+  has_changes: boolean;
+  is_git_repo: boolean;
+  error?: string;
+}

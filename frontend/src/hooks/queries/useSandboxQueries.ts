@@ -2,8 +2,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UseMutationOptions, UseQueryOptions } from '@tanstack/react-query';
 import { sandboxService } from '@/services/sandboxService';
 import type {
+  DiffMode,
   FileContent,
   FileMetadata,
+  GitDiffData,
   PortInfo,
   Secret,
   UpdateFileResult,
@@ -145,6 +147,20 @@ export const useDeleteSecretMutation = (
   options?: UseMutationOptions<void, Error, { sandboxId: string; key: string }>,
 ) =>
   useSecretMutation(({ sandboxId, key }) => sandboxService.deleteSecret(sandboxId, key), options);
+
+export const useGitDiffQuery = (
+  sandboxId: string,
+  mode: DiffMode = 'all',
+  options?: Partial<UseQueryOptions<GitDiffData>>,
+) => {
+  return useQuery({
+    queryKey: queryKeys.sandbox.gitDiff(sandboxId, mode),
+    queryFn: () => sandboxService.getGitDiff(sandboxId, mode),
+    enabled: !!sandboxId,
+    staleTime: 30_000,
+    ...options,
+  });
+};
 
 interface BrowserStatus {
   running: boolean;
