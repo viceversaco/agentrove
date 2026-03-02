@@ -20,11 +20,13 @@ export const PreviewContainer = memo(function PreviewContainer({
 }: PreviewContainerProps) {
   return (
     <div className={`flex flex-col ${previewBackgroundClass} h-full ${className}`}>
-      <PreviewHeader
-        fileName={fileName}
-        isFullscreen={isFullscreen}
-        onToggleFullscreen={onToggleFullscreen}
-      />
+      {isFullscreen && (
+        <PreviewHeader
+          fileName={fileName}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={onToggleFullscreen}
+        />
+      )}
 
       {disableContentWrapper ? (
         children

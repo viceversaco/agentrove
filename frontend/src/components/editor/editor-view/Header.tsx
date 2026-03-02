@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { AlertTriangle, Code, FileText, Save, Loader2, PanelLeft } from 'lucide-react';
+import { AlertTriangle, Code, FileText, Save, Loader2, PanelLeft, Maximize2 } from 'lucide-react';
 import type { FileStructure } from '@/types/file-system.types';
 import { Button } from '@/components/ui/primitives/Button';
 import { isPreviewableFile } from '@/utils/fileTypes';
@@ -15,6 +15,7 @@ export interface HeaderProps {
   isSaving?: boolean;
   onSave?: () => void;
   onToggleFileTree?: () => void;
+  onToggleFullscreen?: () => void;
 }
 
 export const Header = memo(function Header({
@@ -27,6 +28,7 @@ export const Header = memo(function Header({
   isSaving = false,
   onSave,
   onToggleFileTree,
+  onToggleFullscreen,
 }: HeaderProps) {
   const isPreviewable = selectedFile ? isPreviewableFile(selectedFile) : false;
 
@@ -97,7 +99,7 @@ export const Header = memo(function Header({
             {showPreview ? (
               <>
                 <Code className="h-3 w-3" />
-                Code
+                Raw
               </>
             ) : (
               <>
@@ -105,6 +107,18 @@ export const Header = memo(function Header({
                 Preview
               </>
             )}
+          </Button>
+        )}
+
+        {showPreview && onToggleFullscreen && (
+          <Button
+            onClick={onToggleFullscreen}
+            variant="unstyled"
+            className="rounded-md p-1 text-text-tertiary transition-colors duration-200 hover:bg-surface-hover hover:text-text-primary dark:text-text-dark-tertiary dark:hover:bg-surface-dark-hover dark:hover:text-text-dark-primary"
+            title="Enter fullscreen"
+            aria-label="Enter fullscreen"
+          >
+            <Maximize2 className="h-3 w-3" />
           </Button>
         )}
       </div>

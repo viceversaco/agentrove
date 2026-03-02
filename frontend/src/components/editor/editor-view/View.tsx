@@ -154,6 +154,37 @@ export const View = memo(function View({
     [setupEditorTheme],
   );
 
+  const [isPreviewFullscreen, setIsPreviewFullscreen] = useState(false);
+
+  const handleTogglePreviewFullscreen = useCallback(() => {
+    setIsPreviewFullscreen((prev) => !prev);
+  }, []);
+
+  useEffect(() => {
+    if (!showPreview) {
+      setIsPreviewFullscreen(false);
+    }
+  }, [showPreview]);
+
+  useEffect(() => {
+    setIsPreviewFullscreen(false);
+  }, [selectedFile?.path]);
+
+  useEffect(() => {
+    if (!isPreviewFullscreen) return;
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsPreviewFullscreen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isPreviewFullscreen]);
+
   const isValidFile =
     selectedFile && findFileInStructure(fileStructure, selectedFile.path) !== undefined;
 
@@ -186,6 +217,9 @@ export const View = memo(function View({
         isSaving={updateFileMutation.isPending}
         onSave={handleUpdateFile}
         onToggleFileTree={onToggleFileTree}
+        onToggleFullscreen={
+          isPreviewable && showPreview ? handleTogglePreviewFullscreen : undefined
+        }
       />
 
       <div className="relative flex-1 overflow-hidden">
@@ -210,7 +244,11 @@ export const View = memo(function View({
 
         {isPreviewable && showPreview && fileForPreview && (
           <div className="h-full">
-            <FilePreview file={fileForPreview} showPreview={showPreview} />
+            <FilePreview
+              file={fileForPreview}
+              isFullscreen={isPreviewFullscreen}
+              onToggleFullscreen={handleTogglePreviewFullscreen}
+            />
           </div>
         )}
       </div>

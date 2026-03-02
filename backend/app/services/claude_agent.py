@@ -173,10 +173,13 @@ class ClaudeAgentService:
         result: StreamResult,
         session_callback: Callable[[str], None] | None = None,
         attachments: list[dict[str, Any]] | None = None,
+        attachment_base_dir: str = SANDBOX_HOME_DIR,
     ) -> AsyncIterator[StreamEvent]:
         # Send a prompt to the Claude SDK client and yield processed stream
         # events, handling plan mode transitions on tool success/failure.
-        user_prompt = self.prepare_user_prompt(prompt, custom_instructions, attachments)
+        user_prompt = self.prepare_user_prompt(
+            prompt, custom_instructions, attachments, attachment_base_dir
+        )
 
         prompt_message = {
             "type": "user",
@@ -527,6 +530,7 @@ class ClaudeAgentService:
         prompt: str,
         custom_instructions: str | None,
         attachments: list[dict[str, Any]] | None = None,
+        attachment_base_dir: str = SANDBOX_HOME_DIR,
     ) -> str:
         # Wrap the raw user prompt with XML-tagged context (instructions,
         # attachments) so the SDK can distinguish each section.
@@ -545,9 +549,11 @@ class ClaudeAgentService:
 
         if attachments:
             # Uploaded files are copied to the sandbox home dir with their
-            # original filename — reference that path so Claude can find them.
+            # UUID-based filename — reference the correct base path so Claude
+            # can find them (host mode uses the real workspace path, Docker
+            # uses /home/user).
             files_list = "\n".join(
-                f"- {SANDBOX_HOME_DIR}/{attachment['file_path'].split('/')[-1]}"
+                f"- {attachment_base_dir}/{attachment['file_path'].split('/')[-1]}"
                 for attachment in attachments
             )
             parts.append(

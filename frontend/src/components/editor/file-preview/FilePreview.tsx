@@ -1,4 +1,4 @@
-import { memo, useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
+import { memo, useMemo, lazy, Suspense } from 'react';
 import type { ComponentType } from 'react';
 import { createPortal } from 'react-dom';
 import type { FileStructure } from '@/types/file-system.types';
@@ -55,57 +55,29 @@ const previewRenderers: PreviewRenderer[] = [
 
 export interface FilePreviewProps {
   file: FileStructure;
-  showPreview: boolean;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
 }
 
-export const FilePreview = memo(function FilePreview({ file, showPreview }: FilePreviewProps) {
-  const [isFullscreen, setIsFullscreen] = useState(false);
-
+export const FilePreview = memo(function FilePreview({
+  file,
+  isFullscreen = false,
+  onToggleFullscreen,
+}: FilePreviewProps) {
   const matchedPreview = useMemo(() => previewRenderers.find(({ match }) => match(file)), [file]);
 
-  const PreviewComponent = matchedPreview?.Component;
+  const MatchedComponent = matchedPreview?.Component;
 
-  const handleToggleFullscreen = useCallback(() => {
-    setIsFullscreen((prev) => !prev);
-  }, []);
-
-  useEffect(() => {
-    if (typeof document === 'undefined' || !isFullscreen) {
-      return;
-    }
-
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsFullscreen(false);
-      }
-    };
-
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [isFullscreen]);
-
-  useEffect(() => {
-    if (!showPreview) {
-      setIsFullscreen(false);
-    }
-  }, [showPreview]);
-
-  useEffect(() => {
-    setIsFullscreen(false);
-  }, [file.path]);
-
-  if (!showPreview || !PreviewComponent) {
+  if (!MatchedComponent) {
     return null;
   }
 
   const previewContent = (
     <Suspense fallback={null}>
-      <PreviewComponent
+      <MatchedComponent
         file={file}
         isFullscreen={isFullscreen}
-        onToggleFullscreen={handleToggleFullscreen}
+        onToggleFullscreen={onToggleFullscreen}
       />
     </Suspense>
   );

@@ -14,7 +14,12 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import selectinload
 
-from app.constants import REDIS_KEY_CHAT_CONTEXT_USAGE, REDIS_KEY_CHAT_STREAM_LIVE
+from app.constants import (
+    REDIS_KEY_CHAT_CONTEXT_USAGE,
+    REDIS_KEY_CHAT_STREAM_LIVE,
+    SANDBOX_HOME_DIR,
+)
+from app.services.sandbox_providers import SandboxProviderType
 from app.core.config import get_settings
 from app.db.session import SessionLocal
 from app.models.db_models.chat import Chat, Message
@@ -1041,6 +1046,11 @@ class ChatStreamRuntime:
                             params.options.permission_mode
                         )
                     stream_result = StreamResult()
+                    attachment_base_dir = SANDBOX_HOME_DIR
+                    if runtime.chat.sandbox_provider == SandboxProviderType.HOST:
+                        attachment_base_dir = (
+                            runtime.chat.workspace_path or SANDBOX_HOME_DIR
+                        )
                     stream = ai_service.stream_response(
                         client=session.client,
                         prompt=request.prompt,
@@ -1049,6 +1059,7 @@ class ChatStreamRuntime:
                         result=stream_result,
                         session_callback=session_callback,
                         attachments=request.attachments,
+                        attachment_base_dir=attachment_base_dir,
                     )
                     return await runtime.run(ai_service, stream_result, stream)
                 except (

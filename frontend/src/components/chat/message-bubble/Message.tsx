@@ -99,7 +99,7 @@ export const AssistantMessage = memo(function AssistantMessage({
           </div>
 
           {contentText.trim() && !isStreaming && (
-            <div className="mt-2 flex items-center justify-between opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+            <div className="mt-2 flex items-center justify-between">
               <MessageActions
                 messageId={id}
                 contentText={contentText}
