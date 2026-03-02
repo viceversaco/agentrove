@@ -16,8 +16,8 @@ export const SlashCommandsPanel = memo(function SlashCommandsPanel({
   if (suggestions.length === 0) return null;
 
   return (
-    <div className="absolute bottom-full left-0 right-0 z-20 mb-2">
-      <div className="rounded-lg border border-border bg-surface shadow-sm dark:border-border-dark dark:bg-surface-dark">
+    <div className="absolute bottom-full left-0 right-0 z-40 mb-2">
+      <div className="max-h-64 overflow-y-auto rounded-lg border border-border bg-surface shadow-sm dark:border-border-dark dark:bg-surface-dark">
         <div className="py-1" role="listbox">
           {suggestions.map((command, index) => {
             const isActive = index === highlightedIndex;
