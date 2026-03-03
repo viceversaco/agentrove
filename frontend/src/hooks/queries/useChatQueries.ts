@@ -209,6 +209,7 @@ export const useDeleteChatMutation = (options?: UseMutationOptions<void, Error, 
       queryClient.removeQueries({ queryKey: queryKeys.chat(chatId) });
       queryClient.removeQueries({ queryKey: queryKeys.messages(chatId) });
       queryClient.removeQueries({ queryKey: queryKeys.contextUsage(chatId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
       useMessageQueueStore.getState().cleanupChat(chatId);
 
       if (onSuccess) {
@@ -227,6 +228,7 @@ export const useDeleteAllChatsMutation = (options?: UseMutationOptions<void, Err
     mutationFn: () => chatService.deleteAllChats(),
     onSuccess: async (data, variables, context, mutation) => {
       queryClient.removeQueries({ queryKey: [queryKeys.chats] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
       if (onSuccess) {
         await onSuccess(data, variables, context, mutation);
       }
