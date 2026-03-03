@@ -365,9 +365,7 @@ class ChatService(BaseDbService[Chat]):
                         workspace_path=ws.workspace_path,
                     )
                     sandbox_service = SandboxService(provider)
-                    asyncio.create_task(
-                        sandbox_service.delete_sandbox(ws.sandbox_id)
-                    )
+                    asyncio.create_task(sandbox_service.delete_sandbox(ws.sandbox_id))
 
             return len(chat_ids)
 

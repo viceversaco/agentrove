@@ -56,7 +56,9 @@ class SkillService:
 
         return name
 
-    find_item_index_by_name = BaseMarkdownResourceService.find_item_index_by_name
+    find_item_index_by_name = staticmethod(
+        BaseMarkdownResourceService.find_item_index_by_name
+    )
 
     def validate_exact_sanitized_name(self, name: str) -> None:
         if self.sanitize_name(name) != name:
