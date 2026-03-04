@@ -357,82 +357,77 @@ class SandboxService:
         if not enabled_skills and not enabled_commands and not enabled_agents:
             return
 
-        zip_buffer = io.BytesIO()
-        has_content = False
+        writes: list[tuple[str, str | bytes]] = []
 
-        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-            for skill in enabled_skills:
-                skill_name = skill["name"]
-                local_zip_path = Path(skill["path"])
+        for skill in enabled_skills:
+            skill_name = skill["name"]
+            local_zip_path = Path(skill["path"])
 
-                if not local_zip_path.exists():
-                    logger.warning(
-                        "Skill ZIP not found: %s at %s", skill_name, local_zip_path
-                    )
-                    continue
+            if not local_zip_path.exists():
+                logger.warning(
+                    "Skill ZIP not found: %s at %s", skill_name, local_zip_path
+                )
+                continue
 
-                with zipfile.ZipFile(local_zip_path, "r") as skill_zip:
-                    for item in skill_zip.namelist():
-                        content = skill_zip.read(item)
-                        zf.writestr(f".claude/skills/{skill_name}/{item}", content)
-                        has_content = True
+            with zipfile.ZipFile(local_zip_path, "r") as skill_zip:
+                # Strip the skill-name prefix if the zip nests files under it
+                prefix = f"{skill_name}/"
+                for entry in skill_zip.namelist():
+                    if entry.endswith("/"):
+                        continue
+                    file_bytes = skill_zip.read(entry)
+                    rel = entry[len(prefix) :] if entry.startswith(prefix) else entry
+                    remote_path = f"{SANDBOX_CLAUDE_DIR}/skills/{skill_name}/{rel}"
+                    writes.append((remote_path, file_bytes))
 
-            for command in enabled_commands:
-                command_name = command["name"]
-                local_path = Path(command["path"])
+        for command in enabled_commands:
+            command_name = command["name"]
+            local_path = Path(command["path"])
 
-                if not local_path.exists():
-                    logger.warning(
-                        "Command not found: %s at %s", command_name, local_path
-                    )
-                    continue
+            if not local_path.exists():
+                logger.warning("Command not found: %s at %s", command_name, local_path)
+                continue
 
-                command_content = local_path.read_text(encoding="utf-8")
-                zf.writestr(f".claude/commands/{command_name}.md", command_content)
-                has_content = True
+            command_content = local_path.read_text(encoding="utf-8")
+            writes.append(
+                (f"{SANDBOX_CLAUDE_DIR}/commands/{command_name}.md", command_content)
+            )
 
-            for agent in enabled_agents:
-                agent_name = agent["name"]
-                local_path = Path(agent["path"])
+        for agent in enabled_agents:
+            agent_name = agent["name"]
+            local_path = Path(agent["path"])
 
-                if not local_path.exists():
-                    logger.warning("Agent not found: %s at %s", agent_name, local_path)
-                    continue
+            if not local_path.exists():
+                logger.warning("Agent not found: %s at %s", agent_name, local_path)
+                continue
 
-                agent_content = local_path.read_text(encoding="utf-8")
-                zf.writestr(f".claude/agents/{agent_name}.md", agent_content)
-                has_content = True
+            agent_content = local_path.read_text(encoding="utf-8")
+            writes.append(
+                (f"{SANDBOX_CLAUDE_DIR}/agents/{agent_name}.md", agent_content)
+            )
 
-        if not has_content:
+        if not writes:
             return
 
-        zip_buffer.seek(0)
-        zip_content = zip_buffer.getvalue()
-        encoded_content = base64.b64encode(zip_content).decode("utf-8")
-
-        remote_zip_path = f"{SANDBOX_HOME_DIR}/_resources_{uuid.uuid4().hex[:8]}.zip"
-        temp_b64_path = f"{remote_zip_path}.b64tmp"
-
         try:
-            await self.provider.write_file(sandbox_id, temp_b64_path, encoded_content)
-            decode_and_extract_cmd = (
-                f"base64 -d {shlex.quote(temp_b64_path)} > {shlex.quote(remote_zip_path)} && "
-                f"unzip -q -o {shlex.quote(remote_zip_path)} -d {SANDBOX_HOME_DIR} && "
-                f"rm -f {shlex.quote(remote_zip_path)} {shlex.quote(temp_b64_path)}"
-            )
-            await self.execute_command(sandbox_id, decode_and_extract_cmd)
+            async with asyncio.TaskGroup() as tg:
+                for remote_path, content in writes:
+                    tg.create_task(
+                        self.provider.write_file(sandbox_id, remote_path, content)
+                    )
 
             resource_count = (
                 len(enabled_skills) + len(enabled_commands) + len(enabled_agents)
             )
             logger.info(
-                "Copied %d resources to sandbox %s in single upload",
+                "Deployed %d resources (%d files) to sandbox %s",
                 resource_count,
+                len(writes),
                 sandbox_id,
             )
         except Exception as e:
-            logger.error("Failed to copy resources to sandbox %s: %s", sandbox_id, e)
-            raise SandboxException(f"Failed to copy resources to sandbox: {e}") from e
+            logger.error("Failed to deploy resources to sandbox %s: %s", sandbox_id, e)
+            raise SandboxException(f"Failed to deploy resources to sandbox: {e}") from e
 
     async def _add_env_vars_parallel(
         self, sandbox_id: str, custom_env_vars: list[CustomEnvVarDict]
