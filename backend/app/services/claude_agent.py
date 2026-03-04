@@ -135,7 +135,7 @@ class ClaudeAgentService:
         sandbox_id: str = chat.sandbox_id or ""
         workspace_path = chat.workspace_path
         claude_cwd = SANDBOX_HOME_DIR
-        if workspace_path and sandbox_provider == SandboxProviderType.DOCKER.value:
+        if workspace_path:
             claude_cwd = SANDBOX_WORKSPACE_DIR
 
         options = await self._build_claude_options(

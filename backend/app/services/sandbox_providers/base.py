@@ -37,10 +37,15 @@ T = TypeVar("T")
 
 LISTENING_PORTS_COMMAND = "ss -tuln | grep LISTEN | awk '{print $5}' | sed 's/.*://g' | grep -E '^[0-9]+$' | sort -u"
 GITIGNORE_CMD = "cat .gitignore 2>/dev/null"
+RSYNC_EXCLUDE_ARGS = " ".join(
+    f"--exclude={shlex.quote(pattern)}" for pattern in SANDBOX_RESTORE_EXCLUDE_PATTERNS
+)
 
 
 class SandboxProvider(ABC):
     _pty_sessions: dict[str, dict[str, Any]]
+    _checkpoint_create_extra_rsync_flags: str = ""
+    _checkpoint_restore_extra_rsync_flags: str = ""
 
     @staticmethod
     def normalize_path(file_path: str, base: str = SANDBOX_HOME_DIR) -> str:
@@ -457,18 +462,18 @@ class SandboxProvider(ABC):
 
         prev_checkpoint = await self._get_latest_checkpoint_dir(sandbox_id)
 
-        exclude_args = " ".join(
-            f"--exclude={shlex.quote(pattern)}"
-            for pattern in SANDBOX_RESTORE_EXCLUDE_PATTERNS
-        )
-
         link_dest = (
             f"--link-dest={shlex.quote(prev_checkpoint)} " if prev_checkpoint else ""
         )
+        extra = (
+            f"{self._checkpoint_create_extra_rsync_flags} "
+            if self._checkpoint_create_extra_rsync_flags
+            else ""
+        )
         rsync_cmd = (
-            f"rsync -a --delete "
+            f"rsync -a --delete {extra}"
             f"{link_dest}"
-            f"{exclude_args} "
+            f"{RSYNC_EXCLUDE_ARGS} "
             f"{SANDBOX_HOME_DIR}/ {shlex.quote(checkpoint_dir)}/"
         )
 
@@ -501,14 +506,14 @@ class SandboxProvider(ABC):
         if check_result.stdout.strip() != "1":
             raise FileNotFoundError(f"Checkpoint {checkpoint_id} not found")
 
-        exclude_args = " ".join(
-            f"--exclude={shlex.quote(pattern)}"
-            for pattern in SANDBOX_RESTORE_EXCLUDE_PATTERNS
+        extra = (
+            f"{self._checkpoint_restore_extra_rsync_flags} "
+            if self._checkpoint_restore_extra_rsync_flags
+            else ""
         )
-
         rsync_cmd = (
-            f"rsync -a --delete "
-            f"{exclude_args} "
+            f"rsync -a --delete {extra}"
+            f"{RSYNC_EXCLUDE_ARGS} "
             f"--stats "
             f"{shlex.quote(checkpoint_dir)}/ {SANDBOX_HOME_DIR}/"
         )

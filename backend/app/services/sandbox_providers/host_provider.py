@@ -13,6 +13,7 @@ import subprocess
 import sys
 import termios
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -28,6 +29,7 @@ from app.constants import (
     SANDBOX_BINARY_EXTENSIONS,
     SANDBOX_DEFAULT_COMMAND_TIMEOUT,
     SANDBOX_HOME_DIR,
+    SANDBOX_WORKSPACE_DIR,
     TERMINAL_TYPE,
     VNC_WEBSOCKET_PORT,
 )
@@ -51,9 +53,23 @@ HOST_ALLOWED_PREVIEW_PORTS: set[int] = (
     set(DOCKER_AVAILABLE_PORTS) - EXCLUDED_PREVIEW_PORTS
 )
 
+HOME_PREFIX = f"{SANDBOX_HOME_DIR}/"
+WORKSPACE_PREFIX = f"{SANDBOX_WORKSPACE_DIR}/"
+
+# Matches /home/user/workspace or /home/user at word-like boundaries in shell commands.
+# Workspace alternative comes first so the longer path wins.
 VIRTUAL_PATH_PATTERN = re.compile(
-    rf"(?:(?<=^)|(?<=[\s\"'=(])){re.escape(SANDBOX_HOME_DIR)}(?=(?:/|$|[\s\"')]))"
+    rf"(?:(?<=^)|(?<=[\s\"'=(]))"
+    rf"({re.escape(SANDBOX_WORKSPACE_DIR)}|{re.escape(SANDBOX_HOME_DIR)})"
+    rf"(?=(?:/|$|[\s\"')]))"
 )
+
+
+@dataclass
+class HostSandboxInfo:
+    home_dir: Path
+    workspace_dir: Path
+
 
 LISTENING_PORTS_COMMAND = (
     (
@@ -70,72 +86,151 @@ LISTENING_PORTS_COMMAND = (
 
 
 class LocalHostProvider(SandboxProvider):
+    # Follow workspace symlink during checkpoint backup; sync into it during restore
+    _checkpoint_create_extra_rsync_flags = "--copy-dirlinks"
+    _checkpoint_restore_extra_rsync_flags = "--keep-dirlinks"
+
     def __init__(
         self, base_dir: str, preview_base_url: str = "http://localhost"
     ) -> None:
         self._base_dir = Path(base_dir).expanduser().resolve()
         self._base_dir.mkdir(parents=True, exist_ok=True)
         self._preview_base_url = preview_base_url.rstrip("/")
-        self._sandboxes: dict[str, Path] = {}
+        self._sandboxes: dict[str, HostSandboxInfo] = {}
         self._pty_sessions: dict[str, dict[str, Any]] = {}
 
+    def _init_home_dir(self, sandbox_id: str, home_dir: Path) -> None:
+        home_dir.mkdir(parents=True, exist_ok=True)
+        bashrc_content = f'export PS1="user@{sandbox_id}:\\w$ "\n'
+        bashrc = home_dir / ".bashrc"
+        if not bashrc.exists():
+            bashrc.write_text(bashrc_content)
+        bash_profile = home_dir / ".bash_profile"
+        if not bash_profile.exists():
+            bash_profile.write_text("[ -f ~/.bashrc ] && source ~/.bashrc\n")
+
     def bind_workspace(self, sandbox_id: str, workspace_path: str) -> None:
-        self._sandboxes[sandbox_id] = Path(workspace_path).expanduser().resolve()
+        home_dir = (self._base_dir / sandbox_id).resolve()
+        workspace = Path(workspace_path).expanduser().resolve()
+        self._init_home_dir(sandbox_id, home_dir)
+        link = home_dir / "workspace"
+        if link.is_symlink():
+            if link.resolve() != workspace:
+                link.unlink()
+                link.symlink_to(workspace)
+        elif link.exists():
+            shutil.rmtree(link) if link.is_dir() else link.unlink()
+            link.symlink_to(workspace)
+        else:
+            link.symlink_to(workspace)
+        self._sandboxes[sandbox_id] = HostSandboxInfo(
+            home_dir=home_dir, workspace_dir=workspace
+        )
 
     def _resolve_sandbox_dir(self, sandbox_id: str) -> Path:
-        sandbox_dir = self._sandboxes.get(sandbox_id)
-        if sandbox_dir:
-            return sandbox_dir
+        info = self._sandboxes.get(sandbox_id)
+        if info:
+            return info.home_dir
 
         candidate = (self._base_dir / sandbox_id).resolve()
         if candidate.exists() and candidate.is_dir():
-            self._sandboxes[sandbox_id] = candidate
+            workspace_link = candidate / "workspace"
+            if workspace_link.is_symlink():
+                workspace_dir = workspace_link.resolve()
+            else:
+                workspace_dir = candidate
+            self._sandboxes[sandbox_id] = HostSandboxInfo(
+                home_dir=candidate, workspace_dir=workspace_dir
+            )
             return candidate
 
         raise SandboxException(f"Host sandbox {sandbox_id} not found")
 
+    def _resolve_workspace_dir(self, sandbox_id: str) -> Path:
+        info = self._sandboxes.get(sandbox_id)
+        if info:
+            return info.workspace_dir
+        self._resolve_sandbox_dir(sandbox_id)
+        return self._sandboxes[sandbox_id].workspace_dir
+
     def _resolve_path(self, sandbox_id: str, path: str) -> Path:
-        sandbox_dir = self._resolve_sandbox_dir(sandbox_id)
+        home_dir = self._resolve_sandbox_dir(sandbox_id)
+        workspace_dir = self._resolve_workspace_dir(sandbox_id)
         requested = Path(path)
 
         if requested.is_absolute():
             requested_str = str(requested)
             if requested_str == SANDBOX_HOME_DIR:
-                resolved = sandbox_dir
-            else:
-                home_prefix = f"{SANDBOX_HOME_DIR}/"
-                if not requested_str.startswith(home_prefix):
-                    raise SandboxException(f"Path must be inside sandbox root: {path}")
-                relative = requested_str[len(home_prefix) :]
-                resolved = (sandbox_dir / relative).resolve()
+                return home_dir
+            if requested_str == SANDBOX_WORKSPACE_DIR:
+                return workspace_dir
+            if requested_str.startswith(WORKSPACE_PREFIX):
+                relative = requested_str[len(WORKSPACE_PREFIX) :]
+                resolved = (workspace_dir / relative).resolve()
+                try:
+                    resolved.relative_to(workspace_dir)
+                except ValueError as exc:
+                    raise SandboxException(
+                        f"Path escapes workspace root: {path}"
+                    ) from exc
+                return resolved
+            if not requested_str.startswith(HOME_PREFIX):
+                raise SandboxException(f"Path must be inside sandbox root: {path}")
+            relative = requested_str[len(HOME_PREFIX) :]
+            resolved = (home_dir / relative).resolve()
+            try:
+                resolved.relative_to(home_dir)
+            except ValueError:
+                try:
+                    resolved.relative_to(workspace_dir)
+                except ValueError as exc:
+                    raise SandboxException(
+                        f"Path escapes sandbox root: {path}"
+                    ) from exc
         else:
-            resolved = (sandbox_dir / requested).resolve()
-
-        try:
-            resolved.relative_to(sandbox_dir)
-        except ValueError as exc:
-            raise SandboxException(f"Path escapes sandbox root: {path}") from exc
+            resolved = (workspace_dir / requested).resolve()
+            try:
+                resolved.relative_to(workspace_dir)
+            except ValueError as exc:
+                raise SandboxException(f"Path escapes workspace root: {path}") from exc
 
         return resolved
 
-    def _map_virtual_paths(self, sandbox_id: str, command: str) -> str:
-        sandbox_dir = str(self._resolve_sandbox_dir(sandbox_id))
-        return VIRTUAL_PATH_PATTERN.sub(sandbox_dir, command)
+    @staticmethod
+    def _map_virtual_paths(
+        command: str, home_dir_str: str, workspace_dir_str: str
+    ) -> str:
+        replacements = {
+            SANDBOX_WORKSPACE_DIR: workspace_dir_str,
+            SANDBOX_HOME_DIR: home_dir_str,
+        }
+
+        def _replace(m: re.Match[str]) -> str:
+            real = replacements[m.group(1)]
+            if " " not in real:
+                return real
+            # Already inside quotes — no extra quoting needed
+            pos = m.start()
+            if pos > 0 and command[pos - 1] in ('"', "'"):
+                return real
+            return shlex.quote(real)
+
+        return VIRTUAL_PATH_PATTERN.sub(_replace, command)
 
     async def create_sandbox(self, workspace_path: str | None = None) -> str:
         sandbox_id = str(uuid.uuid4())[:12]
-        if workspace_path:
-            self._sandboxes[sandbox_id] = Path(workspace_path).expanduser().resolve()
-            return sandbox_id
+        home_dir = (self._base_dir / sandbox_id).resolve()
+        self._init_home_dir(sandbox_id, home_dir)
 
-        sandbox_dir = (self._base_dir / sandbox_id).resolve()
-        sandbox_dir.mkdir(parents=True, exist_ok=True)
-        bashrc_content = f'export PS1="user@{sandbox_id}:\\w$ "\n'
-        (sandbox_dir / ".bashrc").write_text(bashrc_content)
-        (sandbox_dir / ".bash_profile").write_text(
-            "[ -f ~/.bashrc ] && source ~/.bashrc\n"
+        if workspace_path:
+            workspace = Path(workspace_path).expanduser().resolve()
+            (home_dir / "workspace").symlink_to(workspace)
+        else:
+            workspace = home_dir
+
+        self._sandboxes[sandbox_id] = HostSandboxInfo(
+            home_dir=home_dir, workspace_dir=workspace
         )
-        self._sandboxes[sandbox_id] = sandbox_dir
         return sandbox_id
 
     async def connect_sandbox(self, sandbox_id: str) -> bool:
@@ -152,20 +247,28 @@ class LocalHostProvider(SandboxProvider):
             except Exception:
                 pass
 
-        sandbox_dir = self._sandboxes.pop(sandbox_id, None)
-        if not sandbox_dir:
+        info = self._sandboxes.pop(sandbox_id, None)
+        home_dir = info.home_dir if info else None
+        if not home_dir:
             candidate = (self._base_dir / sandbox_id).resolve()
             if candidate.exists() and candidate.is_dir():
-                sandbox_dir = candidate
+                home_dir = candidate
 
-        if sandbox_dir and sandbox_dir.is_relative_to(self._base_dir):
-            await asyncio.to_thread(shutil.rmtree, sandbox_dir, ignore_errors=True)
+        if home_dir and home_dir.is_relative_to(self._base_dir):
+            await asyncio.to_thread(shutil.rmtree, home_dir, ignore_errors=True)
 
     async def is_running(self, sandbox_id: str) -> bool:
         try:
             return self._resolve_sandbox_dir(sandbox_id).exists()
         except SandboxException:
             return False
+
+    @staticmethod
+    def _mask_host_paths(text: str, home_dir_str: str, workspace_dir_str: str) -> str:
+        # Replace workspace path first (more specific) to avoid partial matches
+        if workspace_dir_str != home_dir_str:
+            text = text.replace(workspace_dir_str, SANDBOX_WORKSPACE_DIR)
+        return text.replace(home_dir_str, SANDBOX_HOME_DIR)
 
     async def execute_command(
         self,
@@ -175,8 +278,13 @@ class LocalHostProvider(SandboxProvider):
         envs: dict[str, str] | None = None,
         timeout: int | None = None,
     ) -> CommandResult:
-        sandbox_dir = self._resolve_sandbox_dir(sandbox_id)
-        command_to_run = self._map_virtual_paths(sandbox_id, command)
+        home_dir = self._resolve_sandbox_dir(sandbox_id)
+        workspace_dir = self._resolve_workspace_dir(sandbox_id)
+        home_dir_str = str(home_dir)
+        workspace_dir_str = str(workspace_dir)
+        command_to_run = self._map_virtual_paths(
+            command, home_dir_str, workspace_dir_str
+        )
         command_with_path = (
             f"export PATH={HOST_REQUIRED_PATH_PREFIX}:$PATH; {command_to_run}"
         )
@@ -184,7 +292,7 @@ class LocalHostProvider(SandboxProvider):
         if envs:
             process_env.update(envs)
         process_env["HOST_HOME"] = os.environ.get("HOME", "")
-        process_env["HOME"] = str(sandbox_dir)
+        process_env["HOME"] = home_dir_str
         process_env["USER"] = "user"
         process_env["HOSTNAME"] = sandbox_id
         process_env["TERM"] = process_env.get("TERM", TERMINAL_TYPE)
@@ -193,7 +301,7 @@ class LocalHostProvider(SandboxProvider):
             await asyncio.to_thread(
                 subprocess.Popen,
                 ["bash", "-lc", command_with_path],
-                cwd=str(sandbox_dir),
+                cwd=workspace_dir_str,
                 env=process_env,
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
@@ -211,7 +319,7 @@ class LocalHostProvider(SandboxProvider):
             "bash",
             "-lc",
             command_with_path,
-            cwd=str(sandbox_dir),
+            cwd=workspace_dir_str,
             env=process_env,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -228,12 +336,15 @@ class LocalHostProvider(SandboxProvider):
                 f"Command execution timed out after {effective_timeout}s"
             )
 
-        sandbox_dir_str = str(sandbox_dir)
-        stdout_str = stdout.decode("utf-8", errors="replace").replace(
-            sandbox_dir_str, SANDBOX_HOME_DIR
+        stdout_str = self._mask_host_paths(
+            stdout.decode("utf-8", errors="replace"),
+            home_dir_str,
+            workspace_dir_str,
         )
-        stderr_str = stderr.decode("utf-8", errors="replace").replace(
-            sandbox_dir_str, SANDBOX_HOME_DIR
+        stderr_str = self._mask_host_paths(
+            stderr.decode("utf-8", errors="replace"),
+            home_dir_str,
+            workspace_dir_str,
         )
 
         return CommandResult(
@@ -362,14 +473,17 @@ class LocalHostProvider(SandboxProvider):
         path: str = SANDBOX_HOME_DIR,
         excluded_patterns: list[str] | None = None,
     ) -> list[FileMetadata]:
-        sandbox_dir = self._resolve_sandbox_dir(sandbox_id)
+        if path == SANDBOX_HOME_DIR:
+            target_dir = self._resolve_workspace_dir(sandbox_id)
+        else:
+            target_dir = self._resolve_path(sandbox_id, path)
         caller_patterns = list(dict.fromkeys(excluded_patterns or []))
         gitignore_patterns, exceptions = await self._get_gitignore_patterns(
-            sandbox_id, str(sandbox_dir)
+            sandbox_id, str(target_dir)
         )
         return await asyncio.to_thread(
             self._walk_files,
-            sandbox_dir,
+            target_dir,
             caller_patterns,
             gitignore_patterns,
             exceptions,
@@ -388,15 +502,17 @@ class LocalHostProvider(SandboxProvider):
         tmux_session: str,
         on_data: PtyDataCallbackType | None = None,
     ) -> PtySession:
-        sandbox_dir = self._resolve_sandbox_dir(sandbox_id)
+        home_dir = self._resolve_sandbox_dir(sandbox_id)
+        workspace_dir = self._resolve_workspace_dir(sandbox_id)
         session_id = str(uuid.uuid4())
         master_fd, slave_fd = pty.openpty()
         self._resize_fd(slave_fd, rows, cols)
 
         env = os.environ.copy()
-        env["HOME"] = str(sandbox_dir)
+        env["HOME"] = str(home_dir)
         env["USER"] = "user"
         env["HOSTNAME"] = sandbox_id
+        env["SHELL"] = "/bin/bash"
         env["TERM"] = TERMINAL_TYPE
 
         cmd = (
@@ -407,7 +523,7 @@ class LocalHostProvider(SandboxProvider):
         process = await asyncio.to_thread(
             subprocess.Popen,
             ["bash", "-lc", cmd],
-            cwd=str(sandbox_dir),
+            cwd=str(workspace_dir),
             env=env,
             stdin=slave_fd,
             stdout=slave_fd,
@@ -430,7 +546,14 @@ class LocalHostProvider(SandboxProvider):
 
         if on_data:
             reader_task = asyncio.create_task(
-                self._pty_reader(sandbox_id, session_id, master_fd, on_data)
+                self._pty_reader(
+                    sandbox_id,
+                    session_id,
+                    master_fd,
+                    on_data,
+                    str(home_dir),
+                    str(workspace_dir),
+                )
             )
             self._pty_sessions[sandbox_id][session_id]["reader_task"] = reader_task
 
@@ -442,12 +565,21 @@ class LocalHostProvider(SandboxProvider):
         session_id: str,
         master_fd: int,
         on_data: PtyDataCallbackType,
+        home_dir_str: str,
+        workspace_dir_str: str,
     ) -> None:
+        home_bytes = home_dir_str.encode()
+        workspace_bytes = workspace_dir_str.encode()
+        virtual_home = SANDBOX_HOME_DIR.encode()
+        virtual_workspace = SANDBOX_WORKSPACE_DIR.encode()
         try:
             while True:
                 chunk = await asyncio.to_thread(os.read, master_fd, 4096)
                 if not chunk:
                     break
+                if workspace_bytes != home_bytes:
+                    chunk = chunk.replace(workspace_bytes, virtual_workspace)
+                chunk = chunk.replace(home_bytes, virtual_home)
                 await on_data(chunk)
         except asyncio.CancelledError:
             pass
@@ -573,8 +705,8 @@ class LocalHostProvider(SandboxProvider):
     async def get_ide_url(self, sandbox_id: str) -> str | None:
         if not shutil.which("openvscode-server"):
             return None
-        sandbox_dir = self._resolve_sandbox_dir(sandbox_id)
-        folder = quote(str(sandbox_dir), safe="/")
+        workspace_dir = self._resolve_workspace_dir(sandbox_id)
+        folder = quote(str(workspace_dir), safe="/")
         return f"{self._preview_base_url}:{OPENVSCODE_PORT}/?folder={folder}"
 
     async def get_vnc_url(self, sandbox_id: str) -> str | None:

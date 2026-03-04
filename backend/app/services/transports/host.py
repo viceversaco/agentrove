@@ -10,7 +10,11 @@ from pathlib import Path
 from claude_agent_sdk._errors import CLIConnectionError, ProcessError
 from claude_agent_sdk.types import ClaudeAgentOptions
 
-from app.constants import HOST_REQUIRED_PATH_PREFIX, SANDBOX_HOME_DIR
+from app.constants import (
+    HOST_REQUIRED_PATH_PREFIX,
+    SANDBOX_HOME_DIR,
+    SANDBOX_WORKSPACE_DIR,
+)
 from app.core.config import get_settings
 from app.services.transports.base import BaseSandboxTransport
 
@@ -30,26 +34,33 @@ class HostSandboxTransport(BaseSandboxTransport):
         self._process: asyncio.subprocess.Process | None = None
         self._stdout_task: asyncio.Task[None] | None = None
         self._stderr_task: asyncio.Task[None] | None = None
+        self._home_dir = (
+            Path(settings.get_host_sandbox_base_dir()).expanduser().resolve()
+            / sandbox_id
+        )
         if workspace_path:
-            self._sandbox_dir = Path(workspace_path).expanduser().resolve()
+            self._workspace_dir = Path(workspace_path).expanduser().resolve()
         else:
-            self._sandbox_dir = (
-                Path(settings.get_host_sandbox_base_dir()).expanduser().resolve()
-                / sandbox_id
-            )
+            self._workspace_dir = self._home_dir
 
     def _resolve_cwd(self, cwd: str) -> Path:
         if cwd == SANDBOX_HOME_DIR:
-            return self._sandbox_dir
+            return self._home_dir
+        if cwd == SANDBOX_WORKSPACE_DIR:
+            return self._workspace_dir
+
+        workspace_prefix = f"{SANDBOX_WORKSPACE_DIR}/"
+        if cwd.startswith(workspace_prefix):
+            return (self._workspace_dir / cwd.removeprefix(workspace_prefix)).resolve()
 
         relative = cwd.removeprefix(f"{SANDBOX_HOME_DIR}/")
         if relative != cwd:
-            return (self._sandbox_dir / relative).resolve()
+            return (self._home_dir / relative).resolve()
 
         path = Path(cwd)
         if path.is_absolute():
             return path
-        return (self._sandbox_dir / path).resolve()
+        return (self._workspace_dir / path).resolve()
 
     def _resolve_run_user(self, requested_user: str) -> tuple[int, int] | None:
         if os.geteuid() != 0:
@@ -73,9 +84,9 @@ class HostSandboxTransport(BaseSandboxTransport):
             return
         self._stdin_closed = False
 
-        if not self._sandbox_dir.exists():
+        if not self._workspace_dir.exists():
             raise CLIConnectionError(
-                f"Host sandbox {self._sandbox_id} not found at {self._sandbox_dir}"
+                f"Host sandbox {self._sandbox_id} not found at {self._workspace_dir}"
             )
 
         command_args = shlex.split(self._build_command())
@@ -84,7 +95,7 @@ class HostSandboxTransport(BaseSandboxTransport):
         env = {
             **os.environ,
             **envs,
-            "HOME": str(self._sandbox_dir),
+            "HOME": str(self._home_dir),
             "USER": requested_user,
             "PATH": f"{HOST_REQUIRED_PATH_PREFIX}:{current_path}",
         }
