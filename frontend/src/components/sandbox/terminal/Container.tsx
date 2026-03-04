@@ -79,7 +79,7 @@ export const Container: FC<ContainerProps> = ({ sandboxId, chatId, isVisible, pa
 
       const newTerminal: TerminalInstance = {
         id: `terminal-${panelKey}-${nextNumber}`,
-        label: `Terminal ${nextNumber}`,
+        label: `Terminal ${prev.length + 1}`,
       };
 
       setActiveTerminalId(newTerminal.id);
@@ -113,7 +113,7 @@ export const Container: FC<ContainerProps> = ({ sandboxId, chatId, isVisible, pa
           return current;
         });
 
-        return filtered;
+        return filtered.map((t, i) => ({ ...t, label: `Terminal ${i + 1}` }));
       });
       setClosingTerminalIds((prev) => {
         const next = new Set(prev);
