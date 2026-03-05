@@ -1,8 +1,6 @@
-import { Button } from '@/components/ui/primitives/Button';
 import { ListManagementTab } from '@/components/ui/ListManagementTab';
 import type { CustomEnvVar } from '@/types/user.types';
-import { Key, Eye, EyeOff } from 'lucide-react';
-import { useState } from 'react';
+import { Key } from 'lucide-react';
 
 interface EnvVarsSettingsTabProps {
   envVars: CustomEnvVar[] | null;
@@ -22,27 +20,6 @@ export const EnvVarsSettingsTab: React.FC<EnvVarsSettingsTabProps> = ({
   onEditEnvVar,
   onDeleteEnvVar,
 }) => {
-  const [revealedValues, setRevealedValues] = useState<Record<string, boolean>>({});
-
-  const toggleValueVisibility = (key: string) => {
-    setRevealedValues((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
-  };
-
-  const handleDelete = async (index: number) => {
-    const deletedKey = envVars?.[index]?.key;
-    await onDeleteEnvVar(index);
-    if (deletedKey) {
-      setRevealedValues((prev) => {
-        const next = { ...prev };
-        delete next[deletedKey];
-        return next;
-      });
-    }
-  };
-
   return (
     <ListManagementTab<CustomEnvVar>
       title="Environment Variables"
@@ -59,7 +36,7 @@ export const EnvVarsSettingsTab: React.FC<EnvVarsSettingsTabProps> = ({
       getItemKey={(envVar) => envVar.key}
       onAdd={onAddEnvVar}
       onEdit={onEditEnvVar}
-      onDelete={handleDelete}
+      onDelete={onDeleteEnvVar}
       renderItem={(envVar) => (
         <>
           <div className="mb-2 flex items-center gap-2">
@@ -67,27 +44,9 @@ export const EnvVarsSettingsTab: React.FC<EnvVarsSettingsTabProps> = ({
               {envVar.key}
             </h3>
           </div>
-          <div className="flex items-center justify-between gap-2">
-            <p className="break-all font-mono text-2xs text-text-quaternary dark:text-text-dark-quaternary">
-              {revealedValues[envVar.key] ? envVar.value : maskValue(envVar.value)}
-            </p>
-            <Button
-              type="button"
-              onClick={() => toggleValueVisibility(envVar.key)}
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 flex-shrink-0 text-text-quaternary hover:text-text-secondary dark:text-text-dark-quaternary dark:hover:text-text-dark-secondary"
-              aria-label={
-                revealedValues[envVar.key] ? `Hide ${envVar.key} value` : `Show ${envVar.key} value`
-              }
-            >
-              {revealedValues[envVar.key] ? (
-                <EyeOff className="h-3 w-3" />
-              ) : (
-                <Eye className="h-3 w-3" />
-              )}
-            </Button>
-          </div>
+          <p className="break-all font-mono text-2xs text-text-quaternary dark:text-text-dark-quaternary">
+            {maskValue(envVar.value)}
+          </p>
         </>
       )}
       logContext="EnvVarsSettingsTab"
