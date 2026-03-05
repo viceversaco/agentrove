@@ -71,12 +71,6 @@ class ChatService(BaseDbService[Chat]):
         )
         return SandboxService(provider)
 
-    @property
-    def session_factory(self) -> SessionFactoryType:
-        # Exposed for endpoints that need to pass the factory to other
-        # services (e.g. ClaudeAgentService) without owning a DB dependency.
-        return self._session_factory
-
     async def get_user_chats(
         self, user: User, pagination: PaginationParams | None = None
     ) -> PaginatedResponse[ChatSchema]:
