@@ -100,6 +100,11 @@ class LocalHostProvider(SandboxProvider):
         bash_profile = home_dir / ".bash_profile"
         if not bash_profile.exists():
             bash_profile.write_text("[ -f ~/.bashrc ] && source ~/.bashrc\n")
+        # Symlink .config so CLI tools (gws, etc.) find host credentials despite HOME override
+        real_config = Path.home() / ".config"
+        sandbox_config = home_dir / ".config"
+        if real_config.is_dir() and not sandbox_config.exists():
+            sandbox_config.symlink_to(real_config)
 
     def bind_workspace(self, sandbox_id: str, workspace_path: str) -> None:
         home_dir = (self._base_dir / sandbox_id).resolve()
