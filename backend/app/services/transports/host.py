@@ -108,6 +108,8 @@ class HostSandboxTransport(BaseSandboxTransport):
             "USER": requested_user,
             "PATH": f"{HOST_REQUIRED_PATH_PREFIX}:{current_path}",
         }
+        env["GIT_CONFIG_GLOBAL"] = settings.GIT_CONFIG_GLOBAL
+        env["GNUPGHOME"] = settings.GNUPGHOME
         run_user = self._resolve_run_user(requested_user)
 
         try:

@@ -31,6 +31,7 @@ from app.constants import (
     TERMINAL_TYPE,
     VNC_WEBSOCKET_PORT,
 )
+from app.core.config import get_settings
 from app.services.exceptions import SandboxException
 from app.services.sandbox_providers.base import SandboxProvider
 from app.services.sandbox_providers.types import (
@@ -44,6 +45,7 @@ from app.services.sandbox_providers.types import (
 )
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 HOST_ALLOWED_PREVIEW_PORTS: set[int] = (
     set(DOCKER_AVAILABLE_PORTS) - EXCLUDED_PREVIEW_PORTS
@@ -293,6 +295,8 @@ class LocalHostProvider(SandboxProvider):
         process_env["USER"] = "user"
         process_env["HOSTNAME"] = sandbox_id
         process_env["TERM"] = process_env.get("TERM", TERMINAL_TYPE)
+        process_env["GIT_CONFIG_GLOBAL"] = settings.GIT_CONFIG_GLOBAL
+        process_env["GNUPGHOME"] = settings.GNUPGHOME
 
         if background:
             await asyncio.to_thread(
@@ -511,6 +515,8 @@ class LocalHostProvider(SandboxProvider):
         env["HOSTNAME"] = sandbox_id
         env["SHELL"] = "/bin/bash"
         env["TERM"] = TERMINAL_TYPE
+        env["GIT_CONFIG_GLOBAL"] = settings.GIT_CONFIG_GLOBAL
+        env["GNUPGHOME"] = settings.GNUPGHOME
 
         cmd = (
             f"export PATH={HOST_REQUIRED_PATH_PREFIX}:$PATH; "
