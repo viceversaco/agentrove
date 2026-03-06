@@ -160,8 +160,8 @@ class Settings(BaseSettings):
     CONTEXT_WINDOW_TOKENS: int = 200_000
 
     # Git configuration
-    GIT_AUTHOR_NAME: str = "Claudex"
-    GIT_AUTHOR_EMAIL: str = "noreply@claudex.pro"
+    GIT_AUTHOR_NAME: str = ""
+    GIT_AUTHOR_EMAIL: str = ""
 
     # Docker Sandbox configuration
     DOCKER_IMAGE: str = "ghcr.io/mng-dev-ai/claudex-sandbox:latest"

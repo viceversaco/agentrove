@@ -468,6 +468,7 @@ class ClaudeAgentService:
         if user_settings.github_personal_access_token:
             env["GITHUB_TOKEN"] = user_settings.github_personal_access_token
             env["GIT_ASKPASS"] = SANDBOX_GIT_ASKPASS_PATH
+        if settings.GIT_AUTHOR_NAME and settings.GIT_AUTHOR_EMAIL:
             env["GIT_AUTHOR_NAME"] = settings.GIT_AUTHOR_NAME
             env["GIT_AUTHOR_EMAIL"] = settings.GIT_AUTHOR_EMAIL
             env["GIT_COMMITTER_NAME"] = settings.GIT_AUTHOR_NAME
