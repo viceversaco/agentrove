@@ -1,5 +1,5 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useRef, useMemo, useCallback, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { useLayoutSidebar } from '@/components/layout/layoutState';
@@ -22,6 +22,7 @@ const EXAMPLE_PROMPTS = [
 
 export function LandingPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const attachedFiles = useChatStore((state) => state.attachedFiles);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const { selectedModelId, selectModel } = useModelSelection({ enabled: isAuthenticated });
@@ -54,7 +55,21 @@ export function LandingPage() {
   const createChat = useCreateChatMutation();
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const initialWorkspaceId = (location.state as { workspaceId?: string })?.workspaceId ?? null;
+  const consumedWorkspaceRef = useRef<string | null>(null);
+
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (
+      initialWorkspaceId &&
+      initialWorkspaceId !== consumedWorkspaceRef.current &&
+      workspaces.some((ws) => ws.id === initialWorkspaceId)
+    ) {
+      consumedWorkspaceRef.current = initialWorkspaceId;
+      setSelectedWorkspaceId(initialWorkspaceId);
+    }
+  }, [initialWorkspaceId, workspaces]);
 
   useEffect(() => {
     if (
