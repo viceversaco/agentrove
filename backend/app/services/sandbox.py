@@ -528,7 +528,6 @@ class SandboxService:
         await self.provider.write_file(
             sandbox_id, f"{openai_dir}/auth.json", openai_auth_json
         )
-        await self.execute_command(sandbox_id, f"sudo chown -R user:user {openai_dir}")
 
     async def _setup_gmail_mcp(
         self,
@@ -562,7 +561,6 @@ class SandboxService:
             sandbox_id, f"{gmail_dir}/credentials.json", credentials_content
         )
 
-        await self.execute_command(sandbox_id, f"sudo chown -R user:user {gmail_dir}")
         await self.execute_command(sandbox_id, f"chmod 600 {gmail_dir}/*.json")
 
     async def initialize_sandbox(

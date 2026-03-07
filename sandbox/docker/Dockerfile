@@ -19,7 +19,6 @@ RUN apt-get update && apt-get install -y \
     zip \
     build-essential \
     software-properties-common \
-    sudo \
     openssh-client \
     jq \
     htop \
@@ -60,12 +59,26 @@ RUN curl -fsSL https://get.docker.com | sh && \
     echo '{"storage-driver": "vfs"}' > /etc/docker/daemon.json
 
 RUN useradd -m -s /bin/bash -u 1000 user && \
-    echo "user ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
     usermod -aG docker user && \
     chown -R user:user /home/user
 
-COPY backend/permission_server.py /usr/local/bin/permission_server.py
-RUN chmod +x /usr/local/bin/permission_server.py
+RUN OPENVSCODE_VERSION="1.105.1" && \
+    ARCH=$(uname -m) && \
+    if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
+        ARCH_SUFFIX="arm64"; \
+    else \
+        ARCH_SUFFIX="x64"; \
+    fi && \
+    curl -fsSL "https://github.com/gitpod-io/openvscode-server/releases/download/openvscode-server-v${OPENVSCODE_VERSION}/openvscode-server-v${OPENVSCODE_VERSION}-linux-${ARCH_SUFFIX}.tar.gz" | \
+    tar -xz -C /tmp && \
+    mv /tmp/openvscode-server-v${OPENVSCODE_VERSION}-linux-${ARCH_SUFFIX} /opt/openvscode-server && \
+    ln -s /opt/openvscode-server/bin/openvscode-server /usr/local/bin/openvscode-server
+
+COPY --chmod=755 backend/permission_server.py /usr/local/bin/permission_server.py
+COPY --chmod=755 scripts/start-vnc.sh /usr/local/bin/start-vnc.sh
+COPY --chmod=755 sandbox/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+
+EXPOSE 3000 3001 5000 5900 6080 8000 8080 8765 5173 4200 8888 4321 3030 5500 1234 4000
 
 USER user
 WORKDIR /home/user
@@ -88,18 +101,6 @@ RUN python3 -m pip install --user --upgrade pip && \
     mcp \
     anthropic-bridge==0.1.38
 
-RUN OPENVSCODE_VERSION="1.105.1" && \
-    ARCH=$(uname -m) && \
-    if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
-        ARCH_SUFFIX="arm64"; \
-    else \
-        ARCH_SUFFIX="x64"; \
-    fi && \
-    curl -fsSL "https://github.com/gitpod-io/openvscode-server/releases/download/openvscode-server-v${OPENVSCODE_VERSION}/openvscode-server-v${OPENVSCODE_VERSION}-linux-${ARCH_SUFFIX}.tar.gz" | \
-    tar -xz -C /tmp && \
-    sudo mv /tmp/openvscode-server-v${OPENVSCODE_VERSION}-linux-${ARCH_SUFFIX} /opt/openvscode-server && \
-    sudo ln -s /opt/openvscode-server/bin/openvscode-server /usr/local/bin/openvscode-server
-
 RUN echo '#!/bin/bash\nexec echo $GITHUB_TOKEN' > /home/user/.git-askpass.sh && \
     chmod +x /home/user/.git-askpass.sh
 
@@ -109,14 +110,6 @@ RUN echo 'export NVM_DIR="$HOME/.nvm"' >> ~/.bashrc && \
 
 RUN mkdir -p /home/user/.claude && \
     mkdir -p /home/user/.checkpoints
-
-EXPOSE 3000 3001 5000 5900 6080 8000 8080 8765 5173 4200 8888 4321 3030 5500 1234 4000
-
-COPY scripts/start-vnc.sh /usr/local/bin/start-vnc.sh
-RUN sudo chmod +x /usr/local/bin/start-vnc.sh
-
-COPY sandbox/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN sudo chmod +x /usr/local/bin/entrypoint.sh
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["/bin/bash"]

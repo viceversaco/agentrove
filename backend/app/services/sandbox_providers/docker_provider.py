@@ -378,13 +378,17 @@ class LocalDockerProvider(SandboxProvider):
             file_data = io.BytesIO(content_bytes)
             info = tarfile.TarInfo(name=Path(normalized_path).name)
             info.size = len(content_bytes)
+            info.uid = 1000
+            info.gid = 1000
+            info.uname = "user"
+            info.gname = "user"
             tar.addfile(info, file_data)
         tar_stream.seek(0)
 
         parent_dir = str(Path(normalized_path).parent)
         mkdir_exec = await container.exec(
             cmd=["mkdir", "-p", parent_dir],
-            user="root",
+            user="1000:1000",
         )
         mkdir_exit_code, mkdir_output = await self._collect_exec_output(mkdir_exec)
         if mkdir_exit_code != 0:
