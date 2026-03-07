@@ -290,6 +290,10 @@ class LocalHostProvider(SandboxProvider):
         process_env = os.environ.copy()
         if envs:
             process_env.update(envs)
+        # Web mode: override HOME so tools (Codex, Gmail MCP) find auth files in the sandbox dir.
+        # Desktop mode: keep real HOME so Claude Code finds its existing login credentials.
+        if not settings.DESKTOP_MODE:
+            process_env["HOME"] = home_dir_str
         process_env["TERM"] = process_env.get("TERM", TERMINAL_TYPE)
         process_env["GIT_CONFIG_GLOBAL"] = settings.GIT_CONFIG_GLOBAL
         process_env["GNUPGHOME"] = settings.GNUPGHOME
@@ -506,6 +510,10 @@ class LocalHostProvider(SandboxProvider):
         self._resize_fd(slave_fd, rows, cols)
 
         env = os.environ.copy()
+        # Web mode: override HOME so terminal sessions see the sandbox home.
+        # Desktop mode: keep real HOME so CLI tools find existing credentials.
+        if not settings.DESKTOP_MODE:
+            env["HOME"] = str(home_dir)
         env["SHELL"] = "/bin/bash"
         env["TERM"] = TERMINAL_TYPE
         env["GIT_CONFIG_GLOBAL"] = settings.GIT_CONFIG_GLOBAL
