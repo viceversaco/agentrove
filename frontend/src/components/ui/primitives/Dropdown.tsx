@@ -1,6 +1,5 @@
 import { memo, ReactNode, useState, useEffect, KeyboardEvent } from 'react';
 import { Check, ChevronDown, LucideIcon, Search, X } from 'lucide-react';
-import fuzzysort from 'fuzzysort';
 import { useDropdown } from '@/hooks/useDropdown';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { Button } from '@/components/ui/primitives/Button';
@@ -65,16 +64,10 @@ function DropdownInner<T>({
   }, [isOpen]);
 
   const filterItems = (itemsToFilter: readonly T[]): T[] => {
-    if (!searchQuery.trim()) return [...itemsToFilter];
-    if (itemsToFilter.length > 0 && typeof itemsToFilter[0] === 'string') {
-      const results = fuzzysort.go(searchQuery, itemsToFilter as unknown as string[], {
-        limit: 50,
-        threshold: -10000,
-      });
-      return results.map((r) => r.target as unknown as T);
-    }
+    if (!searchQuery.trim()) return itemsToFilter as T[];
+    const isStringItems = itemsToFilter.length > 0 && typeof itemsToFilter[0] === 'string';
     return fuzzySearch(searchQuery, [...itemsToFilter], {
-      keys: ['name', 'label'],
+      keys: isStringItems ? undefined : ['name', 'label'],
       limit: 50,
     });
   };
