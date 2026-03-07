@@ -1,9 +1,9 @@
-name: claudex-web
+name: agentrove-web
 
 services:
   postgres:
     image: postgres:13-alpine
-    container_name: claudex-postgres-web
+    container_name: agentrove-postgres-web
     restart: always
     command: -c max_connections=600
     env_file: .env
@@ -19,7 +19,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: claudex-redis-web
+    container_name: agentrove-redis-web
     restart: always
     ports:
       - "${REDIS_PORT}:6379"
@@ -33,7 +33,7 @@ services:
 
   sandbox-setup:
     image: docker:27-cli
-    container_name: claudex-sandbox-setup-web
+    container_name: agentrove-sandbox-setup-web
     restart: "no"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -43,7 +43,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: claudex-api-web
+    container_name: agentrove-api-web
     restart: unless-stopped
     command: ["api"]
     user: root
@@ -76,7 +76,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: claudex-frontend-web
+    container_name: agentrove-frontend-web
     restart: unless-stopped
     depends_on:
       - api
@@ -89,7 +89,7 @@ services:
 
 networks:
   sandbox:
-    name: claudex-sandbox-net
+    name: agentrove-sandbox-net
     external: true
 
 volumes:

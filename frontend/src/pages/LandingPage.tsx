@@ -211,7 +211,7 @@ export function LandingPage() {
                 selectedModelId={selectedModelId}
                 onModelChange={selectModel}
                 showTip={false}
-                placeholder="Ask Claudex to build, fix bugs, explore"
+                placeholder="Ask Agentrove to build, fix bugs, explore"
               />
             </ChatProvider>
 

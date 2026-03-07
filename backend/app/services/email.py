@@ -114,7 +114,7 @@ class EmailService:
     ) -> bool:
         verification_link = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}&email={email}"
 
-        subject = "Verify your Claudex account"
+        subject = "Verify your Agentrove account"
         template = self.template_env.get_template("verification.html")
         body = template.render(verification_link=verification_link, user_name=user_name)
 
@@ -127,7 +127,7 @@ class EmailService:
             f"{settings.FRONTEND_URL}/reset-password?token={reset_token}&email={email}"
         )
 
-        subject = "Reset your Claudex password"
+        subject = "Reset your Agentrove password"
         template = self.template_env.get_template("password_reset.html")
         body = template.render(reset_link=reset_link, user_name=user_name)
 

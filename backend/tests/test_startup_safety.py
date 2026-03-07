@@ -83,7 +83,7 @@ def _setup_migration_mocks(
     upgrade_side_effect: Exception,
 ) -> MagicMock:
     settings = SimpleNamespace(
-        DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/claudex",
+        DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/agentrove",
         ENVIRONMENT=environment,
     )
     monkeypatch.setattr(migrate_module, "get_settings", lambda: settings)

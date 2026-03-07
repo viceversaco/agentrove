@@ -23,7 +23,7 @@ fn get_backend_port(state: tauri::State<'_, Arc<OnceLock<Result<u16, String>>>>)
 fn data_dir() -> std::path::PathBuf {
     dirs::data_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join("com.claudex.app")
+        .join("com.agentrove.app")
 }
 
 fn ensure_secret_key(data_dir: &std::path::Path) -> String {
@@ -52,12 +52,12 @@ fn resolve_backend_binary(app_handle: &tauri::AppHandle) -> std::path::PathBuf {
     let binary = resource_dir
         .join("_up_")
         .join("backend-sidecar")
-        .join("claudex-backend");
+        .join("agentrove-backend");
     if binary.exists() {
         return binary;
     }
 
-    let direct = resource_dir.join("backend-sidecar").join("claudex-backend");
+    let direct = resource_dir.join("backend-sidecar").join("agentrove-backend");
     if direct.exists() {
         return direct;
     }
@@ -66,7 +66,7 @@ fn resolve_backend_binary(app_handle: &tauri::AppHandle) -> std::path::PathBuf {
         .parent()
         .unwrap()
         .join("backend-sidecar")
-        .join("claudex-backend");
+        .join("agentrove-backend");
     if dev_binary.exists() {
         return dev_binary;
     }
@@ -139,7 +139,7 @@ fn spawn_backend(
         backend_path.push_str(&format!(":{}/.local/bin", home.display()));
     }
 
-    let db_path = data_dir.join("claudex.db").to_string_lossy().to_string();
+    let db_path = data_dir.join("agentrove.db").to_string_lossy().to_string();
     let mut command = Command::new(&backend_bin);
     command
         .env("DESKTOP_MODE", "true")

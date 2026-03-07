@@ -2,11 +2,11 @@ services:
   # Test PostgreSQL database
   postgres-test:
     image: postgres:13-alpine
-    container_name: claudex-postgres-test
+    container_name: agentrove-postgres-test
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: claudex_test
+      POSTGRES_DB: agentrove_test
     ports:
       - "5433:5432"
     healthcheck:
@@ -20,7 +20,7 @@ services:
   # Test Redis
   redis-test:
     image: redis:7-alpine
-    container_name: claudex-redis-test
+    container_name: agentrove-redis-test
     ports:
       - "6380:6379"
     healthcheck:
@@ -36,14 +36,14 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile.test
-    container_name: claudex-backend-test
+    container_name: agentrove-backend-test
     depends_on:
       postgres-test:
         condition: service_healthy
       redis-test:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres-test:5432/claudex_test
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres-test:5432/agentrove_test
       - REDIS_URL=redis://redis-test:6379/0
       - SECRET_KEY=test_secret_key_that_is_long_enough_for_validation_requirements
       - TESTING=true
@@ -59,10 +59,10 @@ services:
     command: ["pytest", "-v", "--tb=short"]
     networks:
       - test-network
-      - claudex-sandbox-net
+      - agentrove-sandbox-net
 
 networks:
   test-network:
     driver: bridge
-  claudex-sandbox-net:
+  agentrove-sandbox-net:
     driver: bridge

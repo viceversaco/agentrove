@@ -30,7 +30,7 @@ export function InputProvider({
   isLoading,
   isStreaming = false,
   onStopStream,
-  placeholder = 'Message Claudex\u2026',
+  placeholder = 'Message Agentrove\u2026',
   selectedModelId,
   onModelChange,
   dropdownPosition = 'top',

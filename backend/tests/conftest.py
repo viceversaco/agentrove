@@ -22,7 +22,7 @@ os.environ.setdefault(
     "SECRET_KEY", "test_secret_key_for_testing_at_least_32_characters_long"
 )
 os.environ.setdefault(
-    "DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5433/claudex_test"
+    "DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5433/agentrove_test"
 )
 os.environ.setdefault("REDIS_URL", "redis://localhost:6380/0")
 os.environ.setdefault("REQUIRE_EMAIL_VERIFICATION", "false")
@@ -424,9 +424,9 @@ def docker_available() -> bool:
 def docker_config() -> DockerConfig:
     return DockerConfig(
         image=os.environ.get(
-            "DOCKER_IMAGE", "ghcr.io/mng-dev-ai/claudex-sandbox:latest"
+            "DOCKER_IMAGE", "ghcr.io/mng-dev-ai/agentrove-sandbox:latest"
         ),
-        network="claudex-sandbox-net",
+        network="agentrove-sandbox-net",
         host=None,
         preview_base_url="http://localhost",
         user_home="/home/user",
@@ -597,9 +597,9 @@ async def sandbox_test_context(
         pytest.skip("Docker not available")
     docker_config = DockerConfig(
         image=os.environ.get(
-            "DOCKER_IMAGE", "ghcr.io/mng-dev-ai/claudex-sandbox:latest"
+            "DOCKER_IMAGE", "ghcr.io/mng-dev-ai/agentrove-sandbox:latest"
         ),
-        network="claudex-sandbox-net",
+        network="agentrove-sandbox-net",
         host=None,
         preview_base_url="http://localhost",
         user_home="/home/user",

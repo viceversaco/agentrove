@@ -153,7 +153,7 @@ export function LoginPage() {
     [loginMutation, navigate, values],
   );
 
-  const title = 'Welcome to Claudex';
+  const title = 'Welcome to Agentrove';
   const subtitle = 'Sign in to continue to your account';
 
   const isSubmitting = loginMutation.isPending;

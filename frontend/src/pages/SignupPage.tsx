@@ -141,8 +141,8 @@ export function SignupPage() {
     [signupMutation, values],
   );
 
-  const title = 'Join Claudex';
-  const subtitle = 'Create your claudex account';
+  const title = 'Join Agentrove';
+  const subtitle = 'Create your agentrove account';
 
   const isSubmitting = signupMutation.isPending;
   const error = signupMutation.error?.message;

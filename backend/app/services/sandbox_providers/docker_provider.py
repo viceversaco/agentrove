@@ -37,7 +37,7 @@ from app.services.sandbox_providers.types import (
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-DOCKER_SANDBOX_CONTAINER_PREFIX = "claudex-sandbox-"
+DOCKER_SANDBOX_CONTAINER_PREFIX = "agentrove-sandbox-"
 
 
 class LocalDockerProvider(SandboxProvider):

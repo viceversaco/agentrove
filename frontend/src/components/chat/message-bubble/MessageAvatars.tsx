@@ -43,7 +43,7 @@ export const UserAvatar = () => {
 
 export const BotAvatar = () => (
   <div className="flex h-6 w-6 items-center justify-center">
-    <img src={iconDark} alt="Claudex" className="h-3 w-3 dark:hidden" />
-    <img src={iconLight} alt="Claudex" className="hidden h-3 w-3 dark:block" />
+    <img src={iconDark} alt="Agentrove" className="h-3 w-3 dark:hidden" />
+    <img src={iconLight} alt="Agentrove" className="hidden h-3 w-3 dark:block" />
   </div>
 );

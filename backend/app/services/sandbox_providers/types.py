@@ -62,8 +62,8 @@ class SecretEntry:
 
 @dataclass
 class DockerConfig:
-    image: str = "claudex-sandbox:latest"
-    network: str = "claudex-sandbox-net"
+    image: str = "agentrove-sandbox:latest"
+    network: str = "agentrove-sandbox-net"
     host: str | None = None
     preview_base_url: str = "http://localhost"
     user_home: str = "/home/user"

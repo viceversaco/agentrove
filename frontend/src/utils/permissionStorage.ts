@@ -1,4 +1,4 @@
-const RESOLVED_REQUESTS_KEY = 'claudex_resolved_permission_requests';
+const RESOLVED_REQUESTS_KEY = 'agentrove_resolved_permission_requests';
 const MAX_RESOLVED_REQUESTS = 100;
 
 export function getResolvedRequestIds(): Set<string> {

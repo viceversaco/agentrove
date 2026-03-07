@@ -135,7 +135,7 @@ class TerminalSessionRecord:
         if self.tmux_session_name is None:
             safe_terminal = self.terminal_id.replace("-", "_")
             safe_sandbox = self.sandbox_id.replace("-", "_")
-            self.tmux_session_name = f"claudex_{safe_sandbox}_{safe_terminal}"
+            self.tmux_session_name = f"agentrove_{safe_sandbox}_{safe_terminal}"
         return self.tmux_session_name
 
     async def _input_worker(self, session_id: str) -> None:
