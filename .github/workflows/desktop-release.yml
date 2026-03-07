@@ -46,7 +46,7 @@ jobs:
           projectPath: frontend
           tauriScript: npx tauri
           tagName: ${{ github.ref_name }}
-          releaseName: Claudex Desktop ${{ github.ref_name }}
+          releaseName: Agentrove Desktop ${{ github.ref_name }}
           releaseBody: Desktop release for ${{ github.ref_name }}.
           releaseDraft: false
           prerelease: false

@@ -11,7 +11,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/claudex-sandbox
+  IMAGE_NAME: ${{ github.repository_owner }}/agentrove-sandbox
 
 jobs:
   build-and-push:

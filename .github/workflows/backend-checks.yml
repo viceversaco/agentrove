@@ -85,14 +85,14 @@ jobs:
   #
   #     - name: Pull sandbox image and create network
   #       run: |
-  #         docker pull ghcr.io/mng-dev-ai/claudex-sandbox:latest
-  #         docker network create claudex-sandbox-net 2>/dev/null || true
+  #         docker pull ghcr.io/mng-dev-ai/agentrove-sandbox:latest
+  #         docker network create agentrove-sandbox-net 2>/dev/null || true
   #
   #     - name: Run tests with Docker Compose
   #       env:
   #         CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
   #         GH_TOKEN: ${{ secrets.GH_TOKEN }}
-  #         DOCKER_IMAGE: ghcr.io/mng-dev-ai/claudex-sandbox:latest
+  #         DOCKER_IMAGE: ghcr.io/mng-dev-ai/agentrove-sandbox:latest
   #       run: |
   #         docker compose -f docker-compose.test.yml build backend-test
   #         docker compose -f docker-compose.test.yml run --rm backend-test pytest -v --tb=short --maxfail=5
