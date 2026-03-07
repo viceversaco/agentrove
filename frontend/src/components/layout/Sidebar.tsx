@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FolderOpen, ChevronRight, MoreHorizontal } from 'lucide-react';
+import { Plus, FolderOpen, ChevronRight, MoreHorizontal, MessageSquarePlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useInView } from 'react-intersection-observer';
 import type { FetchNextPageOptions } from '@tanstack/react-query';
@@ -352,6 +352,17 @@ export function Sidebar({
     });
   }, []);
 
+  const handleNewWorkspaceThread = useCallback(
+    (e: React.MouseEvent, workspaceId: string) => {
+      e.stopPropagation();
+      navigate('/', { state: { workspaceId } });
+      if (isMobile) {
+        useUIStore.getState().setSidebarOpen(false);
+      }
+    },
+    [navigate, isMobile],
+  );
+
   const handleWorkspaceContextMenu = useCallback(
     (e: React.MouseEvent<HTMLButtonElement>, workspaceId: string) => {
       e.stopPropagation();
@@ -494,6 +505,14 @@ export function Sidebar({
                         <span className="truncate text-xs font-medium text-text-secondary dark:text-text-dark-secondary">
                           {group.workspace.name}
                         </span>
+                      </button>
+                      <button
+                        type="button"
+                        title="New thread"
+                        onClick={(e) => handleNewWorkspaceThread(e, group.workspace.id)}
+                        className="flex shrink-0 items-center justify-center rounded p-0.5 text-text-quaternary opacity-0 transition-all duration-200 hover:text-text-primary group-hover:opacity-100 dark:text-text-dark-quaternary dark:hover:text-text-dark-primary"
+                      >
+                        <MessageSquarePlus className="h-3.5 w-3.5" />
                       </button>
                       <button
                         type="button"
