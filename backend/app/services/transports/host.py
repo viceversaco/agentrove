@@ -100,12 +100,13 @@ class HostSandboxTransport(BaseSandboxTransport):
         command_args = shlex.split(self._build_command())
         envs, cwd, requested_user = self._prepare_environment()
         envs = self._resolve_virtual_env_paths(envs)
+        # In host mode, don't set CLAUDE_CODE_SANDBOX — it causes the CLI to
+        # treat this as a sandboxed environment and re-prompt for login.
+        envs.pop("CLAUDE_CODE_SANDBOX", None)
         current_path = os.environ.get("PATH", "")
         env = {
             **os.environ,
             **envs,
-            "HOME": str(self._home_dir),
-            "USER": requested_user,
             "PATH": f"{HOST_REQUIRED_PATH_PREFIX}:{current_path}",
         }
         run_user = self._resolve_run_user(requested_user)

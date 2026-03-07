@@ -116,10 +116,10 @@ const getAuthTokenConfig = (
   switch (providerType) {
     case 'anthropic':
       return {
-        label: 'OAuth Token',
+        label: 'OAuth Token (optional)',
         placeholder: 'Paste token from claude setup-token',
         helperText: {
-          prefix: 'Requires Claude Max ($100-200/mo). Run',
+          prefix: 'Optional in host mode if already logged in via CLI. For Docker, run',
           code: 'claude setup-token',
           suffix: 'in terminal',
         },
@@ -204,8 +204,8 @@ export const ProviderDialog: React.FC<ProviderDialogProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const builtInTypes = ['anthropic', 'openrouter', 'openai', 'copilot'];
-    if (builtInTypes.includes(form.provider_type) && !form.auth_token) {
+    const tokenRequiredTypes = ['openrouter', 'openai', 'copilot'];
+    if (tokenRequiredTypes.includes(form.provider_type) && !form.auth_token) {
       setLocalError('Authentication is required for this provider type.');
       return;
     }

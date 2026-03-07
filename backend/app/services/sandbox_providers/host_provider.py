@@ -283,10 +283,6 @@ class LocalHostProvider(SandboxProvider):
         process_env = os.environ.copy()
         if envs:
             process_env.update(envs)
-        process_env["HOST_HOME"] = os.environ.get("HOME", "")
-        process_env["HOME"] = home_dir_str
-        process_env["USER"] = "user"
-        process_env["HOSTNAME"] = sandbox_id
         process_env["TERM"] = process_env.get("TERM", TERMINAL_TYPE)
 
         if background:
@@ -501,9 +497,6 @@ class LocalHostProvider(SandboxProvider):
         self._resize_fd(slave_fd, rows, cols)
 
         env = os.environ.copy()
-        env["HOME"] = str(home_dir)
-        env["USER"] = "user"
-        env["HOSTNAME"] = sandbox_id
         env["SHELL"] = "/bin/bash"
         env["TERM"] = TERMINAL_TYPE
 

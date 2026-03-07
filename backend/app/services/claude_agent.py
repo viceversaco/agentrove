@@ -233,7 +233,8 @@ class ClaudeAgentService:
         auth_token = provider.get("auth_token")
 
         if provider_type == ProviderType.ANTHROPIC.value:
-            # Direct Anthropic API — use OAuth token for authentication
+            # Direct Anthropic API — in host mode the CLI uses the user's
+            # existing login; in Docker mode an explicit token is needed.
             if auth_token:
                 env["CLAUDE_CODE_OAUTH_TOKEN"] = auth_token
         elif provider_type in (
