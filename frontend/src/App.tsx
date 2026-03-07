@@ -253,6 +253,31 @@ export default function App() {
     });
   }, []);
 
+  // Open external links in the system browser — Tauri doesn't handle target="_blank" natively
+  useEffect(() => {
+    if (!isTauri()) return;
+
+    let openUrl: ((url: string) => Promise<void>) | null = null;
+    void import('@tauri-apps/plugin-opener').then((m) => {
+      openUrl = m.openUrl;
+    });
+
+    function handler(e: MouseEvent) {
+      if (!openUrl || !(e.target instanceof Element)) return;
+      const anchor = e.target.closest('a');
+      if (!anchor) return;
+
+      const href = anchor.getAttribute('href');
+      if (!href || !(href.startsWith('http://') || href.startsWith('https://'))) return;
+
+      e.preventDefault();
+      void openUrl(href);
+    }
+
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, []);
+
   if (desktopError) {
     return (
       <div className="bg-surface-primary dark:bg-surface-dark-primary flex min-h-screen items-center justify-center text-text-primary dark:text-text-dark-primary">

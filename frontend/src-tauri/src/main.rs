@@ -187,6 +187,7 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .manage(backend_port.clone())
         .invoke_handler(tauri::generate_handler![get_backend_port])
         .setup(move |app| {
