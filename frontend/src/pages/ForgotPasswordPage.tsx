@@ -175,14 +175,14 @@ export function ForgotPasswordPage() {
         {forgotPasswordMutation.error && (
           <div className="animate-fadeIn rounded-lg border border-error-500/20 bg-error-500/10 p-3">
             <p className="text-xs font-medium text-error-600 dark:text-error-400">
-              {forgotPasswordMutation.error.message.includes('contact@claudex.pro') ? (
+              {forgotPasswordMutation.error.message.includes('contact@agentrove.pro') ? (
                 <>
                   Email not found. Please check your email or contact support at{' '}
                   <a
-                    href="mailto:contact@claudex.pro"
+                    href="mailto:contact@agentrove.pro"
                     className="underline transition-colors hover:text-error-500 dark:hover:text-error-300"
                   >
-                    contact@claudex.pro
+                    contact@agentrove.pro
                   </a>
                 </>
               ) : (

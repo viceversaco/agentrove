@@ -44,7 +44,7 @@ async function checkDesktopUpdate(): Promise<void> {
     return;
   }
 
-  const shouldInstall = await ask(`Claudex ${update.version} is available. Install now?`, {
+  const shouldInstall = await ask(`Agentrove ${update.version} is available. Install now?`, {
     title: 'Update Available',
     kind: 'info',
   });
@@ -54,7 +54,7 @@ async function checkDesktopUpdate(): Promise<void> {
 
   toast.loading('Downloading desktop update...', { id: 'desktop-update' });
   await update.downloadAndInstall();
-  toast.success(`Claudex ${update.version} installed. Restart app to finish update.`, {
+  toast.success(`Agentrove ${update.version} installed. Restart app to finish update.`, {
     id: 'desktop-update',
   });
 }
@@ -232,7 +232,7 @@ export default function App() {
       .catch((error) => {
         if (cancelled) return;
         console.error('Failed to resolve desktop backend port:', error);
-        setDesktopError('Desktop backend failed to start. Restart Claudex and try again.');
+        setDesktopError('Desktop backend failed to start. Restart Agentrove and try again.');
         getCurrentWindow()
           .show()
           .catch((error) => {

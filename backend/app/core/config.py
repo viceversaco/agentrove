@@ -14,10 +14,10 @@ from pythonjsonlogger import jsonlogger
 def _desktop_data_dir() -> Path:
     system = platform.system()
     if system == "Darwin":
-        return Path.home() / "Library" / "Application Support" / "com.claudex.app"
+        return Path.home() / "Library" / "Application Support" / "com.agentrove.app"
     if system == "Windows":
-        return Path.home() / "AppData" / "Roaming" / "com.claudex.app"
-    return Path.home() / ".local" / "share" / "com.claudex.app"
+        return Path.home() / "AppData" / "Roaming" / "com.agentrove.app"
+    return Path.home() / ".local" / "share" / "com.agentrove.app"
 
 
 class Settings(BaseSettings):
@@ -32,7 +32,9 @@ class Settings(BaseSettings):
     REQUIRE_EMAIL_VERIFICATION: bool = False
     REGISTRATION_DISABLED: bool = False
 
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/claudex"
+    DATABASE_URL: str = (
+        "postgresql+asyncpg://postgres:postgres@localhost:5432/agentrove"
+    )
     REDIS_URL: str = "redis://localhost:6379/0"
 
     SECRET_KEY: str = ""
@@ -45,7 +47,7 @@ class Settings(BaseSettings):
 
     ALLOWED_ORIGINS: str | list[str] = [
         "http://localhost:3000",
-        "https://claudex.pro",
+        "https://agentrove.pro",
     ]
 
     TRUSTED_PROXY_HOSTS: str | list[str] = "127.0.0.1"
@@ -92,10 +94,10 @@ class Settings(BaseSettings):
             return self
         data_dir = _desktop_data_dir()
         data_dir.mkdir(parents=True, exist_ok=True)
-        default_db = f"sqlite+aiosqlite:///{(data_dir / 'claudex.db').as_posix()}"
+        default_db = f"sqlite+aiosqlite:///{(data_dir / 'agentrove.db').as_posix()}"
         if (
             self.DATABASE_URL
-            == "postgresql+asyncpg://postgres:postgres@localhost:5432/claudex"
+            == "postgresql+asyncpg://postgres:postgres@localhost:5432/agentrove"
         ):
             self.DATABASE_URL = default_db
         if self.STORAGE_PATH == "/app/storage":
@@ -143,8 +145,8 @@ class Settings(BaseSettings):
     # Email configuration
     MAIL_USERNAME: str = "apikey"
     MAIL_PASSWORD: str | None = None
-    MAIL_FROM: str = "noreply@claudex.pro"
-    MAIL_FROM_NAME: str = "Claudex"
+    MAIL_FROM: str = "noreply@agentrove.pro"
+    MAIL_FROM_NAME: str = "Agentrove"
     MAIL_PORT: int = 587
     MAIL_SERVER: str = "smtp.sendgrid.net"
     MAIL_STARTTLS: bool = True
@@ -169,8 +171,8 @@ class Settings(BaseSettings):
     GNUPGHOME: str = str(Path.home() / ".gnupg")
 
     # Docker Sandbox configuration
-    DOCKER_IMAGE: str = "ghcr.io/mng-dev-ai/claudex-sandbox:latest"
-    DOCKER_NETWORK: str = "claudex-sandbox-net"
+    DOCKER_IMAGE: str = "ghcr.io/mng-dev-ai/agentrove-sandbox:latest"
+    DOCKER_NETWORK: str = "agentrove-sandbox-net"
     DOCKER_HOST: str | None = None
     DOCKER_PREVIEW_BASE_URL: str = "http://localhost"
     # Traefik path-prefix routing for HTTPS sandbox access (see docker_provider.py)

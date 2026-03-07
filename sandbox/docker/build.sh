@@ -5,8 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SANDBOX_DIR="$(dirname "$SCRIPT_DIR")"
 REPO_ROOT="$(dirname "$SANDBOX_DIR")"
 
-IMAGE_NAME="claudex-sandbox:latest"
-GHCR_IMAGE="ghcr.io/mng-dev-ai/claudex-sandbox:latest"
+IMAGE_NAME="agentrove-sandbox:latest"
+GHCR_IMAGE="ghcr.io/mng-dev-ai/agentrove-sandbox:latest"
 
 if [ "$1" = "--push" ]; then
     echo "Building and pushing to GHCR..."
@@ -14,7 +14,7 @@ if [ "$1" = "--push" ]; then
     docker push "$GHCR_IMAGE"
     echo "Done! Image pushed: $GHCR_IMAGE"
 else
-    echo "Building claudex-sandbox image..."
+    echo "Building agentrove-sandbox image..."
     docker build -t "$IMAGE_NAME" -f "$SCRIPT_DIR/Dockerfile" "$REPO_ROOT"
     echo "Done! Image built: $IMAGE_NAME"
     echo ""
@@ -23,7 +23,7 @@ else
 fi
 
 echo "Creating docker network (if not exists)..."
-docker network create claudex-sandbox-net 2>/dev/null || true
+docker network create agentrove-sandbox-net 2>/dev/null || true
 
 echo ""
 echo "To test the image, run:"

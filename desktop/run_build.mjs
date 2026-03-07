@@ -189,7 +189,7 @@ function copySource() {
 }
 
 function writeLauncher() {
-  const launcher = join(sidecarDir, 'claudex-backend');
+  const launcher = join(sidecarDir, 'agentrove-backend');
   writeFileSync(
     launcher,
     '#!/bin/bash\n' +

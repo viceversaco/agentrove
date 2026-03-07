@@ -1,6 +1,6 @@
-# Coolify Installation Guide for Claudex
+# Coolify Installation Guide for Agentrove
 
-This guide provides step-by-step instructions for deploying Claudex on any VPS using [Coolify](https://coolify.io/), a self-hosted PaaS alternative to Heroku, Netlify, and Vercel.
+This guide provides step-by-step instructions for deploying Agentrove on any VPS using [Coolify](https://coolify.io/), a self-hosted PaaS alternative to Heroku, Netlify, and Vercel.
 
 ## Table of Contents
 
@@ -38,7 +38,7 @@ Before starting, ensure you have:
 - **Domain name** with DNS configured (A records pointing to your VPS IP)
   - Main domain: `yourdomain.com` (frontend and API path routing)
 - **Coolify installed** on your VPS ([Installation Guide](https://coolify.io/docs/installation))
-- **GitHub account** with access to your Claudex repository fork
+- **GitHub account** with access to your Agentrove repository fork
 
 ### DNS Configuration
 
@@ -63,7 +63,7 @@ yourdomain.com  →  YOUR_VPS_IP
 1. Select **GitHub App** as the source type
 2. Follow the prompts to create a new GitHub App
 3. Install the GitHub App on your account/organization
-4. Grant repository access to your Claudex fork
+4. Grant repository access to your Agentrove fork
 
 > **Note**: Using a GitHub App provides secure, token-based access with fine-grained permissions.
 
@@ -75,16 +75,16 @@ yourdomain.com  →  YOUR_VPS_IP
 
 1. Click **Projects** in the left sidebar
 2. Click **+ Add** to create a new project
-3. Enter project name: `Claudex`
+3. Enter project name: `Agentrove`
 4. Click **Continue**
 
 ### Step 2: Create Production Environment
 
-1. Inside the Claudex project, click **+ New Environment**
+1. Inside the Agentrove project, click **+ New Environment**
 2. Enter environment name: `production`
 3. Click **Continue**
 
-This environment will contain all your Claudex services.
+This environment will contain all your Agentrove services.
 
 ---
 
@@ -156,7 +156,7 @@ The API is the core backend service handling authentication, chat processing, an
 1. Click **+ Add New Resource**
 2. Select **Application**
 3. Choose your GitHub source
-4. Select your Claudex repository
+4. Select your Agentrove repository
 5. Select the branch (usually `main`)
 
 ### Step 2: Configure General Settings
@@ -266,7 +266,7 @@ Scheduled task execution and cleanup jobs run inside the API service lifecycle.
 1. Click **+ Add New Resource**
 2. Select **Application**
 3. Choose your GitHub source
-4. Select the Claudex repository
+4. Select the Agentrove repository
 5. Select the branch (usually `main`)
 
 ### Step 2: Configure General Settings
@@ -572,7 +572,7 @@ MAIL_PORT=587
 MAIL_USERNAME=apikey
 MAIL_PASSWORD=your-sendgrid-api-key
 MAIL_FROM=noreply@yourdomain.com
-MAIL_FROM_NAME=Claudex
+MAIL_FROM_NAME=Agentrove
 MAIL_STARTTLS=true
 MAIL_SSL_TLS=false
 BLOCK_DISPOSABLE_EMAILS=true
@@ -584,8 +584,8 @@ BLOCK_DISPOSABLE_EMAILS=true
 | `MAIL_PORT` | `587` | SMTP server port |
 | `MAIL_USERNAME` | `apikey` | SMTP username (use `apikey` for SendGrid) |
 | `MAIL_PASSWORD` | *(none)* | SMTP password or API key |
-| `MAIL_FROM` | `noreply@claudex.pro` | Sender email address |
-| `MAIL_FROM_NAME` | `Claudex` | Sender display name |
+| `MAIL_FROM` | `noreply@agentrove.pro` | Sender email address |
+| `MAIL_FROM_NAME` | `Agentrove` | Sender display name |
 | `MAIL_STARTTLS` | `true` | Enable STARTTLS encryption |
 | `MAIL_SSL_TLS` | `false` | Enable SSL/TLS (use either this or STARTTLS) |
 | `BLOCK_DISPOSABLE_EMAILS` | `true` | Block registrations from disposable email domains |
@@ -605,8 +605,8 @@ LOG_LEVEL=INFO
 Fine-tune Docker sandbox behavior. Most deployments can use the defaults.
 
 ```env
-DOCKER_IMAGE=ghcr.io/mng-dev-ai/claudex-sandbox:latest
-DOCKER_NETWORK=claudex-sandbox-net
+DOCKER_IMAGE=ghcr.io/mng-dev-ai/agentrove-sandbox:latest
+DOCKER_NETWORK=agentrove-sandbox-net
 DOCKER_HOST=
 DOCKER_PREVIEW_BASE_URL=http://localhost
 DOCKER_TRAEFIK_ENTRYPOINT=https
@@ -614,8 +614,8 @@ DOCKER_TRAEFIK_ENTRYPOINT=https
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DOCKER_IMAGE` | `ghcr.io/mng-dev-ai/claudex-sandbox:latest` | Docker image for sandbox containers |
-| `DOCKER_NETWORK` | `claudex-sandbox-net` | Docker network for sandbox isolation |
+| `DOCKER_IMAGE` | `ghcr.io/mng-dev-ai/agentrove-sandbox:latest` | Docker image for sandbox containers |
+| `DOCKER_NETWORK` | `agentrove-sandbox-net` | Docker network for sandbox isolation |
 | `DOCKER_HOST` | *(none)* | Custom Docker daemon socket/host |
 | `DOCKER_PREVIEW_BASE_URL` | `http://localhost` | Base URL for sandbox preview links |
 | `DOCKER_TRAEFIK_ENTRYPOINT` | `https` | Traefik entrypoint for sandbox routing |
@@ -708,7 +708,7 @@ CONTEXT_USAGE_CACHE_TTL_SECONDS=600
 
 ## Next Steps
 
-After successfully deploying Claudex:
+After successfully deploying Agentrove:
 
 1. **Set up backups** - Configure PostgreSQL backups in Coolify
 2. **Monitor resources** - Use Coolify's built-in monitoring
@@ -722,6 +722,6 @@ After successfully deploying Claudex:
 
 If you encounter issues not covered in this guide:
 
-1. Check the [GitHub Issues](https://github.com/yourusername/claudex/issues)
+1. Check the [GitHub Issues](https://github.com/yourusername/agentrove/issues)
 2. Review Coolify logs for specific error messages
 3. Join the community discussions for help

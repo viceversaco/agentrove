@@ -58,7 +58,7 @@ def create_admin(app: Any, engine: Any, session_maker: Any) -> Admin:
         app=app,
         engine=engine,
         authentication_backend=authentication_backend,
-        title="Claudex Admin",
+        title="Agentrove Admin",
         base_url="/admin",
     )
 

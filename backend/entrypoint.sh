@@ -2,7 +2,7 @@
 
 ensure_docker_network() {
     if [ -S /var/run/docker.sock ]; then
-        NETWORK_NAME="${DOCKER_NETWORK:-claudex-sandbox-net}"
+        NETWORK_NAME="${DOCKER_NETWORK:-agentrove-sandbox-net}"
         if ! docker network inspect "$NETWORK_NAME" >/dev/null 2>&1; then
             echo "Creating Docker network: $NETWORK_NAME"
             docker network create "$NETWORK_NAME" 2>/dev/null || true

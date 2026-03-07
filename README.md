@@ -1,4 +1,4 @@
-# Claudex
+# Agentrove
 
 Self-hosted Claude Code workspace with multi-provider routing, sandboxed execution, and a full web IDE.
 
@@ -8,13 +8,13 @@ Self-hosted Claude Code workspace with multi-provider routing, sandboxed executi
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
 [![Discord](https://img.shields.io/badge/Discord-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/HvkJU8dcBA)
 
-> **Note:** Claudex is under active development. Expect breaking changes between releases.
+> **Note:** Agentrove is under active development. Expect breaking changes between releases.
 
 ## Community
 
 Join the [Discord server](https://discord.gg/HvkJU8dcBA).
 
-## Why Claudex
+## Why Agentrove
 
 - Claude Code as the execution harness, exposed through a self-hosted web UI
 - One workflow across Anthropic, OpenAI, GitHub Copilot, OpenRouter, and custom Anthropic-compatible endpoints
@@ -36,25 +36,25 @@ React/Vite Frontend
 
 ### Claude Code harness
 
-Claudex runs chats through `claude-agent-sdk`, which drives the Claude Code CLI in the selected sandbox. This keeps Claude Code-native behavior for tools, session flow, permission modes, and MCP orchestration.
+Agentrove runs chats through `claude-agent-sdk`, which drives the Claude Code CLI in the selected sandbox. This keeps Claude Code-native behavior for tools, session flow, permission modes, and MCP orchestration.
 
 ### Anthropic Bridge for non-Anthropic providers
 
-For OpenAI, OpenRouter, and Copilot providers, Claudex starts `anthropic-bridge` inside the sandbox and routes Claude Code requests through:
+For OpenAI, OpenRouter, and Copilot providers, Agentrove starts `anthropic-bridge` inside the sandbox and routes Claude Code requests through:
 
 - `ANTHROPIC_BASE_URL=http://127.0.0.1:3456`
 - provider-specific auth secrets such as `OPENROUTER_API_KEY` and `GITHUB_COPILOT_TOKEN`
 - provider-scoped model IDs like `openai/gpt-5.2-codex`, `openrouter/moonshotai/kimi-k2.5`, `copilot/gpt-5.2-codex`
 
 ```text
-Claudex UI
+Agentrove UI
   -> Claude Agent SDK + Claude Code CLI
   -> Anthropic-compatible request shape
   -> Anthropic Bridge (OpenAI/OpenRouter/Copilot)
   -> Target provider model
 ```
 
-For Anthropic providers, Claudex uses your Claude auth token directly. For custom providers, Claudex calls your configured Anthropic-compatible `base_url`.
+For Anthropic providers, Agentrove uses your Claude auth token directly. For custom providers, Agentrove calls your configured Anthropic-compatible `base_url`.
 
 ## Key Features
 
@@ -98,9 +98,9 @@ When creating a workspace you can override the default sandbox provider (Docker 
 ### Start
 
 ```bash
-git clone https://github.com/Mng-dev-ai/claudex.git
-cd claudex
-docker compose -p claudex-web -f docker-compose.yml up -d
+git clone https://github.com/Mng-dev-ai/agentrove.git
+cd agentrove
+docker compose -p agentrove-web -f docker-compose.yml up -d
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
@@ -108,8 +108,8 @@ Open [http://localhost:3000](http://localhost:3000).
 ### Stop and logs
 
 ```bash
-docker compose -p claudex-web -f docker-compose.yml down
-docker compose -p claudex-web -f docker-compose.yml logs -f
+docker compose -p agentrove-web -f docker-compose.yml down
+docker compose -p agentrove-web -f docker-compose.yml logs -f
 ```
 
 ## Desktop (macOS)
@@ -118,7 +118,7 @@ Desktop mode uses Tauri with a bundled Python backend sidecar on `localhost:8081
 
 ### Download prebuilt app
 
-- Apple Silicon DMG: [Latest Release](https://github.com/Mng-dev-ai/claudex/releases/latest)
+- Apple Silicon DMG: [Latest Release](https://github.com/Mng-dev-ai/agentrove/releases/latest)
 
 ### How it works
 
@@ -159,7 +159,7 @@ npm run desktop:build
 
 App bundle output:
 
-- `frontend/src-tauri/target/release/bundle/macos/Claudex.app`
+- `frontend/src-tauri/target/release/bundle/macos/Agentrove.app`
 
 Desktop troubleshooting:
 
@@ -189,7 +189,7 @@ Switching providers within a workspace does not require a new workflow:
 
 - Same sandbox filesystem/workdir
 - Same `.claude` resources (skills, agents, commands)
-- Same MCP configuration in Claudex
+- Same MCP configuration in Agentrove
 - Same workspace and chat history
 
 This is the main value of using Claude Code as the harness while changing inference providers behind Anthropic Bridge.

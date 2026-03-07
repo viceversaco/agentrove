@@ -40,7 +40,7 @@ class DockerSandboxTransport(BaseSandboxTransport):
     async def _get_container(self) -> Any:
         try:
             container = await self._get_docker().containers.get(
-                f"claudex-sandbox-{self._sandbox_id}"
+                f"agentrove-sandbox-{self._sandbox_id}"
             )
             info = await container.show()
             if info["State"]["Status"] != "running":
