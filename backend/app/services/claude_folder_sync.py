@@ -1,3 +1,5 @@
+import copy
+import json
 import logging
 import os
 import shutil
@@ -23,6 +25,9 @@ CLAUDE_DIR = Path.home() / ".claude"
 CLAUDE_AGENTS_DIR = CLAUDE_DIR / "agents"
 CLAUDE_COMMANDS_DIR = CLAUDE_DIR / "commands"
 CLAUDE_SKILLS_DIR = CLAUDE_DIR / "skills"
+CLAUDE_PLUGINS_DIR = CLAUDE_DIR / "plugins"
+CLAUDE_PLUGINS_CACHE_DIR = CLAUDE_PLUGINS_DIR / "cache"
+INSTALLED_PLUGINS_JSON = CLAUDE_PLUGINS_DIR / "installed_plugins.json"
 
 T = TypeVar("T", bound=Mapping[str, object])
 
@@ -49,13 +54,71 @@ class ClaudeFolderSync:
             return {}
 
     @staticmethod
+    def read_installed_plugins() -> dict | None:
+        if not INSTALLED_PLUGINS_JSON.is_file():
+            return None
+        try:
+            return json.loads(INSTALLED_PLUGINS_JSON.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return None
+
+    @staticmethod
+    def get_active_plugin_paths(
+        data: dict | None = None,
+    ) -> list[Path]:
+        if data is None:
+            data = ClaudeFolderSync.read_installed_plugins()
+        if not data:
+            return []
+        paths: list[Path] = []
+        for entries in data.get("plugins", {}).values():
+            if not entries:
+                continue
+            install_path = entries[0].get("installPath")
+            if not install_path:
+                continue
+            p = Path(install_path)
+            if p.is_dir():
+                paths.append(p)
+        return paths
+
+    @staticmethod
+    def rewrite_installed_plugins_for_container(
+        container_cache_dir: str,
+        data: dict | None = None,
+    ) -> str | None:
+        if data is None:
+            data = ClaudeFolderSync.read_installed_plugins()
+        if not data:
+            return None
+        data = copy.deepcopy(data)
+        host_prefix = str(CLAUDE_PLUGINS_CACHE_DIR) + os.sep
+        for entries in data.get("plugins", {}).values():
+            for entry in entries:
+                ip = entry.get("installPath", "")
+                if ip.startswith(host_prefix):
+                    entry["installPath"] = container_cache_dir + ip[len(host_prefix) :]
+        return json.dumps(data, indent=2)
+
+    @staticmethod
+    def _discover_with_plugins(
+        discover_fn: Callable[..., list[T]],
+        subdir: str,
+        plugin_paths: list[Path],
+    ) -> list[T]:
+        results = discover_fn()
+        for plugin_dir in plugin_paths:
+            results.extend(discover_fn(plugin_dir / subdir))
+        return results
+
+    @staticmethod
     def _merge_by_name(
         db_items: list[T] | None,
-        discover_fn: Callable[[], list[T]],
+        discovered: list[T],
     ) -> list[T]:
         existing = list(db_items) if db_items else []
         existing_names = {str(item["name"]).lower() for item in existing}
-        for item in discover_fn():
+        for item in discovered:
             if str(item["name"]).lower() not in existing_names:
                 existing.append(item)
         return existing
@@ -155,26 +218,38 @@ class ClaudeFolderSync:
     @staticmethod
     def merge_agents(
         db_agents: list[CustomAgentDict] | None,
+        plugin_paths: list[Path] | None = None,
     ) -> list[CustomAgentDict]:
-        return ClaudeFolderSync._merge_by_name(
-            db_agents, ClaudeFolderSync.discover_agents
+        if plugin_paths is None:
+            plugin_paths = ClaudeFolderSync.get_active_plugin_paths()
+        discovered = ClaudeFolderSync._discover_with_plugins(
+            ClaudeFolderSync.discover_agents, "agents", plugin_paths
         )
+        return ClaudeFolderSync._merge_by_name(db_agents, discovered)
 
     @staticmethod
     def merge_commands(
         db_commands: list[CustomSlashCommandDict] | None,
+        plugin_paths: list[Path] | None = None,
     ) -> list[CustomSlashCommandDict]:
-        return ClaudeFolderSync._merge_by_name(
-            db_commands, ClaudeFolderSync.discover_commands
+        if plugin_paths is None:
+            plugin_paths = ClaudeFolderSync.get_active_plugin_paths()
+        discovered = ClaudeFolderSync._discover_with_plugins(
+            ClaudeFolderSync.discover_commands, "commands", plugin_paths
         )
+        return ClaudeFolderSync._merge_by_name(db_commands, discovered)
 
     @staticmethod
     def merge_skills(
         db_skills: list[CustomSkillDict] | None,
+        plugin_paths: list[Path] | None = None,
     ) -> list[CustomSkillDict]:
-        return ClaudeFolderSync._merge_by_name(
-            db_skills, ClaudeFolderSync.discover_skills
+        if plugin_paths is None:
+            plugin_paths = ClaudeFolderSync.get_active_plugin_paths()
+        discovered = ClaudeFolderSync._discover_with_plugins(
+            ClaudeFolderSync.discover_skills, "skills", plugin_paths
         )
+        return ClaudeFolderSync._merge_by_name(db_skills, discovered)
 
     @staticmethod
     def _write_md(directory: Path, name: str, content: str) -> None:

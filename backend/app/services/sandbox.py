@@ -38,7 +38,10 @@ from app.services.sandbox_providers import (
     PtySize,
     SandboxProvider,
 )
-from app.services.claude_folder_sync import ClaudeFolderSync
+from app.services.claude_folder_sync import (
+    CLAUDE_PLUGINS_CACHE_DIR,
+    ClaudeFolderSync,
+)
 from app.services.sandbox_providers.types import CommandResult
 from app.services.skill import SkillService
 
@@ -379,6 +382,40 @@ class SandboxService:
             writes.append(
                 (f"{SANDBOX_CLAUDE_DIR}/agents/{agent_name}.md", agent_content)
             )
+
+        container_cache_dir = f"{SANDBOX_CLAUDE_DIR}/plugins/cache"
+        plugins_data = ClaudeFolderSync.read_installed_plugins()
+        plugin_paths = ClaudeFolderSync.get_active_plugin_paths(plugins_data)
+        if plugin_paths:
+            remapped_json = ClaudeFolderSync.rewrite_installed_plugins_for_container(
+                container_cache_dir, plugins_data
+            )
+            if remapped_json:
+                writes.append(
+                    (
+                        f"{SANDBOX_CLAUDE_DIR}/plugins/installed_plugins.json",
+                        remapped_json,
+                    )
+                )
+            for plugin_dir in plugin_paths:
+                try:
+                    rel_to_cache = plugin_dir.relative_to(CLAUDE_PLUGINS_CACHE_DIR)
+                except ValueError:
+                    continue
+                for f in plugin_dir.rglob("*"):
+                    if not f.is_file():
+                        continue
+                    try:
+                        file_bytes = f.read_bytes()
+                    except OSError:
+                        continue
+                    rel_file = f.relative_to(plugin_dir)
+                    writes.append(
+                        (
+                            f"{container_cache_dir}/{rel_to_cache}/{rel_file}",
+                            file_bytes,
+                        )
+                    )
 
         if not writes:
             return

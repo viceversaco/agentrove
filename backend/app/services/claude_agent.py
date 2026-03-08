@@ -55,7 +55,6 @@ ALLOWED_SLASH_COMMANDS = [
     "/insights",
     "/simplify",
     "/loop",
-    "/frontend-design",
     "/batch",
 ]
 SDK_PERMISSION_MODE_MAP: dict[

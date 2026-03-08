@@ -57,12 +57,6 @@ const SLASH_COMMANDS: SlashCommand[] = [
       'Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo, defaults to 10m)',
   },
   {
-    value: '/frontend-design',
-    label: 'Frontend Design',
-    description:
-      'Create distinctive, production-grade frontend interfaces with high design quality',
-  },
-  {
     value: '/batch',
     label: 'Batch',
     description:

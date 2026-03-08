@@ -110,6 +110,7 @@ class UserService(BaseDbService[UserSettings]):
         if not CLAUDE_DIR.is_dir():
             return
 
+        plugin_paths = ClaudeFolderSync.get_active_plugin_paths()
         merge_specs: list[tuple[str, Any, type[BaseModel]]] = [
             ("custom_agents", ClaudeFolderSync.merge_agents, CustomAgent),
             (
@@ -122,7 +123,7 @@ class UserService(BaseDbService[UserSettings]):
         for attr, merge_fn, model_cls in merge_specs:
             current = getattr(response, attr) or []
             db_items = [x.model_dump() for x in current]
-            merged = merge_fn(db_items)
+            merged = merge_fn(db_items, plugin_paths=plugin_paths)
             if len(merged) > len(db_items):
                 new_items = [
                     model_cls.model_validate(x) for x in merged[len(current) :]
