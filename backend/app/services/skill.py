@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import zipfile
+from collections.abc import Iterator
 from pathlib import Path
 
 from fastapi import UploadFile
@@ -14,6 +15,7 @@ from app.constants import (
 )
 from app.core.config import get_settings
 from app.models.types import CustomSkillDict, EnabledResourceInfo, YamlMetadata
+from app.services.claude_folder_sync import ClaudeFolderSync
 from app.services.exceptions import SkillException
 from app.services.resource import BaseMarkdownResourceService
 from app.utils.yaml_parser import YAMLParser
@@ -24,6 +26,19 @@ MAX_SKILL_SIZE_BYTES = 100 * 1024 * 1024
 
 
 class SkillService:
+    @staticmethod
+    def iter_zip_entries(
+        zf: zipfile.ZipFile, skill_name: str
+    ) -> Iterator[tuple[str, bytes]]:
+        """Yield (relative_path, file_bytes) for each file in a skill zip."""
+        prefix = f"{skill_name}/"
+        for entry in zf.namelist():
+            if entry.endswith("/"):
+                continue
+            file_bytes = zf.read(entry)
+            rel = entry[len(prefix) :] if entry.startswith(prefix) else entry
+            yield rel, file_bytes
+
     def __init__(self) -> None:
         self.storage_path = Path(settings.STORAGE_PATH)
         self.skills_base_path = self.storage_path / "skills"
@@ -141,6 +156,9 @@ class SkillService:
                 with open(final_zip_path, "wb") as f:
                     f.write(contents)
 
+                if ClaudeFolderSync.is_active():
+                    ClaudeFolderSync.write_skill(skill_name, final_zip_path)
+
                 logger.info(
                     f"Stored skill ZIP: {skill_name}, "
                     f"size={len(contents)}, "
@@ -165,6 +183,8 @@ class SkillService:
         skill_path = self._get_skill_path(user_id, skill_name)
         if skill_path.exists():
             os.remove(skill_path)
+        if ClaudeFolderSync.is_active():
+            ClaudeFolderSync.delete_skill(skill_name)
 
     def get_enabled(
         self, user_id: str, custom_skills: list[CustomSkillDict]

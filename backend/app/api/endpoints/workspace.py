@@ -1,4 +1,6 @@
+import asyncio
 import logging
+from pathlib import Path
 from typing import NoReturn
 from uuid import UUID
 
@@ -9,11 +11,14 @@ from app.core.deps import get_workspace_service
 from app.core.security import get_current_user
 from app.models.db_models.user import User
 from app.models.schemas.pagination import PaginatedResponse
+from app.models.schemas.settings import CustomAgent, CustomSkill, CustomSlashCommand
 from app.models.schemas.workspace import (
     Workspace as WorkspaceSchema,
     WorkspaceCreate,
+    WorkspaceResources,
     WorkspaceUpdate,
 )
+from app.services.claude_folder_sync import ClaudeFolderSync
 from app.services.exceptions import WorkspaceException
 from app.services.workspace import WorkspaceService
 
@@ -80,6 +85,27 @@ async def update_workspace(
         )
     except WorkspaceException as e:
         _raise_workspace_http_exception(e)
+
+
+@router.get("/{workspace_id}/resources", response_model=WorkspaceResources)
+async def get_workspace_resources(
+    workspace_id: UUID,
+    current_user: User = Depends(get_current_user),
+    workspace_service: WorkspaceService = Depends(get_workspace_service),
+) -> WorkspaceResources:
+    try:
+        workspace = await workspace_service.get_workspace(workspace_id, current_user)
+    except WorkspaceException as e:
+        _raise_workspace_http_exception(e)
+    project_claude_dir = Path(workspace.workspace_path) / ".claude"
+    raw_agents, raw_commands, raw_skills = await asyncio.to_thread(
+        ClaudeFolderSync.discover_all, project_claude_dir
+    )
+    return WorkspaceResources(
+        agents=[CustomAgent.model_validate(a) for a in raw_agents],
+        commands=[CustomSlashCommand.model_validate(c) for c in raw_commands],
+        skills=[CustomSkill.model_validate(s) for s in raw_skills],
+    )
 
 
 @router.delete("/{workspace_id}", status_code=status.HTTP_204_NO_CONTENT)

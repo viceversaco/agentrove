@@ -24,6 +24,7 @@ export const queryKeys = {
     gitBranches: (sandboxId: string) => ['sandbox', sandboxId, 'git-branches'] as const,
   },
   workspaces: ['workspaces'] as const,
+  workspaceResources: (workspaceId: string) => ['workspaces', workspaceId, 'resources'] as const,
   models: 'models',
   scheduler: {
     tasks: ['scheduler', 'tasks'] as const,

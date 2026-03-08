@@ -3,11 +3,14 @@ import type { GeneralSecretFieldConfig } from '@/types/settings.types';
 import { validateRequired, validateRequiredIf, validateUnique } from '@/utils/validation';
 import { BUILT_IN_AGENTS } from '@/config/constants';
 
+export const mergeByName = <T extends { name: string }>(primary: T[], secondary: T[]): T[] => {
+  if (!secondary.length) return primary;
+  const primaryNames = new Set(primary.map((item) => item.name.toLowerCase()));
+  return [...primary, ...secondary.filter((item) => !primaryNames.has(item.name.toLowerCase()))];
+};
+
 export const mergeAgents = (customAgents: CustomAgent[] | null | undefined): CustomAgent[] => {
-  const custom = customAgents ?? [];
-  const builtInNames = new Set(BUILT_IN_AGENTS.map((a) => a.name.toLowerCase()));
-  const uniqueCustomAgents = custom.filter((a) => !builtInNames.has(a.name.toLowerCase()));
-  return [...BUILT_IN_AGENTS, ...uniqueCustomAgents];
+  return mergeByName(BUILT_IN_AGENTS, customAgents ?? []);
 };
 
 export const createDefaultEnvVarForm = (): CustomEnvVar => ({

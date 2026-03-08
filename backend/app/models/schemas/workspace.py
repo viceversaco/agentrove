@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.models.schemas.settings import CustomAgent, CustomSkill, CustomSlashCommand
+
 
 class WorkspaceCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
@@ -30,3 +32,9 @@ class Workspace(BaseModel):
     source_url: str | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class WorkspaceResources(BaseModel):
+    agents: list[CustomAgent] = Field(default_factory=list)
+    commands: list[CustomSlashCommand] = Field(default_factory=list)
+    skills: list[CustomSkill] = Field(default_factory=list)

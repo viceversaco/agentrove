@@ -15,9 +15,12 @@ import { ChatSessionOrchestrator } from '@/components/chat/chat-window/ChatSessi
 import { useEditorState } from '@/hooks/useEditorState';
 import { useChatData } from '@/hooks/useChatData';
 import { useSandboxFiles } from '@/hooks/useSandboxFiles';
-import { useWorkspacesQuery } from '@/hooks/queries/useWorkspaceQueries';
+import {
+  useWorkspacesQuery,
+  useWorkspaceResourcesQuery,
+} from '@/hooks/queries/useWorkspaceQueries';
 import { useSettingsQuery } from '@/hooks/queries/useSettingsQueries';
-import { mergeAgents } from '@/utils/settings';
+import { mergeAgents, mergeByName } from '@/utils/settings';
 import { findFileByToolPath } from '@/utils/file';
 import { ChatProvider } from '@/contexts/ChatContext';
 
@@ -112,11 +115,21 @@ export function ChatPage() {
 
   const { data: settings } = useSettingsQuery();
 
-  const allAgents = useMemo(() => mergeAgents(settings?.custom_agents), [settings?.custom_agents]);
+  const { data: workspaceResources } = useWorkspaceResourcesQuery(currentChat?.workspace_id);
 
-  const enabledSlashCommands = useMemo(() => {
-    return settings?.custom_slash_commands?.filter((cmd) => cmd.enabled) || [];
-  }, [settings?.custom_slash_commands]);
+  const allAgents = useMemo(
+    () => mergeByName(mergeAgents(settings?.custom_agents), workspaceResources?.agents ?? []),
+    [settings?.custom_agents, workspaceResources?.agents],
+  );
+
+  const enabledSlashCommands = useMemo(
+    () =>
+      mergeByName(
+        settings?.custom_slash_commands?.filter((cmd) => cmd.enabled) || [],
+        workspaceResources?.commands ?? [],
+      ),
+    [settings?.custom_slash_commands, workspaceResources?.commands],
+  );
 
   const customPrompts = useMemo(() => {
     return settings?.custom_prompts || [];

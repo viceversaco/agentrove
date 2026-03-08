@@ -1,3 +1,5 @@
+import type { CustomAgent, CustomCommand, CustomSkill } from './user.types';
+
 export type WorkspaceSourceType = 'git' | 'local' | 'empty';
 
 export interface Workspace {
@@ -23,4 +25,10 @@ export interface CreateWorkspaceRequest {
 
 export interface UpdateWorkspaceRequest {
   name?: string;
+}
+
+export interface WorkspaceResources {
+  agents: CustomAgent[];
+  commands: CustomCommand[];
+  skills: CustomSkill[];
 }

@@ -167,6 +167,12 @@ class BaseMarkdownResourceService(ABC, Generic[T]):
     def _validate_additional_fields(self, metadata: YamlMetadata) -> None:
         pass
 
+    def _sync_write_to_claude_folder(self, name: str, content: str) -> None:
+        pass
+
+    def _sync_delete_from_claude_folder(self, name: str) -> None:
+        pass
+
     def _validate_markdown_file(self, content: str) -> ParsedResourceResult:
         if len(content) > self.max_size_bytes:
             self._raise(
@@ -237,6 +243,8 @@ class BaseMarkdownResourceService(ABC, Generic[T]):
         with open(resource_path, "w", encoding="utf-8") as f:
             f.write(content_str)
 
+        self._sync_write_to_claude_folder(sanitized_name, content_str)
+
         logger.info(
             f"Stored {self.resource_type}: {sanitized_name}, size={len(contents)} bytes"
         )
@@ -247,6 +255,7 @@ class BaseMarkdownResourceService(ABC, Generic[T]):
         resource_path = self._get_resource_path(user_id, name)
         if resource_path.exists():
             os.remove(resource_path)
+        self._sync_delete_from_claude_folder(name)
 
     async def update(
         self,
@@ -290,6 +299,10 @@ class BaseMarkdownResourceService(ABC, Generic[T]):
 
         with open(new_path, "w", encoding="utf-8") as f:
             f.write(content)
+
+        if new_sanitized_name != current_name:
+            self._sync_delete_from_claude_folder(current_name)
+        self._sync_write_to_claude_folder(new_sanitized_name, content)
 
         logger.info(
             f"Updated {self.resource_type}: {current_name} -> {new_sanitized_name}, "

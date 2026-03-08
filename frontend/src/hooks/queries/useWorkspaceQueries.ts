@@ -3,11 +3,25 @@ import type { UseMutationOptions, UseQueryOptions } from '@tanstack/react-query'
 import { workspaceService } from '@/services/workspaceService';
 import type {
   Workspace,
+  WorkspaceResources,
   CreateWorkspaceRequest,
   UpdateWorkspaceRequest,
 } from '@/types/workspace.types';
 import type { PaginatedResponse } from '@/types/api.types';
 import { queryKeys } from './queryKeys';
+
+export const useWorkspaceResourcesQuery = (
+  workspaceId: string | undefined,
+  options?: Partial<UseQueryOptions<WorkspaceResources>>,
+) => {
+  return useQuery({
+    queryKey: queryKeys.workspaceResources(workspaceId ?? ''),
+    queryFn: () => workspaceService.getWorkspaceResources(workspaceId!),
+    enabled: !!workspaceId,
+    staleTime: 30_000,
+    ...options,
+  });
+};
 
 export const useWorkspacesQuery = (
   options?: Partial<UseQueryOptions<PaginatedResponse<Workspace>>>,

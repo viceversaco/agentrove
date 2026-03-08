@@ -38,6 +38,7 @@ from app.services.sandbox_providers import (
     PtySize,
     SandboxProvider,
 )
+from app.services.claude_folder_sync import ClaudeFolderSync
 from app.services.sandbox_providers.types import CommandResult
 from app.services.skill import SkillService
 
@@ -312,6 +313,15 @@ class SandboxService:
         custom_slash_commands: list[CustomSlashCommandDict] | None,
         custom_agents: list[CustomAgentDict] | None,
     ) -> None:
+        # In desktop mode, HOME is not overridden so the Claude CLI reads
+        # ~/.claude/ directly. Write resources there instead of the sandbox's
+        # isolated .claude/ directory which the CLI would never find.
+        if ClaudeFolderSync.is_active():
+            ClaudeFolderSync.export_all_to_claude_folder(
+                user_id, custom_agents, custom_slash_commands, custom_skills
+            )
+            return
+
         skill_service = SkillService()
         command_service = CommandService()
         agent_service = AgentService()
@@ -338,13 +348,9 @@ class SandboxService:
                 continue
 
             with zipfile.ZipFile(local_zip_path, "r") as skill_zip:
-                # Strip the skill-name prefix if the zip nests files under it
-                prefix = f"{skill_name}/"
-                for entry in skill_zip.namelist():
-                    if entry.endswith("/"):
-                        continue
-                    file_bytes = skill_zip.read(entry)
-                    rel = entry[len(prefix) :] if entry.startswith(prefix) else entry
+                for rel, file_bytes in SkillService.iter_zip_entries(
+                    skill_zip, skill_name
+                ):
                     remote_path = f"{SANDBOX_CLAUDE_DIR}/skills/{skill_name}/{rel}"
                     writes.append((remote_path, file_bytes))
 

@@ -2,6 +2,7 @@ import { apiClient } from '@/lib/api';
 import { ensureResponse, serviceCall, buildQueryString } from '@/services/base/BaseService';
 import type {
   Workspace,
+  WorkspaceResources,
   CreateWorkspaceRequest,
   UpdateWorkspaceRequest,
 } from '@/types/workspace.types';
@@ -40,9 +41,19 @@ async function deleteWorkspace(workspaceId: string): Promise<void> {
   });
 }
 
+async function getWorkspaceResources(workspaceId: string): Promise<WorkspaceResources> {
+  return serviceCall(async () => {
+    const response = await apiClient.get<WorkspaceResources>(
+      `/workspaces/${workspaceId}/resources`,
+    );
+    return ensureResponse(response, 'Failed to fetch workspace resources');
+  });
+}
+
 export const workspaceService = {
   listWorkspaces,
   createWorkspace,
   updateWorkspace,
   deleteWorkspace,
+  getWorkspaceResources,
 };

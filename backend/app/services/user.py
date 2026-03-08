@@ -10,8 +10,16 @@ from sqlalchemy.orm.attributes import flag_modified
 from app.constants import REDIS_KEY_USER_SETTINGS
 from app.core.config import get_settings
 from app.models.db_models.user import UserSettings
-from app.models.schemas.settings import UserSettingsResponse
+from pydantic import BaseModel
+
+from app.models.schemas.settings import (
+    CustomAgent,
+    CustomSkill,
+    CustomSlashCommand,
+    UserSettingsResponse,
+)
 from app.models.types import InstalledPluginDict
+from app.services.claude_folder_sync import CLAUDE_DIR, ClaudeFolderSync
 from app.services.db import BaseDbService, SessionFactoryType
 from app.services.exceptions import UserException
 from app.utils.cache import CacheStore, cache_connection
@@ -84,6 +92,10 @@ class UserService(BaseDbService[UserSettings]):
         response: UserSettingsResponse = UserSettingsResponse.model_validate(
             user_settings
         )
+
+        if ClaudeFolderSync.is_active():
+            self._merge_claude_folder_resources(response)
+
         if cache:
             await cache.setex(
                 cache_key,
@@ -92,6 +104,30 @@ class UserService(BaseDbService[UserSettings]):
             )
 
         return response
+
+    @staticmethod
+    def _merge_claude_folder_resources(response: UserSettingsResponse) -> None:
+        if not CLAUDE_DIR.is_dir():
+            return
+
+        merge_specs: list[tuple[str, Any, type[BaseModel]]] = [
+            ("custom_agents", ClaudeFolderSync.merge_agents, CustomAgent),
+            (
+                "custom_slash_commands",
+                ClaudeFolderSync.merge_commands,
+                CustomSlashCommand,
+            ),
+            ("custom_skills", ClaudeFolderSync.merge_skills, CustomSkill),
+        ]
+        for attr, merge_fn, model_cls in merge_specs:
+            current = getattr(response, attr) or []
+            db_items = [x.model_dump() for x in current]
+            merged = merge_fn(db_items)
+            if len(merged) > len(db_items):
+                new_items = [
+                    model_cls.model_validate(x) for x in merged[len(current) :]
+                ]
+                setattr(response, attr, list(current) + new_items)
 
     async def update_user_settings(
         self, user_id: UUID, settings_update: dict[str, Any], db: AsyncSession
