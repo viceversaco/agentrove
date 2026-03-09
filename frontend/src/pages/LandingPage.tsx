@@ -6,6 +6,7 @@ import { useLayoutSidebar } from '@/components/layout/layoutState';
 import { Input as ChatInput } from '@/components/chat/message-input/Input';
 import { WorkspaceSelector } from '@/components/chat/WorkspaceSelector';
 import { useChatStore } from '@/store/chatStore';
+import { useModelStore } from '@/store/modelStore';
 import { useAuthStore } from '@/store/authStore';
 import { useInfiniteChatsQuery, useCreateChatMutation } from '@/hooks/queries/useChatQueries';
 import { useWorkspacesQuery } from '@/hooks/queries/useWorkspaceQueries';
@@ -131,6 +132,7 @@ export function LandingPage() {
           model_id: selectedModelId,
           workspace_id: selectedWorkspaceId,
         });
+        useModelStore.getState().selectModel(newChat.id, selectedModelId);
         setMessage('');
         navigate(`/chat/${newChat.id}`, { state: { initialPrompt: trimmedPrompt } });
       } catch (error) {

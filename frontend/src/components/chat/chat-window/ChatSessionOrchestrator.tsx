@@ -50,7 +50,20 @@ export function ChatSessionOrchestrator({
     })),
   );
 
-  const { selectedModelId, selectModel } = useModelSelection({ chatId });
+  const lastAssistantModelId = useMemo((): string | null | undefined => {
+    if (messagesQuery.isLoading) return null;
+    for (let i = fetchedMessages.length - 1; i >= 0; i--) {
+      if (fetchedMessages[i].role === 'assistant' && fetchedMessages[i].model_id) {
+        return fetchedMessages[i].model_id;
+      }
+    }
+    return undefined;
+  }, [fetchedMessages, messagesQuery.isLoading]);
+
+  const { selectedModelId, selectModel } = useModelSelection({
+    chatId,
+    initialModelId: lastAssistantModelId,
+  });
 
   const {
     initialPrompt,

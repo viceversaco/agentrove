@@ -17,8 +17,14 @@ export const useModelsQuery = (options?: Partial<UseQueryOptions<Model[]>>) => {
   });
 };
 
-export const useModelSelection = (options?: { enabled?: boolean; chatId?: string }) => {
+export const useModelSelection = (options?: {
+  enabled?: boolean;
+  chatId?: string;
+  // null = still loading (defer default), undefined = no initial model (use models[0])
+  initialModelId?: string | null;
+}) => {
   const chatId = options?.chatId ?? DEFAULT_MODEL_KEY;
+  const initialModelId = options?.initialModelId;
   const { data: models = [], isLoading } = useModelsQuery({
     enabled: options?.enabled,
   });
@@ -27,10 +33,17 @@ export const useModelSelection = (options?: { enabled?: boolean; chatId?: string
   useEffect(() => {
     if (models.length === 0) return;
     const selectedExists = models.some((m) => m.model_id === selectedModelId);
-    if (!selectedExists) {
-      useModelStore.getState().selectModel(chatId, models[0].model_id);
-    }
-  }, [models, selectedModelId, chatId]);
+    if (selectedExists) return;
+
+    // Still loading initial model from message history — wait before defaulting
+    if (initialModelId === null) return;
+
+    const fallback =
+      initialModelId && models.some((m) => m.model_id === initialModelId)
+        ? initialModelId
+        : models[0].model_id;
+    useModelStore.getState().selectModel(chatId, fallback);
+  }, [models, selectedModelId, chatId, initialModelId]);
 
   const selectedModel = useMemo(
     () => models.find((m) => m.model_id === selectedModelId) ?? null,
