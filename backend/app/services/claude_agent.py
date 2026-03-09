@@ -25,6 +25,10 @@ from app.models.db_models.enums import MessageRole
 from app.models.db_models.user import User, UserSettings
 from app.models.schemas.settings import ProviderType
 from app.prompts.enhance_prompt import ENHANCE_PROMPT
+from app.prompts.generate_title import (
+    GENERATE_TITLE_SYSTEM_PROMPT,
+    GENERATE_TITLE_USER_TEMPLATE,
+)
 from app.services.exceptions import ClaudeAgentException
 from app.services.provider import ProviderService
 from app.services.sandbox_providers import SandboxProviderType
@@ -304,11 +308,7 @@ class ClaudeAgentService:
         env, _, actual_model_id = self._build_auth_env(model_id, user_settings)
 
         options = ClaudeAgentOptions(
-            system_prompt=(
-                "Summarize the user's message into a short conversation title (3-8 words, max 255 characters). "
-                "Reply with ONLY the title, nothing else. "
-                "Do not answer, explain, analyze, or respond to the message — only summarize its topic."
-            ),
+            system_prompt=GENERATE_TITLE_SYSTEM_PROMPT,
             permission_mode="default",
             model=actual_model_id,
             max_turns=1,
@@ -318,12 +318,19 @@ class ClaudeAgentService:
         try:
             title = ""
             async with ClaudeSDKClient(options=options) as client:
-                await client.query(prompt)
+                await client.query(GENERATE_TITLE_USER_TEMPLATE.format(message=prompt))
                 async for message in client.receive_response():
                     if isinstance(message, ResultMessage) and message.result:
-                        title = message.result.strip().strip('"')
+                        title = message.result
 
-            return title
+            title = title.strip().strip('"').strip("'")
+            if not title:
+                return None
+            # If the model returned a long response instead of a title, take just the first line
+            first_line = title.split("\n", 1)[0].strip()
+            if len(first_line) > 80:
+                first_line = first_line[:77] + "..."
+            return first_line or None
         except ClaudeSDKError:
             logger.debug("Title generation SDK call failed for user %s", user.id)
             return None
