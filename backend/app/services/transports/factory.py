@@ -14,10 +14,9 @@ def create_sandbox_transport(
     workspace_path: str | None,
     options: ClaudeAgentOptions,
 ) -> SandboxTransport:
-    if (
-        sandbox_provider == SandboxProviderType.DOCKER
-        or sandbox_provider == SandboxProviderType.DOCKER.value
-    ):
+    # Route to the right transport: Docker exec for containerized sandboxes,
+    # local subprocess for host-mode sandboxes.
+    if sandbox_provider == SandboxProviderType.DOCKER:
         docker_config = SandboxProviderFactory.create_docker_config()
         return DockerSandboxTransport(
             sandbox_id=sandbox_id,
@@ -25,7 +24,9 @@ def create_sandbox_transport(
             options=options,
         )
 
-    if sandbox_provider == SandboxProviderType.HOST.value:
+    if sandbox_provider == SandboxProviderType.HOST:
+        if not workspace_path:
+            raise ValueError("workspace_path is required for host sandbox transport")
         return HostSandboxTransport(
             sandbox_id=sandbox_id,
             workspace_path=workspace_path,

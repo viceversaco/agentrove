@@ -19,10 +19,17 @@ from app.constants import TERMINAL_TYPE
 
 logger = logging.getLogger(__name__)
 
+# Safety cap on the JSON accumulation buffer — if the CLI emits a single
+# un-terminated JSON value larger than this, we abort rather than OOM.
 DEFAULT_MAX_BUFFER_SIZE = 1024 * 1024 * 10  # 10MB
+
+# Bounds the in-memory queue between the stdout reader task and the JSON
+# parser; back-pressure stalls the reader when the parser falls behind.
 STDOUT_QUEUE_MAXSIZE = 32
+
+# Claude CLI output may contain ANSI escape sequences (colors, cursor moves)
+# that must be stripped before JSON parsing.
 ANSI_ESCAPE_RE = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
-JSON_START_RE = re.compile(r"[{\[]")
 
 
 class BaseSandboxTransport(Transport, ABC):
@@ -51,6 +58,8 @@ class BaseSandboxTransport(Transport, ABC):
         self._stdin_closed = False
 
     async def __aenter__(self) -> Self:
+        # Connection is lazy — callers must explicitly call connect() after
+        # entering the context manager, so __aenter__ just returns self.
         return self
 
     async def __aexit__(
@@ -59,6 +68,9 @@ class BaseSandboxTransport(Transport, ABC):
         _exc_val: BaseException | None,
         _exc_tb: TracebackType | None,
     ) -> bool:
+        # Always attempts cleanup; if close() fails and there was no original
+        # exception we re-raise the cleanup error, otherwise we log it and let
+        # the original exception propagate to avoid masking it.
         try:
             await self.close()
         except Exception as cleanup_error:
@@ -71,6 +83,9 @@ class BaseSandboxTransport(Transport, ABC):
         return False
 
     def _prepare_environment(self) -> tuple[dict[str, str], str, str]:
+        # Build the env/cwd/user triple used by both Docker exec and host
+        # subprocess. User-provided env vars are merged last so they can
+        # override any of the built-in defaults.
         envs = {
             "CLAUDE_CODE_ENTRYPOINT": "sdk-py",
             "CLAUDE_AGENT_SDK_VERSION": sdk_version,
@@ -92,12 +107,20 @@ class BaseSandboxTransport(Transport, ABC):
         )
 
     async def _cancel_task(self, task: asyncio.Task[Any] | None) -> None:
+        # Cancel and await the task so it finishes before we continue teardown.
+        # Awaiting is required to avoid "task destroyed but pending" warnings;
+        # CancelledError is suppressed because the cancellation is intentional.
         if task:
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task
 
-    async def _put_sentinel(self) -> None:
+    def _put_sentinel(self) -> None:
+        # Signal the JSON parser (_parse_cli_output) that no more data is
+        # coming so it exits its queue-read loop. Uses put_nowait because this
+        # runs in cleanup paths where blocking would delay teardown; if the
+        # queue is full the sentinel is dropped, but the reader tasks also push
+        # their own sentinel when the stream ends, so the parser still unblocks.
         try:
             self._stdout_queue.put_nowait(self._SENTINEL)
         except asyncio.QueueFull:
@@ -105,25 +128,39 @@ class BaseSandboxTransport(Transport, ABC):
 
     @abstractmethod
     async def connect(self) -> None:
+        # Establish the underlying connection (Docker exec or local subprocess)
+        # and start the background reader/monitor tasks.
         pass
 
     @abstractmethod
     async def _cleanup_resources(self) -> None:
+        # Tear down transport-specific resources (kill processes, close streams).
+        # Called by close() after the monitor task has already been cancelled.
         pass
 
     @abstractmethod
     def _is_connection_ready(self) -> bool:
+        # Quick liveness check used by write() and end_input() to guard against
+        # sending data after the underlying stream/process has disappeared.
         pass
 
     @abstractmethod
     async def _send_data(self, data: str) -> None:
+        # Write raw string data to the CLI process's stdin. Raises
+        # CLIConnectionError if the underlying transport is unavailable.
         pass
 
     @abstractmethod
     async def _send_eof(self) -> None:
+        # Close the stdin side of the connection to signal the CLI that no more
+        # input is coming, allowing it to finalize and exit.
         pass
 
     async def close(self) -> None:
+        # Ordered teardown: send EOF, mark closed, stop monitor, release
+        # transport resources, reset state for potential reconnection, then
+        # unblock the parser. Monitor must stop before resource cleanup to
+        # avoid inspecting already-killed processes.
         if self._ready:
             await self.end_input()
         self._ready = False
@@ -131,9 +168,12 @@ class BaseSandboxTransport(Transport, ABC):
         self._monitor_task = None
         await self._cleanup_resources()
         self._stdin_closed = False
-        await self._put_sentinel()
+        self._put_sentinel()
 
     async def write(self, data: str) -> None:
+        # Send data to the CLI's stdin. Non-CLIConnectionError failures are
+        # wrapped and stored in _exit_error so the parser can surface them
+        # after the stream ends, in addition to raising immediately here.
         if not self._ready or not self._is_connection_ready():
             raise CLIConnectionError("Transport is not ready for writing")
         if self._stdin_closed:
@@ -149,6 +189,9 @@ class BaseSandboxTransport(Transport, ABC):
             raise self._exit_error
 
     async def end_input(self) -> None:
+        # Best-effort EOF — called by close() and also available to SDK
+        # consumers directly, so it must be idempotent. Errors are swallowed
+        # because a broken pipe means the process already exited.
         if not self._ready or not self._is_connection_ready() or self._stdin_closed:
             return
         try:
@@ -164,6 +207,10 @@ class BaseSandboxTransport(Transport, ABC):
         return self._ready
 
     def _build_command(self) -> str:
+        # Translate ClaudeAgentOptions into a shell-escaped CLI invocation
+        # string. Used by Docker (passed to `bash -c`) and host (split back
+        # with shlex.split). Always bookended by --output-format and
+        # --input-format stream-json for bidirectional JSON streaming.
         cmd = [
             str(self._options.cli_path or "claude"),
             "--output-format",
@@ -215,6 +262,9 @@ class BaseSandboxTransport(Transport, ABC):
 
         if self._options.mcp_servers:
             if isinstance(self._options.mcp_servers, dict):
+                # SDK-type MCP servers carry a live Python "instance" object
+                # that can't be JSON-serialized — strip it before passing
+                # the config to the CLI.
                 servers_for_cli = {
                     name: {k: v for k, v in config.items() if k != "instance"}
                     if isinstance(config, dict) and config.get("type") == "sdk"
@@ -267,6 +317,9 @@ class BaseSandboxTransport(Transport, ABC):
         return shlex.join(cmd)
 
     def _parse_json_buffer(self, buffer: str) -> tuple[str, list[Any]]:
+        # Greedy JSON extractor: uses raw_decode to pull as many complete JSON
+        # values as possible from the buffer, returning any trailing incomplete
+        # fragment so the caller can accumulate it across chunks.
         messages: list[Any] = []
         while buffer:
             buffer = buffer.lstrip()
@@ -279,6 +332,14 @@ class BaseSandboxTransport(Transport, ABC):
         return buffer, messages
 
     async def _parse_cli_output(self) -> AsyncIterator[dict[str, Any]]:
+        # Core streaming parser: reads raw stdout chunks from the queue, strips
+        # ANSI escapes, skips non-JSON preamble until the first { or [, then
+        # accumulates lines into a buffer and greedily extracts complete JSON
+        # values via _parse_json_buffer. A "result" message acts as a hard
+        # boundary that resets the parser state. After the sentinel signals
+        # end-of-stream, any buffered remainder is drained and _exit_error
+        # (set by write() or _monitor_process) is raised so consumers see all
+        # available data before the error.
         if not self._ready and not self._monitor_task:
             raise CLIConnectionError("Transport is not connected")
 
@@ -293,18 +354,24 @@ class BaseSandboxTransport(Transport, ABC):
             if not isinstance(chunk, str):
                 continue
 
-            clean_chunk = ANSI_ESCAPE_RE.sub("", chunk).replace("\r", "")
+            if "\x1b" in chunk:
+                chunk = ANSI_ESCAPE_RE.sub("", chunk)
+            if "\r" in chunk:
+                chunk = chunk.replace("\r", "")
 
-            for json_line in clean_chunk.split("\n"):
+            for json_line in chunk.split("\n"):
                 json_line = json_line.strip()
                 if not json_line:
                     continue
 
                 if not json_started:
-                    match = JSON_START_RE.search(json_line)
-                    if not match:
+                    start = json_line.find("{")
+                    array_start = json_line.find("[")
+                    if array_start != -1 and (start == -1 or array_start < start):
+                        start = array_start
+                    if start == -1:
                         continue
-                    json_line = json_line[match.start() :]
+                    json_line = json_line[start:]
                     json_started = True
 
                 json_buffer += json_line

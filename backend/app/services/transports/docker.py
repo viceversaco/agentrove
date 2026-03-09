@@ -21,6 +21,8 @@ class DockerSandboxTransport(BaseSandboxTransport):
         docker_config: DockerConfig,
         options: ClaudeAgentOptions,
     ) -> None:
+        # Docker connection state: client → container → exec instance → multiplexed stream.
+        # Types are Any because aiodocker doesn't export typed classes for these objects.
         super().__init__(sandbox_id=sandbox_id, options=options)
         self._docker_config = docker_config
         self._docker: aiodocker.Docker | None = None
@@ -30,14 +32,18 @@ class DockerSandboxTransport(BaseSandboxTransport):
         self._reader_task: asyncio.Task[None] | None = None
 
     def _get_docker(self) -> aiodocker.Docker:
+        # Lazy-init the Docker client, reusing it across calls within
+        # this transport's lifetime (connect + cleanup cycle).
         if self._docker is None:
             try:
                 self._docker = aiodocker.Docker(url=self._docker_config.host or None)
             except Exception as e:
-                raise CLIConnectionError(f"Failed to connect to Docker: {e}")
+                raise CLIConnectionError(f"Failed to connect to Docker: {e}") from e
         return self._docker
 
     async def _get_container(self) -> Any:
+        # Fetch the sandbox container by naming convention and auto-start
+        # it if stopped (e.g., after a Docker daemon restart).
         try:
             container = await self._get_docker().containers.get(
                 f"agentrove-sandbox-{self._sandbox_id}"
@@ -49,9 +55,12 @@ class DockerSandboxTransport(BaseSandboxTransport):
         except Exception as e:
             raise CLIConnectionError(
                 f"Failed to connect to sandbox {self._sandbox_id}: {e}"
-            )
+            ) from e
 
     async def connect(self) -> None:
+        # Create a Docker exec instance inside the container and start the multiplexed
+        # stream. `exec` wraps the CLI in `bash -c` with `exec` so signals reach the
+        # CLI directly instead of being absorbed by the shell.
         if self._ready:
             return
         self._stdin_closed = False
@@ -83,6 +92,8 @@ class DockerSandboxTransport(BaseSandboxTransport):
         return self._stream is not None
 
     async def _read_stream_data(self) -> None:
+        # Demultiplex the Docker exec stream — stdout (stream==1) goes to the
+        # queue for JSON parsing, stderr (stream==2) to the caller's callback.
         try:
             while True:
                 msg = await self._stream.read_out()
@@ -103,9 +114,11 @@ class DockerSandboxTransport(BaseSandboxTransport):
         except Exception as e:
             logger.error("Stream reader error: %s", e)
         finally:
-            await self._put_sentinel()
+            self._put_sentinel()
 
     async def _get_exec_info(self) -> dict[str, Any] | None:
+        # Inspect the exec instance to check Running status, ExitCode, and Pid.
+        # Used by both _monitor_process (polling) and _kill_exec_process (cleanup).
         if not self._exec:
             return None
         try:
@@ -116,6 +129,8 @@ class DockerSandboxTransport(BaseSandboxTransport):
             return None
 
     async def _kill_exec_process(self) -> None:
+        # Send SIGKILL to the exec process group (negative PID) inside the container
+        # via a secondary exec. Process group kill ensures child processes are cleaned up.
         if not self._exec or not self._container:
             return
         try:
@@ -133,6 +148,8 @@ class DockerSandboxTransport(BaseSandboxTransport):
             logger.debug("Failed to kill exec process: %s", e)
 
     async def _cleanup_resources(self) -> None:
+        # Ordered teardown: cancel reader, kill exec process, close stream,
+        # then close the Docker client.
         await self._cancel_task(self._reader_task)
         self._reader_task = None
 
@@ -156,6 +173,8 @@ class DockerSandboxTransport(BaseSandboxTransport):
         await self._stream.write_in(data.encode("utf-8"))
 
     async def _send_eof(self) -> None:
+        # aiodocker doesn't expose EOF on exec streams, so we reach into the
+        # underlying aiohttp transport to send a TCP half-close directly.
         if not self._stream:
             return
         try:
@@ -168,6 +187,8 @@ class DockerSandboxTransport(BaseSandboxTransport):
             pass
 
     async def _monitor_process(self) -> None:
+        # Docker exec doesn't support blocking wait, so we poll every 500ms.
+        # Detects process exit or disappearance and sets _exit_error accordingly.
         if not self._exec or not self._container:
             return
 
@@ -199,4 +220,4 @@ class DockerSandboxTransport(BaseSandboxTransport):
             )
         finally:
             self._ready = False
-            await self._put_sentinel()
+            self._put_sentinel()

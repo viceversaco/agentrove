@@ -27,9 +27,13 @@ class HostSandboxTransport(BaseSandboxTransport):
         self,
         *,
         sandbox_id: str,
-        workspace_path: str | None,
+        workspace_path: str,
         options: ClaudeAgentOptions,
     ) -> None:
+        # _home_dir is a per-sandbox directory on the host (e.g. ~/.agentrove/sandboxes/<id>/)
+        # used as HOME for the CLI process so each sandbox gets isolated config/auth.
+        # _workspace_dir is the cwd the CLI runs in — a real project path in desktop
+        # mode, or the home dir itself in web mode.
         super().__init__(sandbox_id=sandbox_id, options=options)
         self._process: asyncio.subprocess.Process | None = None
         self._stdout_task: asyncio.Task[None] | None = None
@@ -38,20 +42,23 @@ class HostSandboxTransport(BaseSandboxTransport):
             Path(settings.get_host_sandbox_base_dir()).expanduser().resolve()
             / sandbox_id
         )
-        if workspace_path:
-            self._workspace_dir = Path(workspace_path).expanduser().resolve()
-        else:
-            self._workspace_dir = self._home_dir
+        self._workspace_dir = Path(workspace_path).expanduser().resolve()
 
     def _resolve_virtual_env_paths(self, envs: dict[str, str]) -> dict[str, str]:
+        # Env vars from _prepare_environment use virtual sandbox paths (e.g. /home/user/...).
+        # Translate them to real host paths so the subprocess can find them.
+        home = SANDBOX_HOME_DIR
         return {
             key: str(self._resolve_cwd(value))
-            if value.startswith(SANDBOX_HOME_DIR)
+            if value == home or value.startswith(home + "/")
             else value
             for key, value in envs.items()
         }
 
     def _resolve_cwd(self, cwd: str) -> Path:
+        # The rest of the codebase uses virtual sandbox paths (/home/user, /home/user/workspace)
+        # that match the Docker container layout. Map them to real host paths here so callers
+        # don't need to know whether they're running in Docker or on the host.
         if cwd == SANDBOX_HOME_DIR:
             return self._home_dir
         if cwd == SANDBOX_WORKSPACE_DIR:
@@ -61,16 +68,15 @@ class HostSandboxTransport(BaseSandboxTransport):
         if cwd.startswith(workspace_prefix):
             return (self._workspace_dir / cwd.removeprefix(workspace_prefix)).resolve()
 
-        relative = cwd.removeprefix(f"{SANDBOX_HOME_DIR}/")
-        if relative != cwd:
-            return (self._home_dir / relative).resolve()
+        home_prefix = f"{SANDBOX_HOME_DIR}/"
+        if cwd.startswith(home_prefix):
+            return (self._home_dir / cwd.removeprefix(home_prefix)).resolve()
 
-        path = Path(cwd)
-        if path.is_absolute():
-            return path
-        return (self._workspace_dir / path).resolve()
+        return Path(cwd)
 
     def _resolve_run_user(self, requested_user: str) -> tuple[int, int] | None:
+        # When running as root, drop privileges for the CLI subprocess so Claude's
+        # tool use (bash, file writes) can't operate with root access.
         if os.geteuid() != 0:
             return None
 
@@ -84,10 +90,15 @@ class HostSandboxTransport(BaseSandboxTransport):
 
     @staticmethod
     def _set_process_ids(uid: int, gid: int) -> None:
+        # preexec_fn callback — GID must be set before UID because
+        # setting UID first would lose the privilege needed to change GID.
         os.setgid(gid)
         os.setuid(uid)
 
     async def connect(self) -> None:
+        # Spawn the CLI as a local subprocess with resolved paths, sandbox-scoped env,
+        # and optional privilege dropping. Inherits the host's PATH (prefixed with
+        # required tool paths) and os.environ as the base environment.
         if self._ready:
             return
         self._stdin_closed = False
@@ -139,6 +150,8 @@ class HostSandboxTransport(BaseSandboxTransport):
         return self._process is not None and self._process.stdin is not None
 
     async def _cleanup_resources(self) -> None:
+        # Cancel reader tasks first so they don't read from a dead pipe, then
+        # SIGTERM with 2s grace period, then SIGKILL if still alive.
         await self._cancel_task(self._stdout_task)
         await self._cancel_task(self._stderr_task)
         self._stdout_task = None
@@ -167,6 +180,8 @@ class HostSandboxTransport(BaseSandboxTransport):
         await self._process.stdin.drain()
 
     async def _read_stdout(self) -> None:
+        # Feed raw stdout chunks into the queue for the base class JSON parser.
+        # Sentinel on exit ensures the parser unblocks even if the process dies.
         if not self._process or not self._process.stdout:
             return
         try:
@@ -178,9 +193,11 @@ class HostSandboxTransport(BaseSandboxTransport):
         except asyncio.CancelledError:
             pass
         finally:
-            await self._put_sentinel()
+            self._put_sentinel()
 
     async def _read_stderr(self) -> None:
+        # Forward stderr to the caller's callback. No sentinel needed — stderr
+        # doesn't feed the JSON parser.
         if not self._process or not self._process.stderr:
             return
         try:
@@ -197,6 +214,8 @@ class HostSandboxTransport(BaseSandboxTransport):
             pass
 
     async def _monitor_process(self) -> None:
+        # Await process exit directly (unlike Docker which polls). Sets _exit_error
+        # on non-zero exit so the parser surfaces it after draining all buffered output.
         if not self._process:
             return
         try:
@@ -215,4 +234,4 @@ class HostSandboxTransport(BaseSandboxTransport):
             )
         finally:
             self._ready = False
-            await self._put_sentinel()
+            self._put_sentinel()
