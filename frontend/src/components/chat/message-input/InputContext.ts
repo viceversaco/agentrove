@@ -26,7 +26,6 @@ export interface InputState {
   editingImageIndex: number | null;
   contextUsage?: ContextUsageInfo;
   chatId?: string;
-  activeMentions: MentionItem[];
   isMentionActive: boolean;
   slashCommandSuggestions: SlashCommand[];
   highlightedSlashCommandIndex: number;
@@ -54,7 +53,6 @@ export interface InputActions {
   resetDragState: () => void;
   selectSlashCommand: (command: SlashCommand) => void;
   selectMention: (item: MentionItem) => void;
-  removeMention: (path: string) => void;
 }
 
 export interface InputMeta {

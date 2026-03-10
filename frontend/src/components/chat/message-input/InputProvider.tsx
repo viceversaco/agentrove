@@ -48,19 +48,15 @@ export function InputProvider({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [previewDismissed, setPreviewDismissed] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
-  const [activeMentions, setActiveMentions] = useState<MentionItem[]>([]);
   const messageRef = useRef(message);
   messageRef.current = message;
-  const activeMentionsRef = useRef(activeMentions);
-  activeMentionsRef.current = activeMentions;
 
   const prevChatId = useRef(chatId);
   if (prevChatId.current !== chatId) {
     prevChatId.current = chatId;
-    if (activeMentions.length > 0) setActiveMentions([]);
   }
 
-  const hasMessage = message.trim().length > 0 || activeMentions.length > 0;
+  const hasMessage = message.trim().length > 0;
   const hasAttachments = (attachedFiles?.length ?? 0) > 0;
 
   const prevHasAttachments = useRef(hasAttachments);
@@ -143,26 +139,23 @@ export function InputProvider({
       const msg = messageRef.current;
       const beforeMention = msg.slice(0, mentionStartPos);
       const afterMention = msg.slice(mentionEndPos);
-      const newMessage = `${beforeMention}${afterMention}`;
+      const mentionText = `@${item.path}`;
+      const needsSeparator = !afterMention.startsWith(' ');
+      const separator = needsSeparator ? ' ' : '';
+      const newMessage = `${beforeMention}${mentionText}${separator}${afterMention}`;
+      const nextCursorPosition = beforeMention.length + mentionText.length + separator.length;
 
-      setActiveMentions((prev) =>
-        prev.some((m) => m.path === item.path) ? prev : [...prev, item],
-      );
       setMessage(newMessage);
 
       setTimeout(() => {
         if (textareaRef.current) {
-          textareaRef.current.setSelectionRange(mentionStartPos, mentionStartPos);
-          setCursorPosition(mentionStartPos);
+          textareaRef.current.setSelectionRange(nextCursorPosition, nextCursorPosition);
+          setCursorPosition(nextCursorPosition);
         }
       }, 0);
     },
     [setMessage],
   );
-
-  const removeMention = useCallback((path: string) => {
-    setActiveMentions((prev) => prev.filter((m) => m.path !== path));
-  }, []);
 
   const {
     filteredFiles,
@@ -181,25 +174,16 @@ export function InputProvider({
     onSelect: handleMentionSelect,
   });
 
-  const buildMessageWithMentions = useCallback((text: string) => {
-    const mentions = activeMentionsRef.current;
-    if (mentions.length === 0) return text;
-    const mentionPrefix = mentions.map((m) => `@${m.path}`).join(' ');
-    return text.trim() ? `${mentionPrefix} ${text}` : mentionPrefix;
-  }, []);
-
   const handleSubmit = useCallback(
     (event: React.FormEvent) => {
       event.preventDefault();
       if (disabled) return;
       if (!hasMessage) return;
 
-      setMessage(buildMessageWithMentions(messageRef.current));
-      setActiveMentions([]);
       setPreviewDismissed(true);
       onSubmit(event);
     },
-    [disabled, hasMessage, onSubmit, setMessage, buildMessageWithMentions],
+    [disabled, hasMessage, onSubmit],
   );
 
   const submitOrStop = useCallback(() => {
@@ -212,7 +196,7 @@ export function InputProvider({
 
     if (isStreaming && hasMessage && chatId) {
       const { permissionMode, thinkingMode } = useUIStore.getState();
-      const fullMessage = buildMessageWithMentions(messageRef.current).trim();
+      const fullMessage = messageRef.current.trim();
       void useMessageQueueStore
         .getState()
         .queueMessage(
@@ -224,7 +208,6 @@ export function InputProvider({
           attachedFiles ?? undefined,
         );
       setMessage('');
-      setActiveMentions([]);
       clearAttachedFiles?.([]);
       setPreviewDismissed(true);
       return;
@@ -262,7 +245,6 @@ export function InputProvider({
     setMessage,
     clearAttachedFiles,
     selectedModelId,
-    buildMessageWithMentions,
   ]);
 
   const handleKeyDown = useCallback(
@@ -321,7 +303,6 @@ export function InputProvider({
       editingImageIndex,
       contextUsage,
       chatId,
-      activeMentions,
       isMentionActive,
       slashCommandSuggestions,
       highlightedSlashCommandIndex,
@@ -354,7 +335,6 @@ export function InputProvider({
       editingImageIndex,
       contextUsage,
       chatId,
-      activeMentions,
       isMentionActive,
       slashCommandSuggestions,
       highlightedSlashCommandIndex,
@@ -384,7 +364,6 @@ export function InputProvider({
       resetDragState,
       selectSlashCommand,
       selectMention,
-      removeMention,
     }),
     [
       setMessage,
@@ -404,7 +383,6 @@ export function InputProvider({
       resetDragState,
       selectSlashCommand,
       selectMention,
-      removeMention,
     ],
   );
 
