@@ -3,8 +3,8 @@ import type { FileStructure } from '@/types/file-system.types';
 import type { CustomAgent, CustomCommand, CustomPrompt } from '@/types/user.types';
 
 export interface ChatContextValue {
-  chatId?: string;
-  sandboxId?: string;
+  chatId: string | undefined;
+  sandboxId: string | undefined;
   fileStructure: FileStructure[];
   customAgents: CustomAgent[];
   customSlashCommands: CustomCommand[];

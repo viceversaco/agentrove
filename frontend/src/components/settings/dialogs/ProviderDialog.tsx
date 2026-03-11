@@ -250,7 +250,7 @@ export const ProviderDialog: React.FC<ProviderDialogProps> = ({
         </h3>
 
         {errorMessage && (
-          <div className="mb-4 rounded-xl border border-border p-3 dark:border-border-dark">
+          <div className="mb-4 rounded-xl border border-border/50 p-3 dark:border-border-dark/50">
             <p className="text-xs text-text-secondary dark:text-text-dark-secondary">
               {errorMessage}
             </p>

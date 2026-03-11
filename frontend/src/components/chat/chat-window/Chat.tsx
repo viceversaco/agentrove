@@ -259,12 +259,20 @@ export const Chat = memo(function Chat() {
     scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: 'smooth' });
   }, []);
 
-  const containerRefCallback = useCallback((node: HTMLDivElement | null) => {
-    scrollerRef.current = node;
-    if (node) {
-      lastScrollTopRef.current = node.scrollTop;
-    }
-  }, []);
+  const containerRefCallback = useCallback(
+    (node: HTMLDivElement | null) => {
+      const prev = scrollerRef.current;
+      if (prev) {
+        prev.removeEventListener('scroll', handleScroll);
+      }
+      scrollerRef.current = node;
+      if (node) {
+        lastScrollTopRef.current = node.scrollTop;
+        node.addEventListener('scroll', handleScroll, { passive: true });
+      }
+    },
+    [handleScroll],
+  );
 
   const { lastBotMessage, latestUserMessageId } = useMemo(() => {
     let latestAssistantMessage: (typeof messages)[number] | undefined;
@@ -394,7 +402,6 @@ export const Chat = memo(function Chat() {
           <div
             key={chatId ?? 'chat'}
             ref={containerRefCallback}
-            onScroll={handleScroll}
             className="scrollbar-thin scrollbar-thumb-border-secondary dark:scrollbar-thumb-border-dark hover:scrollbar-thumb-text-quaternary dark:hover:scrollbar-thumb-border-dark-hover scrollbar-track-transparent h-full overflow-y-auto overflow-x-hidden"
           >
             {listHeader}

@@ -261,48 +261,43 @@ export const AskUserQuestion: React.FC<AskUserQuestionProps> = ({ tool, chatId }
                 );
               })}
 
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => handleOptionSelect(OTHER_VALUE)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleOptionSelect(OTHER_VALUE);
-                  }
-                }}
-                className={`group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left transition-colors ${
-                  isOtherSelected
-                    ? 'bg-black/5 dark:bg-white/5'
-                    : 'cursor-pointer hover:bg-black/5 dark:hover:bg-white/5'
-                }`}
-              >
-                <span
-                  className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-xs font-medium ${
-                    isOtherSelected
-                      ? 'bg-text-primary text-surface dark:bg-text-dark-primary dark:text-surface-dark'
-                      : 'bg-black/5 text-text-tertiary dark:bg-white/5 dark:text-text-dark-tertiary'
-                  }`}
-                >
-                  {otherLetter}
-                </span>
-                {isOtherSelected ? (
+              {isOtherSelected ? (
+                <div className="flex w-full items-center gap-2.5 rounded-md bg-black/5 px-2.5 py-1.5 dark:bg-white/5">
+                  <button
+                    type="button"
+                    onClick={() => handleOptionSelect(OTHER_VALUE)}
+                    disabled={isLoading}
+                    className="flex-shrink-0"
+                  >
+                    <span className="flex h-5 w-5 items-center justify-center rounded bg-text-primary text-xs font-medium text-surface dark:bg-text-dark-primary dark:text-surface-dark">
+                      {otherLetter}
+                    </span>
+                  </button>
                   <input
                     type="text"
                     placeholder="Type your answer\u2026"
                     value={otherInputs[currentKey] ?? ''}
                     onChange={(e) => handleOtherInputChange(e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
                     className="min-w-0 flex-1 bg-transparent text-xs text-text-primary placeholder-text-tertiary outline-none focus:ring-1 focus:ring-text-quaternary/30 dark:text-text-dark-primary dark:placeholder-text-dark-tertiary"
                     disabled={isLoading}
                     autoFocus
                   />
-                ) : (
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleOptionSelect(OTHER_VALUE)}
+                  disabled={isLoading}
+                  className="group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                >
+                  <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded bg-black/5 text-xs font-medium text-text-tertiary dark:bg-white/5 dark:text-text-dark-tertiary">
+                    {otherLetter}
+                  </span>
                   <span className="text-xs text-text-secondary dark:text-text-dark-secondary">
                     Other
                   </span>
-                )}
-              </div>
+                </button>
+              )}
             </div>
           )}
         </div>

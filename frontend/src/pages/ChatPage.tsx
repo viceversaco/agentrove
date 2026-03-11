@@ -138,9 +138,7 @@ export function ChatPage() {
     ],
   );
 
-  const customPrompts = useMemo(() => {
-    return settings?.custom_prompts || [];
-  }, [settings?.custom_prompts]);
+  const customPrompts = useMemo(() => settings?.custom_prompts ?? [], [settings?.custom_prompts]);
 
   const { selectedFile, setSelectedFile, isRefreshing, handleRefresh, handleFileSelect } =
     useEditorState(refetchFilesMetadata);

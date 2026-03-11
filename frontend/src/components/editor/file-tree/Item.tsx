@@ -1,7 +1,7 @@
 import { memo, useCallback, useMemo } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { FileName } from './FileName';
-import { FileIcon } from './FileIcon';
+import { FileIcon, FolderIcon } from './FileIcon';
 import { useFileTreeContext } from './fileTreeContext';
 import type { FileStructure } from '@/types/file-system.types';
 import { getFileName } from '@/utils/file';
@@ -61,12 +61,11 @@ export const Item = memo(function Item({ item, level, searchQuery = '', matchedP
           <div className="w-3 flex-shrink-0" />
         )}
 
-        <FileIcon
-          name={getFileName(item.path)}
-          isFolder={isFolder}
-          isExpanded={isExpanded}
-          className="size-3 flex-shrink-0"
-        />
+        {isFolder ? (
+          <FolderIcon isExpanded={isExpanded} className="size-3 flex-shrink-0" />
+        ) : (
+          <FileIcon name={getFileName(item.path)} className="size-3 flex-shrink-0" />
+        )}
 
         <FileName
           path={item.path}

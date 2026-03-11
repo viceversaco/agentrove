@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { BaseModal } from '@/components/ui/shared/BaseModal';
 import { Button } from '@/components/ui/primitives/Button';
 import { Spinner } from '@/components/ui/primitives/Spinner';
@@ -205,7 +205,10 @@ export const PluginDetailModal: React.FC<PluginDetailModalProps> = ({
   const installedPlugin = installedPlugins.find((p) => p.name === plugin?.name);
   const cliInstalledWithoutComponents =
     installedPlugin !== undefined && (installedPlugin.components ?? []).length === 0;
-  const installedComponents = new Set(installedPlugin?.components ?? []);
+  const installedComponents = useMemo(
+    () => new Set(installedPlugin?.components ?? []),
+    [installedPlugin?.components],
+  );
 
   useEffect(() => {
     if (!isOpen) {

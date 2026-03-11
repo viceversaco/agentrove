@@ -175,7 +175,7 @@ function WorkspaceItem({
             <div className="mt-0.5 overflow-hidden rounded-md border border-border/50 dark:border-border-dark/50">
               {branchesLoading ? (
                 <div className="flex items-center justify-center gap-1.5 px-2 py-3">
-                  <Loader2 className="h-3 w-3 animate-spin text-text-quaternary dark:text-text-dark-quaternary" />
+                  <Loader2 className="h-3 w-3 animate-spin text-text-quaternary motion-reduce:animate-none dark:text-text-dark-quaternary" />
                   <span className="text-2xs text-text-quaternary dark:text-text-dark-quaternary">
                     Loading branches…
                   </span>
@@ -319,10 +319,10 @@ function RepoListSkeleton() {
     <div className="flex flex-col gap-2">
       {SKELETON_ITEMS.map((i) => (
         <div key={i} className="flex items-start gap-2.5 px-2.5 py-2">
-          <div className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-pulse rounded bg-surface-tertiary dark:bg-surface-dark-tertiary" />
+          <div className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-pulse rounded bg-surface-tertiary motion-reduce:animate-none dark:bg-surface-dark-tertiary" />
           <div className="flex-1 space-y-1.5">
-            <div className="h-3 w-2/3 animate-pulse rounded bg-surface-tertiary dark:bg-surface-dark-tertiary" />
-            <div className="h-2.5 w-full animate-pulse rounded bg-surface-tertiary dark:bg-surface-dark-tertiary" />
+            <div className="h-3 w-2/3 animate-pulse rounded bg-surface-tertiary motion-reduce:animate-none dark:bg-surface-dark-tertiary" />
+            <div className="h-2.5 w-full animate-pulse rounded bg-surface-tertiary motion-reduce:animate-none dark:bg-surface-dark-tertiary" />
           </div>
         </div>
       ))}
@@ -620,7 +620,7 @@ export function WorkspaceSelector({
                     <div className="max-h-[12rem] overflow-y-auto">
                       {createWorkspace.isPending ? (
                         <div className="flex items-center justify-center gap-2 px-2.5 py-6">
-                          <Loader2 className="h-3.5 w-3.5 animate-spin text-text-quaternary dark:text-text-dark-quaternary" />
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-text-quaternary motion-reduce:animate-none dark:text-text-dark-quaternary" />
                           <span className="text-xs text-text-tertiary dark:text-text-dark-tertiary">
                             Cloning repository…
                           </span>

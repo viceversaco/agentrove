@@ -93,7 +93,7 @@ export function LandingPage() {
     [settings?.custom_slash_commands, settings?.custom_skills],
   );
 
-  const customPrompts = useMemo(() => settings?.custom_prompts || [], [settings?.custom_prompts]);
+  const customPrompts = useMemo(() => settings?.custom_prompts ?? [], [settings?.custom_prompts]);
 
   useEffect(() => {
     useChatStore.getState().setCurrentChat(null);

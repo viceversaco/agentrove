@@ -3,6 +3,7 @@ import { FileUploadDialog } from '@/components/ui/FileUploadDialog';
 import { DrawingModal } from '@/components/ui/DrawingModal';
 import { DropIndicator } from './DropIndicator';
 import { SendButton } from './SendButton';
+import type { SendButtonStatus } from './SendButton';
 import { AttachButton } from './AttachButton';
 import { Textarea } from './Textarea';
 import { InputControls } from './InputControls';
@@ -51,6 +52,16 @@ function InputLayout() {
     state.showPreview &&
     state.attachedFiles &&
     state.attachedFiles.length > 0;
+
+  const sendStatus: SendButtonStatus = state.isStreaming
+    ? state.hasMessage
+      ? 'ready'
+      : 'streaming'
+    : state.isLoading
+      ? 'loading'
+      : state.hasMessage
+        ? 'ready'
+        : 'idle';
 
   return (
     <form ref={meta.formRef} onSubmit={actions.handleSubmit} className="relative px-4 sm:px-6">
@@ -107,16 +118,10 @@ function InputLayout() {
                 }}
               />
               <SendButton
-                isLoading={state.isLoading}
-                isStreaming={state.isStreaming}
-                disabled={
-                  (!state.isLoading && !state.isStreaming && !state.hasMessage) ||
-                  state.isEnhancing ||
-                  state.isDisabled
-                }
+                status={sendStatus}
+                disabled={sendStatus === 'idle' || state.isEnhancing || state.isDisabled}
                 onClick={actions.handleSendClick}
                 type="button"
-                hasMessage={state.hasMessage}
                 showLoadingSpinner={state.showLoadingSpinner}
               />
             </div>

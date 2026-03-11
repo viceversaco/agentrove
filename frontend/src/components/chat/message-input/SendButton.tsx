@@ -1,72 +1,73 @@
 import { ArrowUp, LoaderCircle, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/primitives/Button';
 
+export type SendButtonStatus = 'idle' | 'ready' | 'loading' | 'streaming';
+
 export interface SendButtonProps {
-  isLoading: boolean;
-  isStreaming?: boolean;
+  status: SendButtonStatus;
   disabled: boolean;
   onClick: (e: React.MouseEvent) => void;
   type?: 'button' | 'submit';
-  hasMessage?: boolean;
   className?: string;
   showLoadingSpinner?: boolean;
 }
 
+const BASE_CLASSES =
+  'p-1.5 rounded-full transition-colors duration-200 transform disabled:opacity-50 disabled:cursor-not-allowed active:scale-95';
+
+const PRIMARY_BG =
+  'bg-text-primary dark:bg-text-dark-primary hover:bg-text-secondary dark:hover:bg-text-dark-secondary';
+
+const VISUAL_COLORS: Record<'spinner' | 'stop' | 'ready' | 'idle', string> = {
+  spinner: PRIMARY_BG,
+  stop: 'bg-error-500 hover:bg-error-600',
+  ready: PRIMARY_BG,
+  idle: 'bg-surface-tertiary dark:bg-surface-dark-tertiary',
+};
+
 export function SendButton({
-  isLoading,
-  isStreaming = false,
+  status,
   disabled,
   onClick,
   type = 'button',
-  hasMessage = false,
   className = '',
   showLoadingSpinner = false,
 }: SendButtonProps) {
-  const baseClasses =
-    'p-1.5 rounded-full transition-colors duration-200 transform disabled:opacity-50 disabled:cursor-not-allowed active:scale-95';
+  const isActive = status === 'loading' || status === 'streaming';
+  const hasMessage = status === 'ready';
+
+  const showSpinnerIcon = showLoadingSpinner && status === 'loading';
+  const showStopIcon = !showSpinnerIcon && isActive;
 
   const scaleClass = hasMessage && !disabled ? 'scale-100' : 'scale-90';
+  const colorClasses = showSpinnerIcon
+    ? VISUAL_COLORS.spinner
+    : showStopIcon
+      ? VISUAL_COLORS.stop
+      : hasMessage
+        ? VISUAL_COLORS.ready
+        : VISUAL_COLORS.idle;
+  let ariaLabel: string;
+  let icon: React.ReactNode;
 
-  const showSpinnerIcon = showLoadingSpinner && isLoading && !isStreaming;
-  const showStopIcon = !showSpinnerIcon && (isLoading || isStreaming) && !hasMessage;
-
-  let colorClasses;
   if (showSpinnerIcon) {
-    colorClasses =
-      'bg-text-primary dark:bg-text-dark-primary hover:bg-text-secondary dark:hover:bg-text-dark-secondary';
+    ariaLabel = 'Starting chat';
+    icon = (
+      <LoaderCircle className="h-3.5 w-3.5 animate-spin text-text-dark-primary motion-reduce:animate-none dark:text-text-primary" />
+    );
   } else if (showStopIcon) {
-    colorClasses = 'bg-error-500 hover:bg-error-600';
-  } else if (hasMessage) {
-    colorClasses =
-      'bg-text-primary dark:bg-text-dark-primary hover:bg-text-secondary dark:hover:bg-text-dark-secondary';
+    ariaLabel = 'Stop generating';
+    icon = (
+      <Pause className="h-3 w-3 animate-pulse text-text-dark-primary motion-reduce:animate-none" />
+    );
   } else {
-    colorClasses = 'bg-surface-tertiary dark:bg-surface-dark-tertiary';
-  }
-
-  const cursorClass = !isLoading && !isStreaming && !hasMessage ? 'cursor-not-allowed' : '';
-
-  const getAriaLabel = () => {
-    if (showSpinnerIcon) return 'Starting chat';
-    if (showStopIcon) return 'Stop generating';
-    return 'Send message';
-  };
-
-  const renderIcon = () => {
-    if (showSpinnerIcon) {
-      return (
-        <LoaderCircle className="h-3.5 w-3.5 animate-spin text-text-dark-primary dark:text-text-primary" />
-      );
-    }
-
-    if (showStopIcon) {
-      return <Pause className="h-3 w-3 animate-pulse text-text-dark-primary" />;
-    }
-    return (
+    ariaLabel = 'Send message';
+    icon = (
       <ArrowUp
         className={`h-3.5 w-3.5 transition-transform ${hasMessage ? 'text-text-dark-primary dark:text-text-primary' : 'text-text-quaternary'}`}
       />
     );
-  };
+  }
 
   return (
     <Button
@@ -74,10 +75,10 @@ export function SendButton({
       onClick={onClick}
       disabled={disabled}
       variant="unstyled"
-      className={`${baseClasses} ${scaleClass} ${colorClasses} ${cursorClass} ${className}`}
-      aria-label={getAriaLabel()}
+      className={`${BASE_CLASSES} ${scaleClass} ${colorClasses} ${className}`}
+      aria-label={ariaLabel}
     >
-      {renderIcon()}
+      {icon}
     </Button>
   );
 }

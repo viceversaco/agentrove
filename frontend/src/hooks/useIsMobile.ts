@@ -11,7 +11,7 @@ export function useIsMobile(): boolean {
       setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
     };
 
-    window.addEventListener('resize', handleResize);
+    window.addEventListener('resize', handleResize, { passive: true });
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 

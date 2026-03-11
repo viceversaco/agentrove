@@ -200,37 +200,52 @@ function AttachmentViewerInner({ attachments, uploadingAttachmentIds }: Attachme
     }
   }, []);
 
-  useEffect(() => {
-    if (!attachments || attachments.length === 0) return;
+  const imageAttachments = useMemo(
+    () => (attachments ?? []).filter((a) => a.file_type === 'image'),
+    [attachments],
+  );
+  const imageIdKey = useMemo(
+    () => imageAttachments.map((a) => a.id).join('\0'),
+    [imageAttachments],
+  );
 
-    const imageAttachments = attachments.filter((a) => a.file_type === 'image');
+  useEffect(() => {
     if (imageAttachments.length === 0) return;
 
     const newAttachments = imageAttachments.filter((a) => !loadedIdsRef.current.has(a.id));
     if (newAttachments.length === 0) return;
 
-    const loadImages = async () => {
-      for (const attachment of newAttachments) {
+    for (const attachment of newAttachments) {
+      loadedIdsRef.current.add(attachment.id);
+    }
+    setImageStates((prev) => {
+      const next = { ...prev };
+      for (const a of newAttachments) next[a.id] = { isLoading: true, error: false, imageSrc: '' };
+      return next;
+    });
+
+    let cancelled = false;
+    const completedIds = new Set<string>();
+    void Promise.all(
+      newAttachments.map(async (attachment) => {
         const key = attachment.id;
-        loadedIdsRef.current.add(key);
-
-        setImageStates((prev) => ({
-          ...prev,
-          [key]: { isLoading: true, error: false, imageSrc: '' },
-        }));
-
         try {
           if (isBrowserObjectUrl(attachment.file_url)) {
-            setImageStates((prev) => ({
-              ...prev,
-              [key]: { isLoading: false, error: false, imageSrc: attachment.file_url },
-            }));
-            continue;
+            if (!cancelled) {
+              completedIds.add(key);
+              setImageStates((prev) => ({
+                ...prev,
+                [key]: { isLoading: false, error: false, imageSrc: attachment.file_url },
+              }));
+            }
+            return;
           }
 
           const blob = await fetchAttachmentBlob(attachment.file_url, apiClient);
+          if (cancelled) return;
           const blobUrl = URL.createObjectURL(blob);
           ownedObjectUrlsRef.current.add(blobUrl);
+          completedIds.add(key);
 
           setImageStates((prev) => ({
             ...prev,
@@ -239,16 +254,26 @@ function AttachmentViewerInner({ attachments, uploadingAttachmentIds }: Attachme
         } catch (error) {
           logger.error('Image download failed', 'AttachmentViewer', error);
           loadedIdsRef.current.delete(key);
-          setImageStates((prev) => ({
-            ...prev,
-            [key]: { isLoading: false, error: true, imageSrc: '' },
-          }));
+          if (!cancelled) {
+            setImageStates((prev) => ({
+              ...prev,
+              [key]: { isLoading: false, error: true, imageSrc: '' },
+            }));
+          }
+        }
+      }),
+    );
+    return () => {
+      cancelled = true;
+      // Only remove IDs that never finished loading so the next effect retries them
+      for (const a of newAttachments) {
+        if (!completedIds.has(a.id)) {
+          loadedIdsRef.current.delete(a.id);
         }
       }
     };
-
-    loadImages();
-  }, [attachments]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageIdKey]);
 
   useEffect(() => {
     const loadedIds = loadedIdsRef.current;
@@ -295,19 +320,7 @@ function AttachmentViewerInner({ attachments, uploadingAttachmentIds }: Attachme
           );
         }
 
-        if (attachment.file_type === 'pdf') {
-          return (
-            <ThumbnailWrapper
-              key={attachment.id}
-              attachment={attachment}
-              onDownload={handleDownload}
-            >
-              <IconThumbnail attachment={attachment} isLoading={isUploadingAttachment} />
-            </ThumbnailWrapper>
-          );
-        }
-
-        if (attachment.file_type === 'xlsx') {
+        if (attachment.file_type === 'pdf' || attachment.file_type === 'xlsx') {
           return (
             <ThumbnailWrapper
               key={attachment.id}

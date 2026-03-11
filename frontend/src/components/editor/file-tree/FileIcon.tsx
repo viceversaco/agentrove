@@ -33,23 +33,32 @@ function loadModule(): Promise<GetIconFn | null> {
   return loadPromise;
 }
 
-export interface FileIconProps {
-  name: string;
-  isFolder?: boolean;
+export interface FolderIconProps {
   isExpanded?: boolean;
   className?: string;
 }
 
-export const FileIcon = memo(function FileIcon({
-  name,
-  isFolder = false,
-  isExpanded,
-  className,
-}: FileIconProps) {
-  const [svg, setSvg] = useState<string | null>(() => (isFolder ? null : getSvg(name)));
+export const FolderIcon = memo(function FolderIcon({ isExpanded, className }: FolderIconProps) {
+  const Icon = isExpanded ? FolderOpen : Folder;
+  return (
+    <Icon
+      className={cn(
+        'text-text-quaternary transition-colors dark:text-text-dark-quaternary',
+        className,
+      )}
+    />
+  );
+});
+
+export interface FileIconProps {
+  name: string;
+  className?: string;
+}
+
+export const FileIcon = memo(function FileIcon({ name, className }: FileIconProps) {
+  const [svg, setSvg] = useState<string | null>(() => getSvg(name));
 
   useEffect(() => {
-    if (isFolder) return;
     const resolved = getSvg(name);
     if (resolved) {
       setSvg(resolved);
@@ -63,25 +72,15 @@ export const FileIcon = memo(function FileIcon({
     return () => {
       cancelled = true;
     };
-  }, [name, isFolder]);
-
-  if (isFolder) {
-    const FolderIcon = isExpanded ? FolderOpen : Folder;
-    return (
-      <FolderIcon
-        className={cn(
-          'text-text-quaternary transition-colors dark:text-text-dark-quaternary',
-          className,
-        )}
-      />
-    );
-  }
+  }, [name]);
 
   if (!svg) return <span className={cn('inline-flex shrink-0', className)} />;
 
   return (
     <span
       className={cn('inline-flex shrink-0', className)}
+      role="img"
+      aria-hidden="true"
       dangerouslySetInnerHTML={{ __html: svg }}
     />
   );

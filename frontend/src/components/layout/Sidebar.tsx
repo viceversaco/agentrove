@@ -175,8 +175,11 @@ export function Sidebar({
   }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const { pinnedChats, workspaceGroups } = useMemo(() => {
-    const pinned = chats.filter((chat) => !!chat.pinned_at);
-    const unpinned = chats.filter((chat) => !chat.pinned_at);
+    const pinned: Chat[] = [];
+    const unpinned: Chat[] = [];
+    for (const chat of chats) {
+      (chat.pinned_at ? pinned : unpinned).push(chat);
+    }
     return {
       pinnedChats: pinned,
       workspaceGroups: groupChatsByWorkspace(unpinned, workspaces),
@@ -601,7 +604,7 @@ export function Sidebar({
           <button
             type="button"
             onClick={() => handleDeleteWorkspace(workspaceDropdown.workspaceId)}
-            className="text-error dark:text-error-dark w-full rounded-md px-2.5 py-1.5 text-left text-xs transition-colors duration-200 hover:bg-surface-hover dark:hover:bg-surface-dark-hover"
+            className="w-full rounded-md px-2.5 py-1.5 text-left text-xs text-error-500 transition-colors duration-200 hover:bg-surface-hover dark:text-error-400 dark:hover:bg-surface-dark-hover"
           >
             Delete
           </button>

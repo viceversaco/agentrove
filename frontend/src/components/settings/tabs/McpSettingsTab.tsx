@@ -26,6 +26,17 @@ const getCommandTypeBadge = (commandType: string): string => {
   }
 };
 
+function EnvVarCount({ envVars }: { envVars?: Record<string, string> | null }) {
+  if (!envVars) return null;
+  const count = Object.keys(envVars).length;
+  if (count === 0) return null;
+  return (
+    <p className="text-2xs text-text-quaternary dark:text-text-dark-quaternary">
+      {count} env var{count !== 1 ? 's' : ''}
+    </p>
+  );
+}
+
 export const McpSettingsTab: React.FC<McpSettingsTabProps> = ({
   mcps,
   onAddMcp,
@@ -85,12 +96,7 @@ export const McpSettingsTab: React.FC<McpSettingsTabProps> = ({
                 {mcp.url}
               </p>
             )}
-            {mcp.env_vars && Object.keys(mcp.env_vars).length > 0 && (
-              <p className="text-2xs text-text-quaternary dark:text-text-dark-quaternary">
-                {Object.keys(mcp.env_vars).length} env var
-                {Object.keys(mcp.env_vars).length !== 1 ? 's' : ''}
-              </p>
-            )}
+            <EnvVarCount envVars={mcp.env_vars} />
           </div>
         </>
       )}

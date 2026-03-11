@@ -262,7 +262,9 @@ export const DiffView = memo(function DiffView({ sandboxId }: DiffViewProps) {
           title="Refresh diff"
           aria-label="Refresh diff"
         >
-          <RotateCcw className={cn('h-3 w-3', isFetching && 'animate-spin')} />
+          <RotateCcw
+            className={cn('h-3 w-3', isFetching && 'animate-spin motion-reduce:animate-none')}
+          />
         </Button>
 
         <Dropdown
@@ -384,6 +386,7 @@ export const DiffView = memo(function DiffView({ sandboxId }: DiffViewProps) {
               return (
                 <div key={i}>
                   <button
+                    type="button"
                     onClick={() => toggleFile(i)}
                     className="flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors duration-200 hover:bg-surface-hover dark:hover:bg-surface-dark-hover"
                   >
