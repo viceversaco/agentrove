@@ -833,7 +833,6 @@ class ChatStreamRuntime:
         assistant_message_id: str,
     ) -> ChatStreamRequest:
         system_prompt = build_system_prompt_for_chat(
-            chat.sandbox_id or "",
             user_settings,
         )
         return ChatStreamRequest(

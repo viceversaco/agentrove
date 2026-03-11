@@ -686,7 +686,6 @@ class ChatService(BaseDbService[Chat]):
         )
 
         system_prompt = build_system_prompt_for_chat(
-            chat.workspace.sandbox_id,
             user_settings,
             selected_prompt_name=request.selected_prompt_name,
         )
