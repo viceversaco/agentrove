@@ -1,4 +1,10 @@
-import type { CustomAgent, CustomCommand, CustomEnvVar, CustomMcp, CustomSkill } from '@/types/user.types';
+import type {
+  CustomAgent,
+  CustomCommand,
+  CustomEnvVar,
+  CustomMcp,
+  CustomSkill,
+} from '@/types/user.types';
 import type { GeneralSecretFieldConfig } from '@/types/settings.types';
 import { validateRequired, validateRequiredIf, validateUnique } from '@/utils/validation';
 import { BUILT_IN_AGENTS } from '@/config/constants';
