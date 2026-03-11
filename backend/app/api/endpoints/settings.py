@@ -1,5 +1,3 @@
-from typing import cast
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,7 +38,7 @@ async def update_user_settings(
 ) -> UserSettingsResponse:
     update_data = settings_update.model_dump(exclude_unset=True)
     try:
-        user_settings = await user_service.update_user_settings(
+        await user_service.update_user_settings(
             user_id=current_user.id, settings_update=update_data, db=db
         )
     except DuplicateProviderNameError as e:
@@ -55,7 +53,6 @@ async def update_user_settings(
         )
     async with cache_connection() as cache:
         await user_service.invalidate_settings_cache(cache, current_user.id)
-    response = cast(
-        UserSettingsResponse, UserSettingsResponse.model_validate(user_settings)
-    )
-    return response
+        return await user_service.get_user_settings_response(
+            current_user.id, db=db, cache=cache
+        )

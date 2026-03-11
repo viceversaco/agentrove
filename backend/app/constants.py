@@ -12,7 +12,6 @@ HOST_REQUIRED_PATH_PREFIX: Final[str] = (
 
 MAX_RESOURCE_NAME_LENGTH: Final[int] = 50
 MIN_RESOURCE_NAME_LENGTH: Final[int] = 2
-MAX_RESOURCES_PER_USER: Final[int] = 10
 MAX_RESOURCE_SIZE_BYTES: Final[int] = 100 * 1024
 
 REDIS_KEY_CHAT_STREAM_LIVE: Final[str] = "chat:{chat_id}:stream:live"

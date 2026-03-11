@@ -123,11 +123,7 @@ export function ChatPage() {
   );
 
   const enabledSlashCommands = useMemo(
-    () =>
-      mergeByName(
-        settings?.custom_slash_commands?.filter((cmd) => cmd.enabled) || [],
-        workspaceResources?.commands ?? [],
-      ),
+    () => mergeByName(settings?.custom_slash_commands || [], workspaceResources?.commands ?? []),
     [settings?.custom_slash_commands, workspaceResources?.commands],
   );
 

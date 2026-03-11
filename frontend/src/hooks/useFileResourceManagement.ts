@@ -5,29 +5,22 @@ import { logger } from '@/utils/logger';
 import type { UserSettings } from '@/types/user.types';
 import { queryKeys } from './queries/queryKeys';
 
-type PersistSettingsFn = (
-  updater: (previous: UserSettings) => UserSettings,
-  options?: { successMessage?: string; errorMessage?: string },
-) => Promise<void>;
-
 type SettingsArrayKey = 'custom_agents' | 'custom_skills' | 'custom_slash_commands';
 
 interface UseFileResourceOptions<T> {
   settingsKey: SettingsArrayKey;
   itemName: string;
-  maxItems: number;
   uploadFn: (file: File) => Promise<T>;
   deleteFn: (name: string) => Promise<void>;
   updateFn?: (name: string, content: string) => Promise<T>;
 }
 
-export function useFileResourceManagement<T extends { name: string; enabled?: boolean }>(
+export function useFileResourceManagement<T extends { name: string }>(
   localSettings: UserSettings,
-  persistSettings: PersistSettingsFn,
   setLocalSettings: Dispatch<SetStateAction<UserSettings>>,
   options: UseFileResourceOptions<T>,
 ) {
-  const { settingsKey, itemName, maxItems, uploadFn, deleteFn, updateFn } = options;
+  const { settingsKey, itemName, uploadFn, deleteFn, updateFn } = options;
   const queryClient = useQueryClient();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -50,12 +43,6 @@ export function useFileResourceManagement<T extends { name: string; enabled?: bo
 
   const handleUpload = useCallback(
     async (file: File) => {
-      const currentItems = getItems();
-      if (currentItems.length >= maxItems) {
-        setUploadError(`Maximum ${maxItems} ${itemName}s allowed`);
-        return;
-      }
-
       setIsUploading(true);
       setUploadError(null);
 
@@ -77,7 +64,7 @@ export function useFileResourceManagement<T extends { name: string; enabled?: bo
         setIsUploading(false);
       }
     },
-    [getItems, maxItems, itemName, uploadFn, setLocalSettings, settingsKey, queryClient],
+    [itemName, uploadFn, setLocalSettings, settingsKey, queryClient],
   );
 
   const handleDelete = useCallback(
@@ -107,24 +94,6 @@ export function useFileResourceManagement<T extends { name: string; enabled?: bo
       }
     },
     [getItems, deleteFn, setLocalSettings, settingsKey, itemName, queryClient],
-  );
-
-  const handleToggle = useCallback(
-    (index: number, enabled: boolean) => {
-      persistSettings(
-        (prev) => {
-          const arr = [...((prev[settingsKey] as T[] | null) || [])];
-          if (arr[index]) {
-            arr[index] = { ...arr[index], enabled };
-          }
-          return { ...prev, [settingsKey]: arr };
-        },
-        { errorMessage: `Failed to update ${itemName} state` },
-      ).catch((error) => {
-        logger.error(`Failed to toggle ${itemName}`, 'useFileResourceManagement', error);
-      });
-    },
-    [persistSettings, settingsKey, itemName],
   );
 
   const handleDialogClose = useCallback(() => {
@@ -190,7 +159,6 @@ export function useFileResourceManagement<T extends { name: string; enabled?: bo
     handleUpload,
     handleDialogClose,
     handleDelete,
-    handleToggle,
     isEditDialogOpen,
     editingItem,
     isSavingEdit,

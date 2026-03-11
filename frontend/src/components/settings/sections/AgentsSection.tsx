@@ -17,21 +17,15 @@ const AgentEditDialog = lazy(() =>
 );
 
 export function AgentsSection() {
-  const { localSettings, persistSettings, setLocalSettings } = useSettingsContext();
+  const { localSettings, setLocalSettings } = useSettingsContext();
 
-  const agentManagement = useFileResourceManagement(
-    localSettings,
-    persistSettings,
-    setLocalSettings,
-    {
-      settingsKey: 'custom_agents',
-      itemName: 'Agent',
-      maxItems: 10,
-      uploadFn: agentService.uploadAgent,
-      deleteFn: agentService.deleteAgent,
-      updateFn: agentService.updateAgent,
-    },
-  );
+  const agentManagement = useFileResourceManagement(localSettings, setLocalSettings, {
+    settingsKey: 'custom_agents',
+    itemName: 'Agent',
+    uploadFn: agentService.uploadAgent,
+    deleteFn: agentService.deleteAgent,
+    updateFn: agentService.updateAgent,
+  });
 
   return (
     <>
@@ -40,7 +34,6 @@ export function AgentsSection() {
         onAddAgent={agentManagement.handleAdd}
         onEditAgent={agentManagement.handleEdit}
         onDeleteAgent={agentManagement.handleDelete}
-        onToggleAgent={agentManagement.handleToggle}
       />
       <SettingsUploadModal
         isOpen={agentManagement.isDialogOpen}

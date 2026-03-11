@@ -18,8 +18,10 @@ from app.models.schemas.workspace import (
     WorkspaceResources,
     WorkspaceUpdate,
 )
-from app.services.claude_folder_sync import ClaudeFolderSync
+from app.services.agent import AgentService
+from app.services.command import CommandService
 from app.services.exceptions import WorkspaceException
+from app.services.skill import SkillService
 from app.services.workspace import WorkspaceService
 
 router = APIRouter()
@@ -28,6 +30,19 @@ logger = logging.getLogger(__name__)
 
 def _raise_workspace_http_exception(exc: WorkspaceException) -> NoReturn:
     raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+
+def _discover_workspace_resources(claude_dir: Path) -> WorkspaceResources:
+    agent_service = AgentService(base_path=claude_dir / "agents")
+    command_service = CommandService(base_path=claude_dir / "commands")
+    skill_service = SkillService(base_path=claude_dir / "skills")
+    return WorkspaceResources(
+        agents=[CustomAgent.model_validate(a) for a in agent_service.list_all()],
+        commands=[
+            CustomSlashCommand.model_validate(c) for c in command_service.list_all()
+        ],
+        skills=[CustomSkill.model_validate(s) for s in skill_service.list_all()],
+    )
 
 
 @router.post(
@@ -98,14 +113,7 @@ async def get_workspace_resources(
     except WorkspaceException as e:
         _raise_workspace_http_exception(e)
     project_claude_dir = Path(workspace.workspace_path) / ".claude"
-    raw_agents, raw_commands, raw_skills = await asyncio.to_thread(
-        ClaudeFolderSync.discover_all, project_claude_dir
-    )
-    return WorkspaceResources(
-        agents=[CustomAgent.model_validate(a) for a in raw_agents],
-        commands=[CustomSlashCommand.model_validate(c) for c in raw_commands],
-        skills=[CustomSkill.model_validate(s) for s in raw_skills],
-    )
+    return await asyncio.to_thread(_discover_workspace_resources, project_claude_dir)
 
 
 @router.delete("/{workspace_id}", status_code=status.HTTP_204_NO_CONTENT)

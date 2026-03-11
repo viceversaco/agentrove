@@ -51,7 +51,6 @@ class CustomAgent(BaseModel):
     name: str
     description: str
     content: str
-    enabled: bool = True
     model: Literal["sonnet", "opus", "haiku", "inherit"] = "inherit"
     allowed_tools: list[str] | None = None
 
@@ -75,7 +74,6 @@ class CustomEnvVar(BaseModel):
 class CustomSkill(BaseModel):
     name: str
     description: str
-    enabled: bool = True
     size_bytes: int
     file_count: int
 
@@ -84,7 +82,6 @@ class CustomSlashCommand(BaseModel):
     name: str
     description: str
     content: str
-    enabled: bool = True
     argument_hint: str | None = None
     allowed_tools: list[str] | None = None
     model: (
@@ -115,11 +112,8 @@ class UserSettingsBase(BaseModel):
     timezone: str = Field(default="UTC", max_length=64)
     custom_instructions: str | None = Field(default=None, max_length=1500)
     custom_providers: list[CustomProvider] | None = None
-    custom_agents: list[CustomAgent] | None = None
     custom_mcps: list[CustomMcp] | None = None
     custom_env_vars: list[CustomEnvVar] | None = None
-    custom_skills: list[CustomSkill] | None = None
-    custom_slash_commands: list[CustomSlashCommand] | None = None
     custom_prompts: list[CustomPrompt] | None = None
     installed_plugins: list[InstalledPluginSchema] | None = None
     notifications_enabled: bool = True
@@ -128,11 +122,8 @@ class UserSettingsBase(BaseModel):
 
     @field_validator(
         "custom_providers",
-        "custom_agents",
         "custom_mcps",
         "custom_env_vars",
-        "custom_skills",
-        "custom_slash_commands",
         "custom_prompts",
         "installed_plugins",
         mode="before",
@@ -164,3 +155,6 @@ class UserSettingsResponse(UserSettingsBase):
     user_id: UUID
     created_at: datetime
     updated_at: datetime
+    custom_agents: list[CustomAgent] | None = None
+    custom_skills: list[CustomSkill] | None = None
+    custom_slash_commands: list[CustomSlashCommand] | None = None

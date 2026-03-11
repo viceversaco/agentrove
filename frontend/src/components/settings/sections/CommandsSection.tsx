@@ -17,21 +17,15 @@ const CommandEditDialog = lazy(() =>
 );
 
 export function CommandsSection() {
-  const { localSettings, persistSettings, setLocalSettings } = useSettingsContext();
+  const { localSettings, setLocalSettings } = useSettingsContext();
 
-  const commandManagement = useFileResourceManagement(
-    localSettings,
-    persistSettings,
-    setLocalSettings,
-    {
-      settingsKey: 'custom_slash_commands',
-      itemName: 'Command',
-      maxItems: 10,
-      uploadFn: commandService.uploadCommand,
-      deleteFn: commandService.deleteCommand,
-      updateFn: commandService.updateCommand,
-    },
-  );
+  const commandManagement = useFileResourceManagement(localSettings, setLocalSettings, {
+    settingsKey: 'custom_slash_commands',
+    itemName: 'Command',
+    uploadFn: commandService.uploadCommand,
+    deleteFn: commandService.deleteCommand,
+    updateFn: commandService.updateCommand,
+  });
 
   return (
     <>
@@ -40,7 +34,6 @@ export function CommandsSection() {
         onAddCommand={commandManagement.handleAdd}
         onEditCommand={commandManagement.handleEdit}
         onDeleteCommand={commandManagement.handleDelete}
-        onToggleCommand={commandManagement.handleToggle}
       />
       <SettingsUploadModal
         isOpen={commandManagement.isDialogOpen}

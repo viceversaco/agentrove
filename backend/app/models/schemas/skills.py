@@ -15,3 +15,20 @@ class SkillResponse(BaseModel):
 
 class SkillDeleteResponse(BaseModel):
     status: Literal["deleted", "not_found"]
+
+
+class SkillFileEntry(BaseModel):
+    path: str = Field(..., description="Relative path within the skill")
+    content: str = Field(
+        ..., description="File content (UTF-8 text or base64 for binary)"
+    )
+    is_binary: bool = Field(default=False, description="Whether the file is binary")
+
+
+class SkillFilesResponse(BaseModel):
+    name: str
+    files: list[SkillFileEntry]
+
+
+class SkillUpdateRequest(BaseModel):
+    files: list[SkillFileEntry]

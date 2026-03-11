@@ -89,7 +89,7 @@ export function LandingPage() {
   const allAgents = useMemo(() => mergeAgents(settings?.custom_agents), [settings?.custom_agents]);
 
   const enabledSlashCommands = useMemo(
-    () => settings?.custom_slash_commands?.filter((cmd) => cmd.enabled) || [],
+    () => settings?.custom_slash_commands || [],
     [settings?.custom_slash_commands],
   );
 

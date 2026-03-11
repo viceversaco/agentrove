@@ -7,13 +7,10 @@ from sqlalchemy import Boolean, DateTime, ForeignKey, JSON, String, Text
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 
 from app.models.types import (
-    CustomAgentDict,
     CustomEnvVarDict,
     CustomMcpDict,
     CustomPromptDict,
     CustomProviderDict,
-    CustomSkillDict,
-    CustomSlashCommandDict,
     InstalledPluginDict,
 )
 
@@ -92,17 +89,8 @@ class UserSettings(Base):
     custom_providers: Mapped[list[CustomProviderDict] | None] = mapped_column(
         EncryptedJSON, nullable=True
     )
-    custom_agents: Mapped[list[CustomAgentDict] | None] = mapped_column(
-        JSON, nullable=True
-    )
     custom_mcps: Mapped[list[CustomMcpDict] | None] = mapped_column(JSON, nullable=True)
     custom_env_vars: Mapped[list[CustomEnvVarDict] | None] = mapped_column(
-        JSON, nullable=True
-    )
-    custom_skills: Mapped[list[CustomSkillDict] | None] = mapped_column(
-        JSON, nullable=True
-    )
-    custom_slash_commands: Mapped[list[CustomSlashCommandDict] | None] = mapped_column(
         JSON, nullable=True
     )
     custom_prompts: Mapped[list[CustomPromptDict] | None] = mapped_column(

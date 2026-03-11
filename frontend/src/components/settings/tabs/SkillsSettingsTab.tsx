@@ -1,4 +1,3 @@
-import { Switch } from '@/components/ui/primitives/Switch';
 import { ListManagementTab } from '@/components/ui/ListManagementTab';
 import type { CustomSkill } from '@/types/user.types';
 import { Zap } from 'lucide-react';
@@ -6,8 +5,8 @@ import { Zap } from 'lucide-react';
 interface SkillsSettingsTabProps {
   skills: CustomSkill[] | null;
   onAddSkill: () => void;
+  onEditSkill: (index: number) => void;
   onDeleteSkill: (index: number) => void | Promise<void>;
-  onToggleSkill: (index: number, enabled: boolean) => void;
 }
 
 const formatBytes = (bytes: number): string => {
@@ -19,15 +18,13 @@ const formatBytes = (bytes: number): string => {
 export const SkillsSettingsTab: React.FC<SkillsSettingsTabProps> = ({
   skills,
   onAddSkill,
+  onEditSkill,
   onDeleteSkill,
-  onToggleSkill,
 }) => {
-  const isMaxLimitReached = skills && skills.length >= 10;
-
   return (
     <ListManagementTab<CustomSkill>
       title="Custom Skills"
-      description="Upload custom skills as ZIP files. Skills will be available in `.claude/skills/` directory. Maximum 10 skills per user."
+      description="Upload custom skills as ZIP files. Skills will be available in `.claude/skills/` directory."
       items={skills}
       emptyIcon={Zap}
       emptyText="No custom skills uploaded yet"
@@ -39,28 +36,14 @@ export const SkillsSettingsTab: React.FC<SkillsSettingsTabProps> = ({
       }
       getItemKey={(skill) => skill.name}
       onAdd={onAddSkill}
+      onEdit={onEditSkill}
       onDelete={onDeleteSkill}
-      maxLimit={10}
-      isMaxLimitReached={isMaxLimitReached}
-      footerContent={
-        isMaxLimitReached && (
-          <p className="mt-2 text-xs text-text-quaternary dark:text-text-dark-quaternary">
-            Maximum skill limit reached (10/10)
-          </p>
-        )
-      }
-      renderItem={(skill, index) => (
+      renderItem={(skill) => (
         <>
-          <div className="mb-1 flex flex-wrap items-center gap-2">
+          <div className="mb-1">
             <h3 className="min-w-0 max-w-full truncate text-xs font-medium text-text-primary dark:text-text-dark-primary sm:max-w-[250px]">
               {skill.name}
             </h3>
-            <Switch
-              checked={skill.enabled ?? true}
-              onCheckedChange={(checked) => onToggleSkill(index, checked)}
-              size="sm"
-              aria-label={`Toggle ${skill.name} skill`}
-            />
           </div>
           {skill.description && (
             <p className="mb-2 text-xs text-text-tertiary dark:text-text-dark-tertiary">

@@ -23,11 +23,8 @@ from app.constants import (
     SANDBOX_IDE_TOKEN_PATH,
 )
 from app.models.types import (
-    CustomAgentDict,
     CustomEnvVarDict,
     CustomProviderDict,
-    CustomSkillDict,
-    CustomSlashCommandDict,
 )
 from app.models.schemas.settings import ProviderType
 from app.services.agent import AgentService
@@ -311,53 +308,45 @@ class SandboxService:
     async def _deploy_resources(
         self,
         sandbox_id: str,
-        user_id: str,
-        custom_skills: list[CustomSkillDict] | None,
-        custom_slash_commands: list[CustomSlashCommandDict] | None,
-        custom_agents: list[CustomAgentDict] | None,
     ) -> None:
-        # In desktop mode, HOME is not overridden so the Claude CLI reads
-        # ~/.claude/ directly. Write resources there instead of the sandbox's
-        # isolated .claude/ directory which the CLI would never find.
+        # In desktop mode, resources already live at ~/.claude/ which the
+        # sandbox reads directly — no need to copy anything.
         if ClaudeFolderSync.is_active():
-            ClaudeFolderSync.export_all_to_claude_folder(
-                user_id, custom_agents, custom_slash_commands, custom_skills
-            )
             return
 
         skill_service = SkillService()
         command_service = CommandService()
         agent_service = AgentService()
 
-        enabled_skills = skill_service.get_enabled(user_id, custom_skills or [])
-        enabled_commands = command_service.get_enabled(
-            user_id, custom_slash_commands or []
-        )
-        enabled_agents = agent_service.get_enabled(user_id, custom_agents or [])
-
-        if not enabled_skills and not enabled_commands and not enabled_agents:
-            return
+        skill_paths = skill_service.get_all_skill_paths()
+        command_paths = command_service.get_all_resource_paths()
+        agent_paths = agent_service.get_all_resource_paths()
 
         writes: list[tuple[str, str | bytes]] = []
 
-        for skill in enabled_skills:
+        for skill in skill_paths:
             skill_name = skill["name"]
-            local_zip_path = Path(skill["path"])
+            skill_dir = Path(skill["path"])
 
-            if not local_zip_path.exists():
+            if not skill_dir.is_dir():
                 logger.warning(
-                    "Skill ZIP not found: %s at %s", skill_name, local_zip_path
+                    "Skill directory not found: %s at %s", skill_name, skill_dir
                 )
                 continue
 
-            with zipfile.ZipFile(local_zip_path, "r") as skill_zip:
-                for rel, file_bytes in SkillService.iter_zip_entries(
-                    skill_zip, skill_name
-                ):
-                    remote_path = f"{SANDBOX_CLAUDE_DIR}/skills/{skill_name}/{rel}"
-                    writes.append((remote_path, file_bytes))
+            for f in skill_dir.rglob("*"):
+                if not f.is_file():
+                    continue
+                try:
+                    file_bytes = f.read_bytes()
+                except OSError:
+                    continue
+                rel = str(f.relative_to(skill_dir))
+                writes.append(
+                    (f"{SANDBOX_CLAUDE_DIR}/skills/{skill_name}/{rel}", file_bytes)
+                )
 
-        for command in enabled_commands:
+        for command in command_paths:
             command_name = command["name"]
             local_path = Path(command["path"])
 
@@ -370,7 +359,7 @@ class SandboxService:
                 (f"{SANDBOX_CLAUDE_DIR}/commands/{command_name}.md", command_content)
             )
 
-        for agent in enabled_agents:
+        for agent in agent_paths:
             agent_name = agent["name"]
             local_path = Path(agent["path"])
 
@@ -427,9 +416,7 @@ class SandboxService:
                         self.provider.write_file(sandbox_id, remote_path, content)
                     )
 
-            resource_count = (
-                len(enabled_skills) + len(enabled_commands) + len(enabled_agents)
-            )
+            resource_count = len(skill_paths) + len(command_paths) + len(agent_paths)
             logger.info(
                 "Deployed %d resources (%d files) to sandbox %s",
                 resource_count,
@@ -577,10 +564,6 @@ class SandboxService:
         sandbox_id: str,
         github_token: str | None = None,
         custom_env_vars: list[CustomEnvVarDict] | None = None,
-        custom_skills: list[CustomSkillDict] | None = None,
-        custom_slash_commands: list[CustomSlashCommandDict] | None = None,
-        custom_agents: list[CustomAgentDict] | None = None,
-        user_id: str | None = None,
         auto_compact_disabled: bool = False,
         attribution_disabled: bool = False,
         custom_providers: list[CustomProviderDict] | None = None,
@@ -598,17 +581,7 @@ class SandboxService:
         if custom_env_vars:
             tasks.append(self._add_env_vars_parallel(sandbox_id, custom_env_vars))
 
-        has_resources = custom_skills or custom_slash_commands or custom_agents
-        if has_resources and user_id is not None:
-            tasks.append(
-                self._deploy_resources(
-                    sandbox_id,
-                    user_id,
-                    custom_skills,
-                    custom_slash_commands,
-                    custom_agents,
-                )
-            )
+        tasks.append(self._deploy_resources(sandbox_id))
 
         if github_token:
             tasks.append(self._setup_github_token(sandbox_id, github_token))

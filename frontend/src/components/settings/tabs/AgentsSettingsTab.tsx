@@ -1,4 +1,3 @@
-import { Switch } from '@/components/ui/primitives/Switch';
 import { ListManagementTab } from '@/components/ui/ListManagementTab';
 import type { CustomAgent } from '@/types/user.types';
 import { Bot } from 'lucide-react';
@@ -8,7 +7,6 @@ interface AgentsSettingsTabProps {
   onAddAgent: () => void;
   onEditAgent: (index: number) => void;
   onDeleteAgent: (index: number) => void | Promise<void>;
-  onToggleAgent: (index: number, enabled: boolean) => void;
 }
 
 export const AgentsSettingsTab: React.FC<AgentsSettingsTabProps> = ({
@@ -16,7 +14,6 @@ export const AgentsSettingsTab: React.FC<AgentsSettingsTabProps> = ({
   onAddAgent,
   onEditAgent,
   onDeleteAgent,
-  onToggleAgent,
 }) => {
   return (
     <ListManagementTab<CustomAgent>
@@ -35,18 +32,12 @@ export const AgentsSettingsTab: React.FC<AgentsSettingsTabProps> = ({
       onAdd={onAddAgent}
       onEdit={onEditAgent}
       onDelete={onDeleteAgent}
-      renderItem={(agent, index) => (
+      renderItem={(agent) => (
         <>
-          <div className="mb-1 flex flex-wrap items-center gap-2">
+          <div className="mb-1">
             <h3 className="min-w-0 max-w-full truncate text-xs font-medium text-text-primary dark:text-text-dark-primary sm:max-w-[250px]">
               {agent.name}
             </h3>
-            <Switch
-              checked={agent.enabled ?? true}
-              onCheckedChange={(checked) => onToggleAgent(index, checked)}
-              size="sm"
-              aria-label={`Toggle ${agent.name} agent`}
-            />
           </div>
           {agent.description && (
             <p className="mb-2 line-clamp-2 text-xs text-text-tertiary dark:text-text-dark-tertiary">

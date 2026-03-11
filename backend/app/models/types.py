@@ -5,7 +5,6 @@ class BaseResourceDict(TypedDict, total=False):
     name: str
     description: str
     content: str
-    enabled: bool
 
 
 class CustomAgentDict(BaseResourceDict, total=False):
@@ -32,7 +31,6 @@ class CustomEnvVarDict(TypedDict, total=False):
 class CustomSkillDict(TypedDict, total=False):
     name: str
     description: str
-    enabled: bool
     size_bytes: int
     file_count: int
 

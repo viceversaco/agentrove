@@ -16,7 +16,6 @@ export interface CustomAgent {
   name: string;
   description: string;
   content: string;
-  enabled: boolean;
   model?: 'sonnet' | 'opus' | 'haiku' | 'inherit' | null;
   allowed_tools?: string[] | null;
   [key: string]: unknown;
@@ -43,7 +42,6 @@ export interface CustomEnvVar {
 export interface CustomSkill {
   name: string;
   description: string;
-  enabled: boolean;
   size_bytes: number;
   file_count: number;
 }
@@ -52,7 +50,6 @@ export interface CustomCommand {
   name: string;
   description: string;
   content: string;
-  enabled: boolean;
   argument_hint?: string | null;
   allowed_tools?: string[] | null;
   model?:

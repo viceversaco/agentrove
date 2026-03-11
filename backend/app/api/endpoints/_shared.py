@@ -9,6 +9,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from app.models.db_models.user import UserSettings
 from app.services.exceptions import ServiceException, UserException
 from app.services.user import UserService
+from app.utils.cache import cache_connection
 
 
 async def load_user_settings_or_404(
@@ -63,6 +64,22 @@ def validate_name_or_400(
         validate_name(name)
     except ServiceException as exc:
         raise_bad_request_from_service(exc)
+
+
+async def prune_installed_component(
+    *,
+    user_service: UserService,
+    user_id: UUID,
+    db: AsyncSession,
+    component_id: str,
+) -> None:
+    user_settings = await load_user_settings_or_404(user_service, user_id, db)
+    if user_service.remove_installed_component(user_settings, component_id):
+        flag_modified(user_settings, "installed_plugins")
+        await user_service.save_settings(user_settings, db, user_id)
+    else:
+        async with cache_connection() as cache:
+            await user_service.invalidate_settings_cache(cache, user_id)
 
 
 async def save_settings_list(

@@ -31,10 +31,7 @@ from app.models.schemas.marketplace import (
     UninstallResponse,
 )
 from app.models.types import (
-    CustomAgentDict,
     CustomMcpDict,
-    CustomSkillDict,
-    CustomSlashCommandDict,
     InstalledPluginDict,
 )
 from app.services.agent import AgentService
@@ -86,16 +83,6 @@ async def install_plugin_components(
 ) -> InstallResponse:
     user_settings = await load_user_settings_or_404(user_service, current_user.id, db)
 
-    current_agents = cast(
-        list[CustomAgentDict], list(user_settings.custom_agents or [])
-    )
-    current_commands = cast(
-        list[CustomSlashCommandDict],
-        list(user_settings.custom_slash_commands or []),
-    )
-    current_skills = cast(
-        list[CustomSkillDict], list(user_settings.custom_skills or [])
-    )
     current_mcps = cast(list[CustomMcpDict], list(user_settings.custom_mcps or []))
 
     try:
@@ -105,37 +92,21 @@ async def install_plugin_components(
 
     try:
         result = await installer_service.install_components(
-            user_id=str(current_user.id),
             details=details,
             components=request.components,
-            current_agents=current_agents,
-            current_commands=current_commands,
-            current_skills=current_skills,
             current_mcps=current_mcps,
         )
     except MarketplaceException as e:
         raise HTTPException(status_code=e.status_code, detail=str(e))
 
     if result.installed:
-        if user_settings.custom_agents is None:
-            user_settings.custom_agents = []
-        for agent in result.new_agents:
-            append_named_item_if_missing(user_settings.custom_agents, agent)
-
-        if user_settings.custom_slash_commands is None:
-            user_settings.custom_slash_commands = []
-        for cmd in result.new_commands:
-            append_named_item_if_missing(user_settings.custom_slash_commands, cmd)
-
-        if user_settings.custom_skills is None:
-            user_settings.custom_skills = []
-        for skill in result.new_skills:
-            append_named_item_if_missing(user_settings.custom_skills, skill)
-
-        if user_settings.custom_mcps is None:
-            user_settings.custom_mcps = []
-        for mcp in result.new_mcps:
-            append_named_item_if_missing(user_settings.custom_mcps, mcp)
+        # MCPs still stored in DB (they don't have a filesystem representation)
+        if result.new_mcps:
+            if user_settings.custom_mcps is None:
+                user_settings.custom_mcps = []
+            for mcp in result.new_mcps:
+                append_named_item_if_missing(user_settings.custom_mcps, mcp)
+            flag_modified(user_settings, "custom_mcps")
 
         installed_plugins: list[InstalledPluginDict] = list(
             user_settings.installed_plugins or []
@@ -154,11 +125,6 @@ async def install_plugin_components(
         else:
             installed_plugins.append(record)
         user_settings.installed_plugins = installed_plugins
-
-        flag_modified(user_settings, "custom_agents")
-        flag_modified(user_settings, "custom_slash_commands")
-        flag_modified(user_settings, "custom_skills")
-        flag_modified(user_settings, "custom_mcps")
         flag_modified(user_settings, "installed_plugins")
 
         await user_service.save_settings(user_settings, db, current_user.id)
@@ -201,17 +167,15 @@ async def uninstall_plugin_components(
 
     uninstalled: list[str] = []
     failed: list[InstallComponentResult] = []
-    user_id = str(current_user.id)
 
     installed_plugins: list[InstalledPluginDict] = list(
         user_settings.installed_plugins or []
     )
 
-    component_dispatch: dict[str, tuple[str, Any | None]] = {
-        "agent": ("custom_agents", agent_service),
-        "command": ("custom_slash_commands", command_service),
-        "skill": ("custom_skills", skill_service),
-        "mcp": ("custom_mcps", None),
+    service_dispatch: dict[str, Any] = {
+        "agent": agent_service,
+        "command": command_service,
+        "skill": skill_service,
     }
 
     for component_id in request.components:
@@ -227,7 +191,27 @@ async def uninstall_plugin_components(
 
         comp_type, comp_name = component_id.split(":", 1)
 
-        if comp_type not in component_dispatch:
+        if comp_type == "mcp":
+            # MCPs are still DB-managed
+            items = list(user_settings.custom_mcps or [])
+            idx = find_named_item_index(items, comp_name)
+            if idx is None:
+                failed.append(
+                    InstallComponentResult(
+                        component=component_id,
+                        success=False,
+                        error="Mcp not found",
+                    )
+                )
+                continue
+            items.pop(idx)
+            user_settings.custom_mcps = items if items else None
+            flag_modified(user_settings, "custom_mcps")
+            uninstalled.append(component_id)
+            continue
+
+        service = service_dispatch.get(comp_type)
+        if service is None:
             failed.append(
                 InstallComponentResult(
                     component=component_id,
@@ -237,25 +221,8 @@ async def uninstall_plugin_components(
             )
             continue
 
-        field_name, service = component_dispatch[comp_type]
-        items = list(getattr(user_settings, field_name) or [])
-        idx = find_named_item_index(items, comp_name)
-
-        if idx is None:
-            failed.append(
-                InstallComponentResult(
-                    component=component_id,
-                    success=False,
-                    error=f"{comp_type.title()} not found",
-                )
-            )
-            continue
-
         try:
-            if service is not None:
-                await service.delete(user_id, comp_name)
-            items.pop(idx)
-            setattr(user_settings, field_name, items if items else None)
+            await service.delete(comp_name)
             uninstalled.append(component_id)
         except (ServiceException, OSError) as e:
             failed.append(
@@ -278,12 +245,7 @@ async def uninstall_plugin_components(
             user_settings.installed_plugins = (
                 installed_plugins if installed_plugins else None
             )
-
-        flag_modified(user_settings, "custom_agents")
-        flag_modified(user_settings, "custom_slash_commands")
-        flag_modified(user_settings, "custom_skills")
-        flag_modified(user_settings, "custom_mcps")
-        flag_modified(user_settings, "installed_plugins")
+            flag_modified(user_settings, "installed_plugins")
 
         await user_service.save_settings(user_settings, db, current_user.id)
 

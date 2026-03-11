@@ -19,8 +19,6 @@ interface ListManagementTabProps<T> {
   onEdit?: (index: number) => void;
   onDelete: (index: number) => void | Promise<void>;
   renderItem: (item: T, index: number) => ReactNode;
-  maxLimit?: number;
-  isMaxLimitReached?: boolean;
   footerContent?: ReactNode;
   logContext: string;
 }
@@ -40,8 +38,6 @@ export const ListManagementTab = <T,>({
   onEdit,
   onDelete,
   renderItem,
-  maxLimit,
-  isMaxLimitReached,
   footerContent,
   logContext,
 }: ListManagementTabProps<T>) => {
@@ -86,10 +82,6 @@ export const ListManagementTab = <T,>({
             variant="outline"
             size="sm"
             className="w-full shrink-0 sm:w-auto"
-            disabled={isMaxLimitReached}
-            title={
-              isMaxLimitReached && maxLimit ? `Maximum of ${maxLimit} items reached` : undefined
-            }
           >
             <Plus className="h-3.5 w-3.5" />
             {addButtonText}

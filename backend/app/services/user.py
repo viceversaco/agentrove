@@ -7,10 +7,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
-from app.constants import CLAUDE_DIR, REDIS_KEY_USER_SETTINGS
+from app.constants import REDIS_KEY_USER_SETTINGS
 from app.core.config import get_settings
 from app.models.db_models.user import UserSettings
-from pydantic import BaseModel
 
 from app.models.schemas.settings import (
     CustomAgent,
@@ -19,9 +18,12 @@ from app.models.schemas.settings import (
     UserSettingsResponse,
 )
 from app.models.types import InstalledPluginDict
+from app.services.agent import AgentService
 from app.services.claude_folder_sync import ClaudeFolderSync
+from app.services.command import CommandService
 from app.services.db import BaseDbService, SessionFactoryType
 from app.services.exceptions import UserException
+from app.services.skill import SkillService
 from app.utils.cache import CacheStore, cache_connection
 
 settings = get_settings()
@@ -93,8 +95,7 @@ class UserService(BaseDbService[UserSettings]):
             user_settings
         )
 
-        if ClaudeFolderSync.is_active():
-            self._merge_claude_folder_resources(response)
+        self._populate_filesystem_resources(response)
 
         if cache:
             await cache.setex(
@@ -106,29 +107,35 @@ class UserService(BaseDbService[UserSettings]):
         return response
 
     @staticmethod
-    def _merge_claude_folder_resources(response: UserSettingsResponse) -> None:
-        if not CLAUDE_DIR.is_dir():
-            return
+    def _populate_filesystem_resources(response: UserSettingsResponse) -> None:
+        agents = AgentService().list_all()
+        commands = CommandService().list_all()
+        skills = SkillService().list_all()
 
-        plugin_paths = ClaudeFolderSync.get_active_plugin_paths()
-        merge_specs: list[tuple[str, Any, type[BaseModel]]] = [
-            ("custom_agents", ClaudeFolderSync.merge_agents, CustomAgent),
-            (
-                "custom_slash_commands",
-                ClaudeFolderSync.merge_commands,
-                CustomSlashCommand,
-            ),
-            ("custom_skills", ClaudeFolderSync.merge_skills, CustomSkill),
+        # In desktop mode, merge resources from active Claude plugin install paths
+        if ClaudeFolderSync.is_active():
+            seen_agents = {a["name"] for a in agents}
+            seen_commands = {c["name"] for c in commands}
+            seen_skills = {s["name"] for s in skills}
+            for plugin_dir in ClaudeFolderSync.get_active_plugin_paths():
+                for a in AgentService(base_path=plugin_dir / "agents").list_all():
+                    if a["name"] not in seen_agents:
+                        agents.append(a)
+                        seen_agents.add(a["name"])
+                for c in CommandService(base_path=plugin_dir / "commands").list_all():
+                    if c["name"] not in seen_commands:
+                        commands.append(c)
+                        seen_commands.add(c["name"])
+                for s in SkillService(base_path=plugin_dir / "skills").list_all():
+                    if s["name"] not in seen_skills:
+                        skills.append(s)
+                        seen_skills.add(s["name"])
+
+        response.custom_agents = [CustomAgent.model_validate(a) for a in agents]
+        response.custom_slash_commands = [
+            CustomSlashCommand.model_validate(c) for c in commands
         ]
-        for attr, merge_fn, model_cls in merge_specs:
-            current = getattr(response, attr) or []
-            db_items = [x.model_dump() for x in current]
-            merged = merge_fn(db_items, plugin_paths=plugin_paths)
-            if len(merged) > len(db_items):
-                new_items = [
-                    model_cls.model_validate(x) for x in merged[len(current) :]
-                ]
-                setattr(response, attr, list(current) + new_items)
+        response.custom_skills = [CustomSkill.model_validate(s) for s in skills]
 
     async def update_user_settings(
         self, user_id: UUID, settings_update: dict[str, Any], db: AsyncSession
@@ -141,11 +148,8 @@ class UserService(BaseDbService[UserSettings]):
 
         json_fields = {
             "custom_providers",
-            "custom_agents",
             "custom_mcps",
             "custom_env_vars",
-            "custom_skills",
-            "custom_slash_commands",
             "custom_prompts",
         }
 

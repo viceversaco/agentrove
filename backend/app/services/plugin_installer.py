@@ -9,10 +9,7 @@ from fastapi import UploadFile
 
 from app.models.schemas.marketplace import InstallComponentResult
 from app.models.types import (
-    CustomAgentDict,
     CustomMcpDict,
-    CustomSkillDict,
-    CustomSlashCommandDict,
     InstalledPluginDict,
     PluginComponentsDict,
     PluginDetailsDict,
@@ -32,9 +29,6 @@ SUPPORTED_MCP_COMMANDS: set[str] = {"npx", "bunx", "uvx"}
 class InstallResult:
     installed: list[str]
     failed: list[InstallComponentResult]
-    new_agents: list[CustomAgentDict]
-    new_commands: list[CustomSlashCommandDict]
-    new_skills: list[CustomSkillDict]
     new_mcps: list[CustomMcpDict]
 
 
@@ -47,12 +41,8 @@ class PluginInstallerService:
 
     async def install_components(
         self,
-        user_id: str,
         details: PluginDetailsDict,
         components: list[str],
-        current_agents: list[CustomAgentDict],
-        current_commands: list[CustomSlashCommandDict],
-        current_skills: list[CustomSkillDict],
         current_mcps: list[CustomMcpDict],
     ) -> InstallResult:
         source = details.get("source", "")
@@ -61,9 +51,6 @@ class PluginInstallerService:
 
         installed: list[str] = []
         failed: list[InstallComponentResult] = []
-        new_agents: list[CustomAgentDict] = []
-        new_commands: list[CustomSlashCommandDict] = []
-        new_skills: list[CustomSkillDict] = []
         new_mcps: list[CustomMcpDict] = []
 
         for component in components:
@@ -94,25 +81,13 @@ class PluginInstallerService:
 
             try:
                 if comp_type == "agent":
-                    agent = await self._install_agent(
-                        user_id, source, comp_name, current_agents, marketplace
-                    )
-                    agent["name"] = comp_name
-                    new_agents.append(agent)
+                    await self._install_agent(source, comp_name, marketplace)
                     installed.append(component)
                 elif comp_type == "command":
-                    cmd = await self._install_command(
-                        user_id, source, comp_name, current_commands, marketplace
-                    )
-                    cmd["name"] = comp_name
-                    new_commands.append(cmd)
+                    await self._install_command(source, comp_name, marketplace)
                     installed.append(component)
                 elif comp_type == "skill":
-                    skill = await self._install_skill(
-                        user_id, source, comp_name, current_skills, marketplace
-                    )
-                    skill["name"] = comp_name
-                    new_skills.append(skill)
+                    await self._install_skill(source, comp_name, marketplace)
                     installed.append(component)
                 elif comp_type == "mcp":
                     mcp = await self._install_mcp(
@@ -149,9 +124,6 @@ class PluginInstallerService:
         return InstallResult(
             installed=installed,
             failed=failed,
-            new_agents=new_agents,
-            new_commands=new_commands,
-            new_skills=new_skills,
             new_mcps=new_mcps,
         )
 
@@ -179,43 +151,37 @@ class PluginInstallerService:
 
     async def _install_agent(
         self,
-        user_id: str,
         source: str,
         agent_name: str,
-        current_agents: list[CustomAgentDict],
         marketplace: str = "",
-    ) -> CustomAgentDict:
+    ) -> None:
         content = await self.marketplace.download_agent(source, agent_name, marketplace)
         file = self._create_upload_file(f"{agent_name}.md", content)
-        return await self.agent_service.upload(user_id, file, current_agents)
+        await self.agent_service.upload(file)
 
     async def _install_command(
         self,
-        user_id: str,
         source: str,
         command_name: str,
-        current_commands: list[CustomSlashCommandDict],
         marketplace: str = "",
-    ) -> CustomSlashCommandDict:
+    ) -> None:
         content = await self.marketplace.download_command(
             source, command_name, marketplace
         )
         file = self._create_upload_file(f"{command_name}.md", content)
-        return await self.command_service.upload(user_id, file, current_commands)
+        await self.command_service.upload(file)
 
     async def _install_skill(
         self,
-        user_id: str,
         source: str,
         skill_name: str,
-        current_skills: list[CustomSkillDict],
         marketplace: str = "",
-    ) -> CustomSkillDict:
+    ) -> None:
         zip_content = await self.marketplace.download_skill_as_zip(
             source, skill_name, marketplace
         )
         file = self._create_upload_file(f"{skill_name}.zip", zip_content)
-        return await self.skill_service.upload(user_id, file, current_skills)
+        await self.skill_service.upload(file)
 
     async def _install_mcp(
         self,
