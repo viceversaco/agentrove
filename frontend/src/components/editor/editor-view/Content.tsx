@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import Editor from '@monaco-editor/react';
 import type * as monaco from 'monaco-editor';
+import { MONACO_FONT_FAMILY } from '@/config/constants';
 
 const EDITOR_OPTIONS = {
   minimap: { enabled: false },
@@ -15,8 +16,7 @@ const EDITOR_OPTIONS = {
     strings: true,
   },
   snippetSuggestions: 'inline',
-  fontFamily:
-    'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+  fontFamily: MONACO_FONT_FAMILY,
   fontSize: 12,
   lineHeight: 1.5,
   renderLineHighlight: 'none',

@@ -16,11 +16,12 @@ export interface ItemProps {
 }
 
 export const Item = memo(function Item({ item, level, searchQuery = '', matchedPaths }: ItemProps) {
-  const { selectedFile, expandedFolders, onFileSelect, onToggleFolder } =
+  const { selectedFile, expandedFolders, onFileSelect, onToggleFolder, modifiedPaths } =
     useFileTreeContext('Item');
   const isFolder = item.type === 'folder';
   const isExpanded = isFolder && !!expandedFolders[item.path];
   const isSelected = selectedFile?.path === item.path;
+  const isModified = !isFolder && modifiedPaths?.has(item.path);
 
   const indentStyle = useMemo(() => ({ paddingLeft: `${level * 8 + 4}px` }), [level]);
 
@@ -73,6 +74,10 @@ export const Item = memo(function Item({ item, level, searchQuery = '', matchedP
           searchQuery={searchQuery}
           className={cn('min-w-0 flex-1', isSelected && 'font-medium')}
         />
+
+        {isModified && (
+          <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-text-quaternary dark:bg-text-dark-quaternary" />
+        )}
       </Button>
 
       {isFolder && isExpanded && item.children && (

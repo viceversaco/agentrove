@@ -1,12 +1,13 @@
-import { useState, useEffect, lazy, Suspense, useMemo } from 'react';
-import { File, Folder } from 'lucide-react';
+import { useState, useEffect, lazy, Suspense, useMemo, useCallback } from 'react';
 import { BaseModal } from '@/components/ui/shared/BaseModal';
 import { Button } from '@/components/ui/primitives/Button';
+import { Tree } from '@/components/editor/file-tree/Tree';
 import { useResolvedTheme } from '@/hooks/useResolvedTheme';
 import type { CustomSkill } from '@/types/user.types';
+import type { FileStructure } from '@/types/file-system.types';
 import { skillService, type SkillFileEntry } from '@/services/skillService';
-import { cn } from '@/utils/cn';
-import { detectLanguage } from '@/utils/file';
+import { MONACO_EDITOR_OPTIONS } from '@/config/constants';
+import { detectLanguage, sortFiles } from '@/utils/file';
 
 const Editor = lazy(() => import('@monaco-editor/react'));
 
@@ -28,16 +29,26 @@ export const SkillEditDialog: React.FC<SkillEditDialogProps> = ({
   onSave,
 }) => {
   const [files, setFiles] = useState<SkillFileEntry[]>([]);
-  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<FileStructure | null>(null);
+  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [modifiedFiles, setModifiedFiles] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const theme = useResolvedTheme();
 
+  const fileTree = useMemo(() => skillFilesToFileTree(files), [files]);
+
+  const modifiedPathsKey = useMemo(() => [...modifiedFiles.keys()].sort().join('\0'), [modifiedFiles]);
+  const modifiedPaths = useMemo(
+    () => new Set(modifiedPathsKey ? modifiedPathsKey.split('\0') : []),
+    [modifiedPathsKey],
+  );
+
   useEffect(() => {
     if (!isOpen || !skill) return;
     setFiles([]);
-    setSelectedPath(null);
+    setSelectedFile(null);
+    setExpandedFolders({});
     setModifiedFiles(new Map());
     setLoadError(null);
     setLoading(true);
@@ -48,8 +59,11 @@ export const SkillEditDialog: React.FC<SkillEditDialogProps> = ({
         const loaded = await skillService.getSkillFiles(skill.name);
         if (cancelled) return;
         setFiles(loaded);
+        setExpandedFolders(collectFolderPathsFromFiles(loaded));
         const firstTextFile = loaded.find((f) => !f.is_binary);
-        if (firstTextFile) setSelectedPath(firstTextFile.path);
+        if (firstTextFile) {
+          setSelectedFile({ path: firstTextFile.path, content: firstTextFile.content, type: 'file', is_binary: false });
+        }
       } catch (err) {
         if (cancelled) return;
         setLoadError(err instanceof Error ? err.message : 'Failed to load skill files');
@@ -63,34 +77,38 @@ export const SkillEditDialog: React.FC<SkillEditDialogProps> = ({
     };
   }, [isOpen, skill]);
 
-  const selectedFile = useMemo(
-    () => files.find((f) => f.path === selectedPath) ?? null,
-    [files, selectedPath],
+  const selectedSkillFile = useMemo(
+    () => files.find((f) => f.path === selectedFile?.path) ?? null,
+    [files, selectedFile],
   );
 
   const currentContent = useMemo(() => {
-    if (!selectedFile) return '';
-    if (modifiedFiles.has(selectedFile.path)) return modifiedFiles.get(selectedFile.path)!;
-    return selectedFile.content;
-  }, [selectedFile, modifiedFiles]);
+    if (!selectedSkillFile) return '';
+    if (modifiedFiles.has(selectedSkillFile.path)) return modifiedFiles.get(selectedSkillFile.path)!;
+    return selectedSkillFile.content;
+  }, [selectedSkillFile, modifiedFiles]);
 
   const hasChanges = modifiedFiles.size > 0;
 
   const handleEditorChange = (value: string | undefined) => {
-    if (!selectedPath) return;
+    if (!selectedFile) return;
+    const original = files.find((f) => f.path === selectedFile.path);
+    if (!original) return;
 
     setModifiedFiles((prev) => {
-      const original = files.find((f) => f.path === selectedPath);
-      if (!original) return prev;
       const next = new Map(prev);
       if (value === original.content) {
-        next.delete(selectedPath);
+        next.delete(selectedFile.path);
       } else {
-        next.set(selectedPath, value ?? '');
+        next.set(selectedFile.path, value ?? '');
       }
       return next;
     });
   };
+
+  const handleToggleFolder = useCallback((path: string) => {
+    setExpandedFolders((prev) => ({ ...prev, [path]: !prev[path] }));
+  }, []);
 
   const handleSave = async () => {
     const merged = files.map((f) => {
@@ -129,9 +147,9 @@ export const SkillEditDialog: React.FC<SkillEditDialogProps> = ({
       </div>
 
       <div className="flex h-[600px]">
-        <div className="w-52 shrink-0 overflow-y-auto border-r border-border p-2 dark:border-border-dark">
+        <div className="w-52 shrink-0 overflow-y-auto border-r border-border dark:border-border-dark">
           {loading ? (
-            <div className="space-y-2 p-2">
+            <div className="space-y-2 p-4">
               {Array.from({ length: 3 }).map((_, i) => (
                 <div
                   key={i}
@@ -140,25 +158,27 @@ export const SkillEditDialog: React.FC<SkillEditDialogProps> = ({
               ))}
             </div>
           ) : loadError ? (
-            <p className="p-2 text-xs text-text-tertiary dark:text-text-dark-tertiary">
+            <p className="p-4 text-xs text-text-tertiary dark:text-text-dark-tertiary">
               {loadError}
             </p>
           ) : (
-            <FileTree
-              files={files}
-              selectedPath={selectedPath}
-              modifiedPaths={modifiedFiles}
-              onSelect={setSelectedPath}
+            <Tree
+              files={fileTree}
+              selectedFile={selectedFile}
+              expandedFolders={expandedFolders}
+              onFileSelect={setSelectedFile}
+              onToggleFolder={handleToggleFolder}
+              modifiedPaths={modifiedPaths}
             />
           )}
         </div>
 
         <div className="flex-1 overflow-hidden">
-          {!selectedFile ? (
+          {!selectedSkillFile ? (
             <div className="flex h-full items-center justify-center text-xs text-text-quaternary dark:text-text-dark-quaternary">
               {loading ? 'Loading...' : 'Select a file to edit'}
             </div>
-          ) : selectedFile.is_binary ? (
+          ) : selectedSkillFile.is_binary ? (
             <div className="flex h-full items-center justify-center text-xs text-text-quaternary dark:text-text-dark-quaternary">
               Binary file cannot be edited
             </div>
@@ -170,20 +190,11 @@ export const SkillEditDialog: React.FC<SkillEditDialogProps> = ({
             >
               <Editor
                 height="100%"
-                language={detectLanguage(selectedFile.path)}
+                language={detectLanguage(selectedSkillFile.path)}
                 value={currentContent}
                 onChange={handleEditorChange}
                 theme={theme === 'dark' ? 'vs-dark' : 'vs'}
-                options={{
-                  minimap: { enabled: false },
-                  wordWrap: 'on',
-                  automaticLayout: true,
-                  fontSize: 13,
-                  lineNumbers: 'on',
-                  scrollBeyondLastLine: false,
-                  fontFamily:
-                    'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-                }}
+                options={MONACO_EDITOR_OPTIONS}
                 loading={
                   <div className="flex h-full items-center justify-center text-text-quaternary dark:text-text-dark-quaternary">
                     Loading editor...
@@ -224,137 +235,42 @@ export const SkillEditDialog: React.FC<SkillEditDialogProps> = ({
   );
 };
 
-interface FileTreeProps {
-  files: SkillFileEntry[];
-  selectedPath: string | null;
-  modifiedPaths: Map<string, string>;
-  onSelect: (path: string) => void;
-}
-
-interface TreeNode {
-  name: string;
-  path: string;
-  isDir: boolean;
-  children: TreeNode[];
-}
-
-function buildTree(files: SkillFileEntry[]): TreeNode[] {
-  const root: TreeNode[] = [];
+function skillFilesToFileTree(files: SkillFileEntry[]): FileStructure[] {
+  const root: FileStructure[] = [];
 
   for (const file of files) {
     const parts = file.path.split('/');
     let current = root;
 
     for (let i = 0; i < parts.length; i++) {
-      const name = parts[i];
       const isLast = i === parts.length - 1;
       const partPath = parts.slice(0, i + 1).join('/');
 
-      let existing = current.find((n) => n.name === name);
+      let existing = current.find((n) => n.path === partPath);
       if (!existing) {
-        existing = {
-          name,
-          path: partPath,
-          isDir: !isLast,
-          children: [],
-        };
+        existing = isLast
+          ? { path: partPath, content: file.content, type: 'file' as const, is_binary: file.is_binary }
+          : { path: partPath, content: '', type: 'folder' as const, children: [] };
         current.push(existing);
       }
 
       if (!isLast) {
+        if (!existing.children) existing.children = [];
         current = existing.children;
       }
     }
   }
 
-  return sortTree(root);
+  return sortFiles(root);
 }
 
-function sortTree(nodes: TreeNode[]): TreeNode[] {
-  nodes.sort((a, b) => {
-    if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
-    return a.name.localeCompare(b.name);
-  });
-  for (const node of nodes) {
-    if (node.children.length > 0) sortTree(node.children);
+function collectFolderPathsFromFiles(files: SkillFileEntry[]): Record<string, boolean> {
+  const result: Record<string, boolean> = {};
+  for (const file of files) {
+    const parts = file.path.split('/');
+    for (let i = 1; i < parts.length; i++) {
+      result[parts.slice(0, i).join('/')] = true;
+    }
   }
-  return nodes;
-}
-
-function FileTree({ files, selectedPath, modifiedPaths, onSelect }: FileTreeProps) {
-  const tree = useMemo(() => buildTree(files), [files]);
-
-  return (
-    <div className="space-y-px">
-      {tree.map((node) => (
-        <TreeItem
-          key={node.path}
-          node={node}
-          depth={0}
-          selectedPath={selectedPath}
-          modifiedPaths={modifiedPaths}
-          onSelect={onSelect}
-        />
-      ))}
-    </div>
-  );
-}
-
-interface TreeItemProps {
-  node: TreeNode;
-  depth: number;
-  selectedPath: string | null;
-  modifiedPaths: Map<string, string>;
-  onSelect: (path: string) => void;
-}
-
-function TreeItem({ node, depth, selectedPath, modifiedPaths, onSelect }: TreeItemProps) {
-  const [expanded, setExpanded] = useState(true);
-  const isSelected = node.path === selectedPath;
-  const isModified = modifiedPaths.has(node.path);
-
-  if (node.isDir) {
-    return (
-      <>
-        <button
-          onClick={() => setExpanded((prev) => !prev)}
-          className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-2xs text-text-secondary transition-colors hover:bg-surface-hover dark:text-text-dark-secondary dark:hover:bg-surface-dark-hover"
-          style={{ paddingLeft: `${depth * 12 + 8}px` }}
-        >
-          <Folder className="h-3 w-3 shrink-0 text-text-quaternary dark:text-text-dark-quaternary" />
-          <span className="truncate">{node.name}</span>
-        </button>
-        {expanded &&
-          node.children.map((child) => (
-            <TreeItem
-              key={child.path}
-              node={child}
-              depth={depth + 1}
-              selectedPath={selectedPath}
-              modifiedPaths={modifiedPaths}
-              onSelect={onSelect}
-            />
-          ))}
-      </>
-    );
-  }
-
-  return (
-    <button
-      onClick={() => onSelect(node.path)}
-      className={cn(
-        'flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-2xs transition-colors',
-        isSelected
-          ? 'bg-surface-active text-text-primary dark:bg-surface-dark-active dark:text-text-dark-primary'
-          : 'text-text-secondary hover:bg-surface-hover dark:text-text-dark-secondary dark:hover:bg-surface-dark-hover',
-      )}
-      style={{ paddingLeft: `${depth * 12 + 8}px` }}
-    >
-      <File className="h-3 w-3 shrink-0 text-text-quaternary dark:text-text-dark-quaternary" />
-      <span className="truncate">{node.name}</span>
-      {isModified && (
-        <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-text-quaternary dark:bg-text-dark-quaternary" />
-      )}
-    </button>
-  );
+  return result;
 }

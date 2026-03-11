@@ -5,6 +5,7 @@ import { BaseModal } from '@/components/ui/shared/BaseModal';
 import { Button } from '@/components/ui/primitives/Button';
 import { useResolvedTheme } from '@/hooks/useResolvedTheme';
 import type { CustomCommand } from '@/types/user.types';
+import { MONACO_EDITOR_OPTIONS } from '@/config/constants';
 
 interface CommandEditDialogProps {
   isOpen: boolean;
@@ -81,16 +82,7 @@ export const CommandEditDialog: React.FC<CommandEditDialogProps> = ({
             value={editedContent}
             onChange={(value) => setEditedContent(value || '')}
             theme={theme === 'dark' ? 'vs-dark' : 'vs'}
-            options={{
-              minimap: { enabled: false },
-              wordWrap: 'on',
-              automaticLayout: true,
-              fontSize: 13,
-              lineNumbers: 'on',
-              scrollBeyondLastLine: false,
-              fontFamily:
-                'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-            }}
+            options={MONACO_EDITOR_OPTIONS}
             loading={
               <div className="flex h-full items-center justify-center text-text-quaternary dark:text-text-dark-quaternary">
                 Loading editor...

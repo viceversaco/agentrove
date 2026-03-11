@@ -41,6 +41,19 @@ export const BUILT_IN_AGENTS: CustomAgent[] = [
   },
 ];
 
+export const MONACO_FONT_FAMILY =
+  'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+
+export const MONACO_EDITOR_OPTIONS = {
+  minimap: { enabled: false },
+  wordWrap: 'on' as const,
+  automaticLayout: true,
+  fontSize: 13,
+  lineNumbers: 'on' as const,
+  scrollBeyondLastLine: false,
+  fontFamily: MONACO_FONT_FAMILY,
+};
+
 export const MOBILE_BREAKPOINT = 768;
 
 export const AVAILABLE_CLAUDE_TOOLS = [

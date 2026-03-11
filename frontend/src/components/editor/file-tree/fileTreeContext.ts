@@ -9,6 +9,7 @@ export type FileTreeHandlers = {
 export interface FileTreeContextValue extends FileTreeHandlers {
   selectedFile: FileStructure | null;
   expandedFolders: Record<string, boolean>;
+  modifiedPaths?: Set<string>;
 }
 
 export const FileTreeContext = createContext<FileTreeContextValue | null>(null);

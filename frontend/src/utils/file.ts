@@ -50,7 +50,7 @@ const LANGUAGE_MAP: Record<string, string> = {
 
 const LEADING_SLASH_RE = /^\.?\/+/;
 
-function sortFiles(files: FileStructure[]): FileStructure[] {
+export function sortFiles(files: FileStructure[]): FileStructure[] {
   const sorted = [...files].sort((a, b) => {
     if (a.type === 'folder' && b.type === 'file') return -1;
     if (a.type === 'file' && b.type === 'folder') return 1;
