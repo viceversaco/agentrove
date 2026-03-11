@@ -1,4 +1,10 @@
-import type { CustomAgent, CustomEnvVar, CustomMcp } from '@/types/user.types';
+import type {
+  CustomAgent,
+  CustomCommand,
+  CustomEnvVar,
+  CustomMcp,
+  CustomSkill,
+} from '@/types/user.types';
 import type { GeneralSecretFieldConfig } from '@/types/settings.types';
 import { validateRequired, validateRequiredIf, validateUnique } from '@/utils/validation';
 import { BUILT_IN_AGENTS } from '@/config/constants';
@@ -11,6 +17,22 @@ export const mergeByName = <T extends { name: string }>(primary: T[], secondary:
 
 export const mergeAgents = (customAgents: CustomAgent[] | null | undefined): CustomAgent[] => {
   return mergeByName(BUILT_IN_AGENTS, customAgents ?? []);
+};
+
+export const mergeCommands = (
+  settingsCommands: CustomCommand[] | null | undefined,
+  settingsSkills: CustomSkill[] | null | undefined,
+  workspaceCommands?: CustomCommand[] | null,
+  workspaceSkills?: CustomSkill[] | null,
+): CustomCommand[] => {
+  const commands = mergeByName(settingsCommands ?? [], workspaceCommands ?? []);
+  const skills = mergeByName(settingsSkills ?? [], workspaceSkills ?? []);
+  const skillsAsCommands = skills.map((s) => ({
+    name: s.name,
+    description: s.description,
+    content: '',
+  }));
+  return mergeByName(commands, skillsAsCommands);
 };
 
 export const createDefaultEnvVarForm = (): CustomEnvVar => ({

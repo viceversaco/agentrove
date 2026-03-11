@@ -20,7 +20,7 @@ import {
   useWorkspaceResourcesQuery,
 } from '@/hooks/queries/useWorkspaceQueries';
 import { useSettingsQuery } from '@/hooks/queries/useSettingsQueries';
-import { mergeAgents, mergeByName } from '@/utils/settings';
+import { mergeAgents, mergeByName, mergeCommands } from '@/utils/settings';
 import { findFileByToolPath } from '@/utils/file';
 import { ChatProvider } from '@/contexts/ChatContext';
 
@@ -123,8 +123,19 @@ export function ChatPage() {
   );
 
   const enabledSlashCommands = useMemo(
-    () => mergeByName(settings?.custom_slash_commands || [], workspaceResources?.commands ?? []),
-    [settings?.custom_slash_commands, workspaceResources?.commands],
+    () =>
+      mergeCommands(
+        settings?.custom_slash_commands,
+        settings?.custom_skills,
+        workspaceResources?.commands,
+        workspaceResources?.skills,
+      ),
+    [
+      settings?.custom_slash_commands,
+      settings?.custom_skills,
+      workspaceResources?.commands,
+      workspaceResources?.skills,
+    ],
   );
 
   const customPrompts = useMemo(() => {

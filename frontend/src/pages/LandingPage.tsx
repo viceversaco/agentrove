@@ -12,7 +12,7 @@ import { useInfiniteChatsQuery, useCreateChatMutation } from '@/hooks/queries/us
 import { useWorkspacesQuery } from '@/hooks/queries/useWorkspaceQueries';
 import { useModelSelection } from '@/hooks/queries/useModelQueries';
 import { useSettingsQuery } from '@/hooks/queries/useSettingsQueries';
-import { mergeAgents } from '@/utils/settings';
+import { mergeAgents, mergeCommands } from '@/utils/settings';
 import { ChatProvider } from '@/contexts/ChatContext';
 
 const EXAMPLE_PROMPTS = [
@@ -89,8 +89,8 @@ export function LandingPage() {
   const allAgents = useMemo(() => mergeAgents(settings?.custom_agents), [settings?.custom_agents]);
 
   const enabledSlashCommands = useMemo(
-    () => settings?.custom_slash_commands || [],
-    [settings?.custom_slash_commands],
+    () => mergeCommands(settings?.custom_slash_commands, settings?.custom_skills),
+    [settings?.custom_slash_commands, settings?.custom_skills],
   );
 
   const customPrompts = useMemo(() => settings?.custom_prompts || [], [settings?.custom_prompts]);
