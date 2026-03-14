@@ -18,8 +18,23 @@ import { useMessageCache } from '@/hooks/useMessageCache';
 import { streamService } from '@/services/streamService';
 import type { StreamOptions } from '@/services/streamService';
 import { useUIStore } from '@/store/uiStore';
+import type { PaginatedMessages } from '@/types/api.types';
 
 const STREAM_FLUSH_INTERVAL_MS = 130;
+
+function findMessageInCache(
+  queryClient: QueryClient,
+  chatId: string,
+  messageId: string,
+): Message | undefined {
+  const data = queryClient.getQueryData<{ pages: PaginatedMessages[] }>(queryKeys.messages(chatId));
+  if (!data?.pages) return undefined;
+  for (const page of data.pages) {
+    const msg = page.items.find((m) => m.id === messageId);
+    if (msg) return msg;
+  }
+  return undefined;
+}
 
 function createEmptyRenderSnapshot(): ContentRenderSnapshot {
   return { events: [] };
@@ -79,6 +94,7 @@ interface UseStreamCallbacksResult {
 interface StreamSessionState {
   messageId: string;
   lastSeq: number;
+  chatId: string;
 }
 
 function envelopeToRenderEvent(envelope: StreamEnvelope): AssistantStreamEvent | null {
@@ -163,6 +179,8 @@ export function useStreamCallbacks({
   const accumulatorsRef = useRef<Map<string, StreamingContentAccumulator>>(new Map());
   const flushTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const streamSessionsRef = useRef<Map<string, StreamSessionState>>(new Map());
+  const chatIdRef = useRef(chatId);
+  chatIdRef.current = chatId;
 
   const { updateMessageInCache, addMessageToCache, removeMessagesFromCache } = useMessageCache({
     chatId,
@@ -203,9 +221,11 @@ export function useStreamCallbacks({
 
       const update = buildProjectionUpdate(streamId, accumulator, session);
 
-      setMessages((prevMessages) =>
-        prevMessages.map((msg) => (msg.id === session.messageId ? update(msg) : msg)),
-      );
+      if (session.chatId === chatIdRef.current) {
+        setMessages((prevMessages) =>
+          prevMessages.map((msg) => (msg.id === session.messageId ? update(msg) : msg)),
+        );
+      }
 
       if (writeToCache) {
         updateMessageInCache(session.messageId, update);
@@ -231,20 +251,29 @@ export function useStreamCallbacks({
   );
 
   const ensureAccumulator = useCallback(
-    (streamId: string, messageId: string, seq: number): StreamingContentAccumulator => {
+    (
+      streamId: string,
+      messageId: string,
+      seq: number,
+      streamChatId: string,
+    ): StreamingContentAccumulator => {
       const existing = accumulatorsRef.current.get(streamId);
       if (existing) {
         const existingSession = streamSessionsRef.current.get(streamId);
         if (existingSession) {
           existingSession.lastSeq = Math.max(existingSession.lastSeq, seq);
           existingSession.messageId = messageId;
+          existingSession.chatId = streamChatId;
         }
         return existing;
       }
 
       let seedEvents: AssistantStreamEvent[] = [];
       let seedText = '';
-      const existingMessage = messagesRef.current.find((msg) => msg.id === messageId);
+      const existingMessage =
+        streamChatId === chatIdRef.current
+          ? messagesRef.current.find((msg) => msg.id === messageId)
+          : findMessageInCache(queryClient, streamChatId, messageId);
       if (existingMessage) {
         const maybeEvents = existingMessage.content_render?.events;
         seedEvents = Array.isArray(maybeEvents) ? maybeEvents : [];
@@ -256,11 +285,12 @@ export function useStreamCallbacks({
       streamSessionsRef.current.set(streamId, {
         messageId,
         lastSeq: seq,
+        chatId: streamChatId,
       });
 
       return accumulator;
     },
-    [],
+    [queryClient],
   );
 
   useEffect(() => {
@@ -298,7 +328,7 @@ export function useStreamCallbacks({
         return;
       }
 
-      if (pendingUserMessageIdRef.current) {
+      if (pendingUserMessageIdRef.current && chatId === chatIdRef.current) {
         setPendingUserMessageId(null);
       }
 
@@ -361,7 +391,12 @@ export function useStreamCallbacks({
         return;
       }
 
-      const accumulator = ensureAccumulator(envelope.streamId, envelope.messageId, envelope.seq);
+      const accumulator = ensureAccumulator(
+        envelope.streamId,
+        envelope.messageId,
+        envelope.seq,
+        envelope.chatId,
+      );
       accumulator.push(renderEvent);
 
       const session = streamSessionsRef.current.get(envelope.streamId);
@@ -373,6 +408,7 @@ export function useStreamCallbacks({
       scheduleProjection(envelope.streamId);
     },
     [
+      chatId,
       ensureAccumulator,
       onContextUsageUpdate,
       onPermissionRequest,
@@ -390,24 +426,33 @@ export function useStreamCallbacks({
     ) => {
       const resolvedStreamId = streamId ?? resolveStreamIdForMessage(messageId);
       const isCancelled = terminalKind === 'cancelled';
+      const isCurrentChat = chatId === chatIdRef.current;
 
       if (resolvedStreamId) {
         applyProjection(resolvedStreamId, { writeToCache: true });
       }
 
+      // Session cleanup is stateless and safe for any chat; always run it.
+      clearStreamSession(resolvedStreamId);
+
+      // Cache finalization must run even for off-screen chats so returning
+      // to the chat within the staleTime window doesn't show a stuck message.
       if (messageId) {
         const finalizeMessage = (message: Message): Message => ({
           ...message,
           active_stream_id: null,
           stream_status: isCancelled ? 'interrupted' : 'completed',
         });
-        setMessages((prev) =>
-          prev.map((msg) => (msg.id === messageId ? finalizeMessage(msg) : msg)),
-        );
         updateMessageInCache(messageId, finalizeMessage);
+        if (isCurrentChat) {
+          setMessages((prev) =>
+            prev.map((msg) => (msg.id === messageId ? finalizeMessage(msg) : msg)),
+          );
+        }
       }
 
-      clearStreamSession(resolvedStreamId);
+      if (!isCurrentChat) return;
+
       setPendingUserMessageId(null);
       setStreamState('idle');
       setCurrentMessageId(null);
@@ -459,33 +504,43 @@ export function useStreamCallbacks({
 
   const onError = useCallback(
     (streamError: Error, assistantMessageId?: string, streamId?: string) => {
-      clearStreamSession(streamId ?? resolveStreamIdForMessage(assistantMessageId));
+      const resolvedStreamId = streamId ?? resolveStreamIdForMessage(assistantMessageId);
+      const isCurrentChat = chatId === chatIdRef.current;
+
+      if (resolvedStreamId) {
+        applyProjection(resolvedStreamId, { writeToCache: true });
+      }
+      clearStreamSession(resolvedStreamId);
+
+      // Mark the assistant message as failed instead of removing it —
+      // the user message and assistant message are already persisted in
+      // the DB by the time the SSE error event arrives.
+      if (assistantMessageId) {
+        const markFailed = (msg: Message): Message => ({
+          ...msg,
+          active_stream_id: null,
+          stream_status: 'failed',
+        });
+        updateMessageInCache(assistantMessageId, markFailed);
+        if (isCurrentChat) {
+          setMessages((prev) =>
+            prev.map((msg) => (msg.id === assistantMessageId ? markFailed(msg) : msg)),
+          );
+        }
+      }
+
+      if (!isCurrentChat) return;
 
       setError(streamError);
       setStreamState('error');
       setCurrentMessageId(null);
-
-      const userMessageId = pendingUserMessageIdRef.current;
-      const messageIdsToRemove: string[] = [];
-
-      if (userMessageId) {
-        messageIdsToRemove.push(userMessageId);
-      }
-      if (assistantMessageId) {
-        messageIdsToRemove.push(assistantMessageId);
-      }
-
-      if (messageIdsToRemove.length > 0) {
-        const idsToRemove = new Set(messageIdsToRemove);
-        setMessages((prev) => prev.filter((msg) => !idsToRemove.has(msg.id)));
-        removeMessagesFromCache(messageIdsToRemove);
-      }
-
       setPendingUserMessageId(null);
     },
     [
+      applyProjection,
+      chatId,
       clearStreamSession,
-      removeMessagesFromCache,
+      updateMessageInCache,
       resolveStreamIdForMessage,
       setCurrentMessageId,
       setError,
@@ -498,11 +553,12 @@ export function useStreamCallbacks({
   const onQueueProcess = useCallback(
     (data: QueueProcessingData) => {
       if (!chatId) return;
+      const isCurrentChat = chatId === chatIdRef.current;
 
       // Queue continuation starts a new stream/message pair without terminal events
       // on the prior stream, so flush and drop stale per-stream session state.
       for (const [streamId, session] of Array.from(streamSessionsRef.current.entries())) {
-        if (session.messageId === data.assistantMessageId) {
+        if (session.chatId !== chatId || session.messageId === data.assistantMessageId) {
           continue;
         }
         applyProjection(streamId, { writeToCache: true });
@@ -540,9 +596,14 @@ export function useStreamCallbacks({
         is_bot: true,
       };
 
-      setMessages((prev) => [...prev, userMessage, assistantMessage]);
+      // Cache updates must run even for off-screen chats so returning
+      // within the staleTime window shows the queued continuation messages.
       addMessageToCache(userMessage);
       addMessageToCache(assistantMessage);
+
+      if (!isCurrentChat) return;
+
+      setMessages((prev) => [...prev, userMessage, assistantMessage]);
       setCurrentMessageId(data.assistantMessageId);
     },
     [

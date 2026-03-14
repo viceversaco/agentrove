@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { logger } from '@/utils/logger';
 import { chatService } from '@/services/chatService';
 import { chatStorage } from '@/utils/storage';
+import { useStreamStore } from '@/store/streamStore';
 import type { Message } from '@/types/chat.types';
 import type { StreamState } from '@/types/stream.types';
 
@@ -41,90 +42,117 @@ export function useStreamReconnect({
   updateMessageInCache,
   replayStream,
 }: UseStreamReconnectParams): void {
+  const fetchedMessagesRef = useRef(fetchedMessages);
+  fetchedMessagesRef.current = fetchedMessages;
+  const selectedModelIdRef = useRef(selectedModelId);
+  selectedModelIdRef.current = selectedModelId;
+
   useEffect(() => {
     if (!chatId || isInitialLoading || !hasFetchedMessages) return;
+    if (streamState !== 'idle' || currentMessageId || wasAborted) return;
+
+    let cancelled = false;
 
     const checkActiveTask = async () => {
       try {
+        if (useStreamStore.getState().getStreamByChat(chatId)) return;
+
         const status = await chatService.checkChatStatus(chatId);
-        if (status?.has_active_task && streamState === 'idle' && !currentMessageId && !wasAborted) {
-          let targetMessageId = status.message_id;
+        if (cancelled) return;
+        if (!status?.has_active_task) return;
 
-          if (!targetMessageId) {
-            const latestAssistantMessage = [...fetchedMessages]
-              .reverse()
-              .find((msg) => msg.role === 'assistant');
-            targetMessageId = latestAssistantMessage?.id;
-          }
+        let targetMessageId = status.message_id;
 
-          if (targetMessageId) {
-            setStreamState('streaming');
-            setCurrentMessageId(targetMessageId);
-
-            const messageExists = fetchedMessages.some((msg) => msg.id === targetMessageId);
-            const existingMessage = fetchedMessages.find((msg) => msg.id === targetMessageId);
-            const previousSnapshot = existingMessage
-              ? {
-                  content_text: existingMessage.content_text,
-                  content_render: existingMessage.content_render,
-                  last_seq: existingMessage.last_seq,
-                  active_stream_id: existingMessage.active_stream_id ?? null,
-                }
-              : null;
-
-            const reconnectSeq = status.last_seq ?? existingMessage?.last_seq ?? 0;
-            const storedSeqRaw = chatStorage.getEventId(chatId);
-            const storedSeq = storedSeqRaw ? Number(storedSeqRaw) : Number.NaN;
-            const normalizedStoredSeq = Number.isFinite(storedSeq) && storedSeq > 0 ? storedSeq : 0;
-            const normalizedReconnectSeq = reconnectSeq > 0 ? reconnectSeq : 0;
-            // If the active assistant message is absent locally, start replay from 0 so
-            // we rebuild the full message instead of resuming from a truncated cursor.
-            const replayAfterSeq = messageExists
-              ? Math.max(normalizedStoredSeq, normalizedReconnectSeq)
-              : 0;
-            if (replayAfterSeq > 0) {
-              chatStorage.setEventId(chatId, String(replayAfterSeq));
-            } else {
-              chatStorage.removeEventId(chatId);
-            }
-
-            if (!messageExists) {
-              const placeholderMessage: Message = {
-                id: targetMessageId,
-                chat_id: chatId,
-                role: 'assistant',
-                content_text: '',
-                content_render: { events: [] },
-                last_seq: status.last_seq ?? 0,
-                active_stream_id: status.stream_id ?? null,
-                stream_status: 'in_progress',
-                created_at: new Date().toISOString(),
-                model_id: selectedModelId || '',
-                is_bot: true,
-              };
-              addMessageToCache(placeholderMessage);
-              setMessages((prev) => [...prev, placeholderMessage]);
-            }
-
-            try {
-              await replayStream(targetMessageId, replayAfterSeq);
-            } catch (replayError) {
-              logger.error('Stream reconnect failed', 'useStreamReconnect', replayError);
-              if (previousSnapshot) {
-                setMessages((prev) =>
-                  prev.map((msg) =>
-                    msg.id === targetMessageId ? { ...msg, ...previousSnapshot } : msg,
-                  ),
-                );
-                updateMessageInCache(targetMessageId, (msg) => ({
-                  ...msg,
-                  ...previousSnapshot,
-                }));
-              }
-              setStreamState('idle');
-              setCurrentMessageId(null);
+        if (!targetMessageId) {
+          const msgs = fetchedMessagesRef.current;
+          let latestAssistantMessage: Message | undefined;
+          for (let i = msgs.length - 1; i >= 0; i--) {
+            if (msgs[i].role === 'assistant') {
+              latestAssistantMessage = msgs[i];
+              break;
             }
           }
+          targetMessageId = latestAssistantMessage?.id;
+        }
+
+        if (!targetMessageId) return;
+
+        setStreamState('streaming');
+        setCurrentMessageId(targetMessageId);
+
+        const messages = fetchedMessagesRef.current;
+        const existingMessage = messages.find((msg) => msg.id === targetMessageId);
+        const messageExists = existingMessage != null;
+        const previousSnapshot = existingMessage
+          ? {
+              content_text: existingMessage.content_text,
+              content_render: existingMessage.content_render,
+              last_seq: existingMessage.last_seq,
+              active_stream_id: existingMessage.active_stream_id ?? null,
+            }
+          : null;
+
+        const reconnectSeq = status.last_seq ?? existingMessage?.last_seq ?? 0;
+        const storedSeqRaw = chatStorage.getEventId(chatId);
+        const storedSeq = storedSeqRaw ? Number(storedSeqRaw) : Number.NaN;
+        const normalizedStoredSeq = Number.isFinite(storedSeq) && storedSeq > 0 ? storedSeq : 0;
+        const normalizedReconnectSeq = reconnectSeq > 0 ? reconnectSeq : 0;
+        // If the active assistant message is absent locally, start replay from 0 so
+        // we rebuild the full message instead of resuming from a truncated cursor.
+        const replayAfterSeq = messageExists
+          ? Math.max(normalizedStoredSeq, normalizedReconnectSeq)
+          : 0;
+        if (replayAfterSeq > 0) {
+          chatStorage.setEventId(chatId, String(replayAfterSeq));
+        } else {
+          chatStorage.removeEventId(chatId);
+        }
+
+        if (!messageExists) {
+          const placeholderMessage: Message = {
+            id: targetMessageId,
+            chat_id: chatId,
+            role: 'assistant',
+            content_text: '',
+            content_render: { events: [] },
+            last_seq: status.last_seq ?? 0,
+            active_stream_id: status.stream_id ?? null,
+            stream_status: 'in_progress',
+            created_at: new Date().toISOString(),
+            model_id: selectedModelIdRef.current || '',
+            is_bot: true,
+          };
+          addMessageToCache(placeholderMessage);
+          setMessages((prev) => [...prev, placeholderMessage]);
+        }
+
+        try {
+          await replayStream(targetMessageId, replayAfterSeq);
+        } catch (replayError) {
+          logger.error('Stream reconnect failed', 'useStreamReconnect', replayError);
+          if (previousSnapshot) {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === targetMessageId ? { ...msg, ...previousSnapshot } : msg,
+              ),
+            );
+            updateMessageInCache(targetMessageId, (msg) => ({
+              ...msg,
+              ...previousSnapshot,
+            }));
+          } else {
+            const markFailed = (msg: Message): Message => ({
+              ...msg,
+              active_stream_id: null,
+              stream_status: 'failed',
+            });
+            setMessages((prev) =>
+              prev.map((msg) => (msg.id === targetMessageId ? markFailed(msg) : msg)),
+            );
+            updateMessageInCache(targetMessageId, markFailed);
+          }
+          setStreamState('idle');
+          setCurrentMessageId(null);
         }
       } catch (checkError) {
         logger.error('Active task check failed', 'useStreamReconnect', checkError);
@@ -133,12 +161,12 @@ export function useStreamReconnect({
 
     const timeoutId = setTimeout(checkActiveTask, 100);
     return () => {
+      cancelled = true;
       clearTimeout(timeoutId);
     };
   }, [
     chatId,
     currentMessageId,
-    fetchedMessages,
     hasFetchedMessages,
     isInitialLoading,
     replayStream,
@@ -146,7 +174,6 @@ export function useStreamReconnect({
     updateMessageInCache,
     wasAborted,
     addMessageToCache,
-    selectedModelId,
     setStreamState,
     setCurrentMessageId,
     setMessages,

@@ -729,22 +729,44 @@ class SchedulerService(BaseDbService[ScheduledTask]):
 
             system_prompt = build_system_prompt_for_chat(user_settings)
 
-            await ChatStreamRuntime.execute_chat(
-                request=ChatStreamRequest(
-                    prompt=prompt_message,
-                    system_prompt=system_prompt,
-                    custom_instructions=user_settings.custom_instructions,
-                    chat_data=chat_data,
-                    model_id=model_id,
-                    permission_mode="auto",
-                    session_id=None,
-                    assistant_message_id=str(assistant_message_id),
-                    thinking_mode="ultra",
-                    attachments=None,
-                    is_custom_prompt=False,
-                ),
-                session_factory=self.session_factory,
+            stream_request = ChatStreamRequest(
+                prompt=prompt_message,
+                system_prompt=system_prompt,
+                custom_instructions=user_settings.custom_instructions,
+                chat_data=chat_data,
+                model_id=model_id,
+                permission_mode="auto",
+                session_id=None,
+                assistant_message_id=str(assistant_message_id),
+                thinking_mode="ultra",
+                attachments=None,
+                is_custom_prompt=False,
             )
+            try:
+                await ChatStreamRuntime.execute_chat(
+                    request=stream_request,
+                    session_factory=self.session_factory,
+                )
+            except asyncio.CancelledError:
+                await ChatStreamRuntime.mark_message_failed(
+                    assistant_message_id=str(assistant_message_id),
+                    session_factory=self.session_factory,
+                    stream_status=MessageStreamStatus.INTERRUPTED,
+                )
+                raise
+            except Exception as exc:
+                logger.error(
+                    "Scheduled task chat failed for %s: %s",
+                    chat_id,
+                    exc,
+                )
+                await ChatStreamRuntime.emit_bootstrap_error(
+                    chat_id=str(chat_id),
+                    assistant_message_id=str(assistant_message_id),
+                    session_factory=self.session_factory,
+                    error_message=str(exc),
+                )
+                raise
 
             async with self.session_factory() as db:
                 execution = await db.get(TaskExecution, execution_id)

@@ -47,6 +47,21 @@ logger = logging.getLogger(__name__)
 TERMINAL_STREAM_EVENT_TYPES = {"cancelled", "complete", "error"}
 
 
+def _extract_queue_processing_message_id(raw_data: Any) -> UUID | None:
+    if not isinstance(raw_data, str):
+        return None
+    if StreamEventKind.QUEUE_PROCESSING.value not in raw_data:
+        return None
+    try:
+        env = json.loads(raw_data)
+        if env.get("kind") != StreamEventKind.QUEUE_PROCESSING.value:
+            return None
+        new_mid = (env.get("payload") or {}).get("assistant_message_id")
+        return UUID(new_mid) if new_mid else None
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+
 class ChatService(BaseDbService[Chat]):
     def __init__(
         self,
@@ -597,6 +612,10 @@ class ChatService(BaseDbService[Chat]):
                     async for item in self._replay_stream_backlog(chat_id, after_seq):
                         yield item
                         last_seq = int(item["id"])
+                        new_mid = _extract_queue_processing_message_id(item.get("data"))
+                        if new_mid:
+                            active_message_id = new_mid
+                            active_stream_id = None
 
                     async for event in self._stream_live_redis_events(
                         chat_id,
@@ -607,6 +626,13 @@ class ChatService(BaseDbService[Chat]):
                         event_seq = int(event["id"])
                         if event_seq > last_seq:
                             last_seq = event_seq
+
+                        new_mid = _extract_queue_processing_message_id(
+                            event.get("data")
+                        )
+                        if new_mid:
+                            active_message_id = new_mid
+                            active_stream_id = None
 
         except Exception as exc:
             logger.error(

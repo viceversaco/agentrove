@@ -937,7 +937,7 @@ class ChatStreamRuntime:
             logger.error("Failed to re-queue message: %s", requeue_exc)
 
     @staticmethod
-    async def _mark_message_failed(
+    async def mark_message_failed(
         *,
         assistant_message_id: str | None,
         session_factory: SessionFactoryType,
@@ -971,6 +971,70 @@ class ChatStreamRuntime:
                 stream_status.value,
             )
 
+    @staticmethod
+    async def emit_bootstrap_error(
+        *,
+        chat_id: str,
+        assistant_message_id: str | None,
+        session_factory: SessionFactoryType,
+        error_message: str,
+    ) -> None:
+        if not assistant_message_id:
+            return
+        try:
+            message_service = MessageService(session_factory=session_factory)
+            message = await message_service.get_message(UUID(assistant_message_id))
+            if not message or message.stream_status != MessageStreamStatus.IN_PROGRESS:
+                return
+            stream_id = uuid4()
+            payload = {"error": error_message}
+            error_seq = await message_service.append_event_with_next_seq(
+                chat_id=UUID(chat_id),
+                message_id=UUID(assistant_message_id),
+                stream_id=stream_id,
+                event_type="error",
+                render_payload=payload,
+                audit_payload={"payload": payload},
+            )
+            async with cache_connection() as cache:
+                channel = REDIS_KEY_CHAT_STREAM_LIVE.format(chat_id=chat_id)
+                envelope = StreamEnvelope.serialize(
+                    chat_id=UUID(chat_id),
+                    message_id=UUID(assistant_message_id),
+                    stream_id=stream_id,
+                    seq=error_seq,
+                    kind="error",
+                    payload=payload,
+                )
+                await cache.publish(channel, envelope)
+            existing_render = message.content_render or {"events": []}
+            render_events = list(existing_render.get("events", []))
+            render_events.append(
+                {"type": "assistant_text", "text": f"\n\nError: {error_message}"}
+            )
+            content_text = message.content_text or ""
+            if not content_text:
+                content_text = error_message
+            await message_service.update_message_snapshot(
+                UUID(assistant_message_id),
+                content_text=content_text,
+                content_render={**existing_render, "events": render_events},
+                last_seq=error_seq,
+                active_stream_id=None,
+                stream_status=MessageStreamStatus.FAILED,
+            )
+        except Exception as inner_exc:
+            logger.error(
+                "Failed to emit bootstrap error for chat %s: %s",
+                chat_id,
+                inner_exc,
+            )
+            await ChatStreamRuntime.mark_message_failed(
+                assistant_message_id=assistant_message_id,
+                session_factory=session_factory,
+                stream_status=MessageStreamStatus.FAILED,
+            )
+
     @classmethod
     async def execute_chat(
         cls,
@@ -982,110 +1046,101 @@ class ChatStreamRuntime:
             request=request,
             session_factory=session_factory,
         )
-        try:
-            async with cache_connection() as cache:
-                runtime.cache = cache
+        async with cache_connection() as cache:
+            runtime.cache = cache
 
-                ai_service = ClaudeAgentService(session_factory=runtime.session_factory)
-                user = User(id=runtime.chat.user_id)
+            ai_service = ClaudeAgentService(session_factory=runtime.session_factory)
+            user = User(id=runtime.chat.user_id)
 
-                params: SessionParams = await ai_service.build_session_params(
-                    user=user,
-                    chat=runtime.chat,
-                    system_prompt=request.system_prompt,
-                    model_id=request.model_id,
-                    permission_mode=request.permission_mode,
-                    session_id=request.session_id,
-                    thinking_mode=request.thinking_mode,
-                    is_custom_prompt=request.is_custom_prompt,
-                )
+            params: SessionParams = await ai_service.build_session_params(
+                user=user,
+                chat=runtime.chat,
+                system_prompt=request.system_prompt,
+                model_id=request.model_id,
+                permission_mode=request.permission_mode,
+                session_id=request.session_id,
+                thinking_mode=request.thinking_mode,
+                is_custom_prompt=request.is_custom_prompt,
+            )
 
-                session = await session_registry.get_or_create(
-                    chat_id=runtime.chat_id,
-                    options=params.options,
-                    transport_factory=params.transport_factory,
-                )
+            session = await session_registry.get_or_create(
+                chat_id=runtime.chat_id,
+                options=params.options,
+                transport_factory=params.transport_factory,
+            )
 
-                session_callback = SessionUpdateCallback(
-                    chat_id=runtime.chat_id,
-                    assistant_message_id=request.assistant_message_id,
-                    session_factory=runtime.session_factory,
-                    session_container=runtime.session_container,
-                )
+            session_callback = SessionUpdateCallback(
+                chat_id=runtime.chat_id,
+                assistant_message_id=request.assistant_message_id,
+                session_factory=runtime.session_factory,
+                session_container=runtime.session_container,
+            )
 
-                session.cancel_event.clear()
-                if session_registry.consume_pending_cancel(runtime.chat_id):
-                    session.cancel_event.set()
-                runtime._cancel_event = session.cancel_event
-                session.active_generation_task = asyncio.current_task()
-                runtime.transport = session.transport
-                runtime.client = session.client
-                stream: AsyncIterator[StreamEvent] | None = None
-                try:
-                    if params.options.model:
-                        await session.client.set_model(params.options.model)
-                    if params.options.permission_mode:
-                        await session.client.set_permission_mode(
-                            params.options.permission_mode
-                        )
-                    stream_result = StreamResult()
-                    attachment_base_dir = SANDBOX_HOME_DIR
-                    if runtime.chat.sandbox_provider == SandboxProviderType.HOST:
-                        # Files are written to the sandbox home dir
-                        # (/home/user/ → {host_base}/{sandbox_id}/), so
-                        # point Claude at the real host path, not the
-                        # workspace path.
-                        host_base = (
-                            Path(settings.get_host_sandbox_base_dir())
-                            .expanduser()
-                            .resolve()
-                        )
-                        sid = runtime.chat.sandbox_id
-                        assert sid is not None
-                        attachment_base_dir = str(host_base / sid)
-                    stream = ai_service.stream_response(
-                        client=session.client,
-                        prompt=request.prompt,
-                        custom_instructions=request.custom_instructions,
-                        session_id=request.session_id,
-                        result=stream_result,
-                        session_callback=session_callback,
-                        attachments=request.attachments,
-                        attachment_base_dir=attachment_base_dir,
+            session.cancel_event.clear()
+            if session_registry.consume_pending_cancel(runtime.chat_id):
+                session.cancel_event.set()
+            runtime._cancel_event = session.cancel_event
+            session.active_generation_task = asyncio.current_task()
+            runtime.transport = session.transport
+            runtime.client = session.client
+            stream: AsyncIterator[StreamEvent] | None = None
+            try:
+                if params.options.model:
+                    await session.client.set_model(params.options.model)
+                if params.options.permission_mode:
+                    await session.client.set_permission_mode(
+                        params.options.permission_mode
                     )
-                    return await runtime.run(ai_service, stream_result, stream)
-                except (
-                    ClaudeAgentException,
-                    asyncio.CancelledError,
-                ) as exc:
-                    if cls._is_transport_fatal(exc):
-                        session.active_generation_task = None
-                        await session_registry.terminate(runtime.chat_id)
-                    raise
-                except Exception:
+                stream_result = StreamResult()
+                attachment_base_dir = SANDBOX_HOME_DIR
+                if runtime.chat.sandbox_provider == SandboxProviderType.HOST:
+                    # Files are written to the sandbox home dir
+                    # (/home/user/ → {host_base}/{sandbox_id}/), so
+                    # point Claude at the real host path, not the
+                    # workspace path.
+                    host_base = (
+                        Path(settings.get_host_sandbox_base_dir())
+                        .expanduser()
+                        .resolve()
+                    )
+                    sid = runtime.chat.sandbox_id
+                    assert sid is not None
+                    attachment_base_dir = str(host_base / sid)
+                stream = ai_service.stream_response(
+                    client=session.client,
+                    prompt=request.prompt,
+                    custom_instructions=request.custom_instructions,
+                    session_id=request.session_id,
+                    result=stream_result,
+                    session_callback=session_callback,
+                    attachments=request.attachments,
+                    attachment_base_dir=attachment_base_dir,
+                )
+                return await runtime.run(ai_service, stream_result, stream)
+            except (
+                ClaudeAgentException,
+                asyncio.CancelledError,
+            ) as exc:
+                if cls._is_transport_fatal(exc):
                     session.active_generation_task = None
                     await session_registry.terminate(runtime.chat_id)
-                    raise
-                finally:
-                    if stream is not None and hasattr(stream, "aclose"):
-                        await stream.aclose()
-                    if runtime._cancelled:
-                        try:
-                            async with asyncio.timeout(5.0):
-                                async for _ in session.client.receive_response():
-                                    pass
-                        except Exception:
-                            pass
-                    session.active_generation_task = None
-                    session.last_used_at = time.monotonic()
-
-        except asyncio.CancelledError:
-            await cls._mark_message_failed(
-                assistant_message_id=request.assistant_message_id,
-                session_factory=session_factory,
-                stream_status=MessageStreamStatus.INTERRUPTED,
-            )
-            raise
+                raise
+            except Exception:
+                session.active_generation_task = None
+                await session_registry.terminate(runtime.chat_id)
+                raise
+            finally:
+                if stream is not None and hasattr(stream, "aclose"):
+                    await stream.aclose()
+                if runtime._cancelled:
+                    try:
+                        async with asyncio.timeout(5.0):
+                            async for _ in session.client.receive_response():
+                                pass
+                    except Exception:
+                        pass
+                session.active_generation_task = None
+                session.last_used_at = time.monotonic()
 
     @classmethod
     async def _bootstrap_and_execute(
@@ -1100,5 +1155,23 @@ class ChatStreamRuntime:
                 request=request,
                 session_factory=session_factory,
             )
+        except asyncio.CancelledError:
+            await cls.mark_message_failed(
+                assistant_message_id=request.assistant_message_id,
+                session_factory=session_factory,
+                stream_status=MessageStreamStatus.INTERRUPTED,
+            )
+            raise
+        except Exception as exc:
+            logger.error(
+                "Chat bootstrap failed for %s: %s", chat_id, exc, exc_info=True
+            )
+            await cls.emit_bootstrap_error(
+                chat_id=chat_id,
+                assistant_message_id=request.assistant_message_id,
+                session_factory=session_factory,
+                error_message=str(exc),
+            )
+            raise
         finally:
             session_registry.consume_pending_cancel(chat_id)

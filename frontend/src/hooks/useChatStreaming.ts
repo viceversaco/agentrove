@@ -12,7 +12,6 @@ import { useInputState } from '@/hooks/useInputState';
 import { useClipboard } from '@/hooks/useClipboard';
 import { useStreamCallbacks } from '@/hooks/useStreamCallbacks';
 import { useStreamReconnect } from '@/hooks/useStreamReconnect';
-import { streamService } from '@/services/streamService';
 
 export { useStreamRestoration } from './useStreamRestoration';
 export { useGlobalStream } from './useGlobalStream';
@@ -93,7 +92,6 @@ export function useChatStreaming({
   const [pendingUserMessageId, setPendingUserMessageIdState] = useState<string | null>(null);
   const pendingStopRef = useRef<Set<string>>(new Set());
   const prevChatIdRef = useRef<string | undefined>(chatId);
-  const lastConnectedStreamRef = useRef<string | null>(null);
   const currentMessageIdRef = useRef<string | null>(null);
   const sendMessageRef = useRef<
     | ((
@@ -154,25 +152,27 @@ export function useChatStreaming({
   useEffect(() => {
     if (!chatId) return;
 
-    const checkAndUpdateCallbacks = () => {
+    const updateCallbacks = () => {
       const existingStream = findActiveStreamForChat(chatId);
-
-      if (existingStream && lastConnectedStreamRef.current !== existingStream.id) {
-        lastConnectedStreamRef.current = existingStream.id;
+      if (existingStream) {
         useStreamStore.getState().updateStreamCallbacks(chatId, existingStream.messageId, {
           onEnvelope,
           onComplete,
           onError,
           onQueueProcess,
         });
-      } else if (!existingStream) {
-        lastConnectedStreamRef.current = null;
       }
     };
 
-    checkAndUpdateCallbacks();
+    updateCallbacks();
 
-    const unsubscribe = useStreamStore.subscribe(checkAndUpdateCallbacks);
+    let prevStreams = useStreamStore.getState().activeStreams;
+    const unsubscribe = useStreamStore.subscribe((state) => {
+      if (state.activeStreams !== prevStreams) {
+        prevStreams = state.activeStreams;
+        updateCallbacks();
+      }
+    });
     return () => unsubscribe();
   }, [chatId, onEnvelope, onComplete, onError, onQueueProcess]);
 
@@ -259,13 +259,15 @@ export function useChatStreaming({
   const handleStopStream = useCallback(
     async (messageId?: string) => {
       const pendingIds = new Set<string>();
+      const stopPromises: Promise<void>[] = [];
       if (messageId) {
         pendingIds.add(messageId);
+        stopPromises.push(stopStream(messageId));
       } else if (chatId) {
-        const activeStreams = useStreamStore.getState().activeStreams;
-        activeStreams.forEach((stream) => {
+        useStreamStore.getState().activeStreams.forEach((stream) => {
           if (stream.chatId === chatId && stream.isActive) {
             pendingIds.add(stream.messageId);
+            stopPromises.push(stopStream(stream.messageId));
           }
         });
       }
@@ -275,14 +277,15 @@ export function useChatStreaming({
       setWasAborted(true);
       setPendingUserMessageId(null);
 
-      try {
-        if (messageId) {
-          await stopStream(messageId);
-        } else {
-          await streamService.stopAllStreams();
+      const results = await Promise.allSettled(stopPromises);
+      let anyFailed = false;
+      for (const result of results) {
+        if (result.status === 'rejected') {
+          anyFailed = true;
+          logger.error('Stream stop request failed', 'useChatStreaming', result.reason);
         }
-      } catch (err) {
-        logger.error('Stream stop request failed', 'useChatStreaming', err);
+      }
+      if (anyFailed) {
         pendingStopRef.current.clear();
       }
     },
