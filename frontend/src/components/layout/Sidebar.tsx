@@ -2,8 +2,6 @@ import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, FolderOpen, ChevronRight, MoreHorizontal, SquarePen } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useInView } from 'react-intersection-observer';
-import type { FetchNextPageOptions } from '@tanstack/react-query';
 import type { Chat } from '@/types/chat.types';
 import type { Workspace } from '@/types/workspace.types';
 import { Button } from '@/components/ui/primitives/Button';
@@ -26,6 +24,8 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import { SidebarChatItem } from './SidebarChatItem';
 import { ChatDropdown } from './ChatDropdown';
 import { DROPDOWN_WIDTH, DROPDOWN_HEIGHT, DROPDOWN_MARGIN } from '@/config/constants';
+
+const CHATS_PER_WORKSPACE = 5;
 
 function calculateDropdownPosition(buttonRect: DOMRect): { top: number; left: number } {
   const isMobile = window.innerWidth < 640;
@@ -114,7 +114,7 @@ export interface SidebarProps {
   onChatSelect: (chatId: string) => void;
   onDeleteChat?: (chatId: string) => void;
   hasNextPage?: boolean;
-  fetchNextPage?: (options?: FetchNextPageOptions) => unknown;
+  fetchNextPage?: () => void;
   isFetchingNextPage?: boolean;
 }
 
@@ -166,13 +166,19 @@ export function Sidebar({
     return chats.find((c) => c.id === dropdown.chatId) || null;
   }, [dropdown, chats]);
 
-  const { ref: loadMoreRef, inView } = useInView();
+  const [expandedWorkspaceChats, setExpandedWorkspaceChats] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    if (inView && hasNextPage && !isFetchingNextPage) {
-      fetchNextPage?.();
-    }
-  }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
+  const toggleWorkspaceExpanded = useCallback((workspaceId: string) => {
+    setExpandedWorkspaceChats((prev) => {
+      const next = new Set(prev);
+      if (next.has(workspaceId)) {
+        next.delete(workspaceId);
+      } else {
+        next.add(workspaceId);
+      }
+      return next;
+    });
+  }, []);
 
   const { pinnedChats, workspaceGroups } = useMemo(() => {
     const pinned: Chat[] = [];
@@ -490,6 +496,11 @@ export function Sidebar({
 
               {workspaceGroups.map((group) => {
                 const isCollapsed = collapsedWorkspaces.has(group.workspace.id);
+                const isChatsExpanded = expandedWorkspaceChats.has(group.workspace.id);
+                const visibleChats = isChatsExpanded
+                  ? group.chats
+                  : group.chats.slice(0, CHATS_PER_WORKSPACE);
+                const hasMoreChats = group.chats.length > CHATS_PER_WORKSPACE;
                 return (
                   <div key={group.workspace.id} className="mb-1">
                     <div className="group flex items-center gap-0.5 px-1 pb-0.5 pt-2">
@@ -533,38 +544,65 @@ export function Sidebar({
                             No threads
                           </p>
                         ) : (
-                          group.chats.map((chat) => (
-                            <SidebarChatItem
-                              key={chat.id}
-                              chat={chat}
-                              isSelected={chat.id === selectedChatId}
-                              isHovered={hoveredChatId === chat.id}
-                              isDropdownOpen={dropdown?.chatId === chat.id}
-                              isChatStreaming={streamingChatIdSet.has(chat.id)}
-                              onSelect={handleChatSelect}
-                              onDropdownClick={handleDropdownClick}
-                              onMouseEnter={handleMouseEnter}
-                              onMouseLeave={handleMouseLeave}
-                            />
-                          ))
+                          <>
+                            {visibleChats.map((chat) => (
+                              <SidebarChatItem
+                                key={chat.id}
+                                chat={chat}
+                                isSelected={chat.id === selectedChatId}
+                                isHovered={hoveredChatId === chat.id}
+                                isDropdownOpen={dropdown?.chatId === chat.id}
+                                isChatStreaming={streamingChatIdSet.has(chat.id)}
+                                onSelect={handleChatSelect}
+                                onDropdownClick={handleDropdownClick}
+                                onMouseEnter={handleMouseEnter}
+                                onMouseLeave={handleMouseLeave}
+                              />
+                            ))}
+                            {hasMoreChats && !isChatsExpanded && (
+                              <button
+                                type="button"
+                                onClick={() => toggleWorkspaceExpanded(group.workspace.id)}
+                                className="w-full px-2.5 py-1 text-left text-2xs text-text-tertiary transition-colors duration-200 hover:text-text-primary dark:text-text-dark-tertiary dark:hover:text-text-dark-primary"
+                              >
+                                Show more ({group.chats.length - CHATS_PER_WORKSPACE})
+                              </button>
+                            )}
+                            {hasMoreChats && isChatsExpanded && (
+                              <div className="flex items-center gap-2 px-2.5 py-1">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleWorkspaceExpanded(group.workspace.id)}
+                                  className="text-2xs text-text-tertiary transition-colors duration-200 hover:text-text-primary dark:text-text-dark-tertiary dark:hover:text-text-dark-primary"
+                                >
+                                  Show less
+                                </button>
+                                {hasNextPage && (
+                                  <button
+                                    type="button"
+                                    onClick={() => fetchNextPage?.()}
+                                    disabled={isFetchingNextPage}
+                                    className="flex items-center gap-1 text-2xs text-text-tertiary transition-colors duration-200 hover:text-text-primary disabled:opacity-50 dark:text-text-dark-tertiary dark:hover:text-text-dark-primary"
+                                  >
+                                    {isFetchingNextPage ? (
+                                      <>
+                                        <Spinner size="xs" />
+                                        Loading…
+                                      </>
+                                    ) : (
+                                      'Load more'
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     )}
                   </div>
                 );
               })}
-
-              {hasNextPage && (
-                <div ref={loadMoreRef} className="py-2 text-center">
-                  {isFetchingNextPage ? (
-                    <div className="flex items-center justify-center gap-2 text-xs text-text-quaternary dark:text-text-dark-quaternary">
-                      <Spinner size="xs" />
-                    </div>
-                  ) : (
-                    <div className="h-4" />
-                  )}
-                </div>
-              )}
             </div>
           )}
         </div>
