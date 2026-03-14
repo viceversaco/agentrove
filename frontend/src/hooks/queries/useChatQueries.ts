@@ -6,8 +6,10 @@ import type { Chat, ContextUsage, CreateChatRequest } from '@/types/chat.types';
 import type { PaginatedChats } from '@/types/api.types';
 import { queryKeys } from './queryKeys';
 
+const CHATS_PER_PAGE = 25;
+
 export const useInfiniteChatsQuery = (options?: { perPage?: number; enabled?: boolean }) => {
-  const perPage = options?.perPage ?? 25;
+  const perPage = options?.perPage ?? CHATS_PER_PAGE;
 
   return useInfiniteQuery({
     queryKey: [queryKeys.chats, 'infinite', perPage] as const,
