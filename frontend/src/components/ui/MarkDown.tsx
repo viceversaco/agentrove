@@ -9,6 +9,9 @@ import type { MessageAttachment } from '@/types/chat.types';
 import { isImageUrl } from '@/utils/fileTypes';
 
 const Mermaid = lazy(() => import('./Mermaid').then((m) => ({ default: m.Mermaid })));
+const VisualWidget = lazy(() =>
+  import('./VisualWidget').then((m) => ({ default: m.VisualWidget })),
+);
 
 type CommonProps = {
   children?: React.ReactNode;
@@ -25,6 +28,16 @@ type ImageProps = ImgHTMLAttributes<HTMLImageElement>;
 
 const MATH_PATTERN = /(^|[^\\])(\$[^$\n]+\$|\$\$[\s\S]*?\$\$|\\\(|\\\[)/;
 
+// Matches an unclosed ```visualizer block at the end of streaming content.
+// Captures the partial content so it can be rendered as a live preview.
+const UNCLOSED_VISUALIZER_RE = /```visualizer\n([\s\S]*)$/;
+
+// Matches just the opening fence without any content yet (no newline after "visualizer").
+const OPENING_VISUALIZER_RE = /```visualizer$/;
+
+// Matches a complete ```visualizer ... ``` block.
+const CLOSED_VISUALIZER_RE = /```visualizer\n([\s\S]*?)```/g;
+
 const createImageAttachment = (url: string, alt?: string): MessageAttachment => {
   return {
     id: url,
@@ -36,10 +49,46 @@ const createImageAttachment = (url: string, alt?: string): MessageAttachment => 
   };
 };
 
+// Split content into segments: markdown text and visualizer blocks.
+// Completed blocks are rendered with stable keys outside react-markdown so they
+// survive parent re-renders during streaming without iframe remount.
+// Unclosed visualizer fences (still streaming) are rendered as live previews.
+function splitVisualizerBlocks(raw: string): Array<{ type: 'md' | 'visualizer'; content: string }> {
+  const segments: Array<{ type: 'md' | 'visualizer'; content: string }> = [];
+  let lastIndex = 0;
+
+  for (const match of raw.matchAll(CLOSED_VISUALIZER_RE)) {
+    const before = raw.slice(lastIndex, match.index);
+    if (before) segments.push({ type: 'md', content: before });
+    segments.push({ type: 'visualizer', content: match[1] });
+    lastIndex = match.index! + match[0].length;
+  }
+
+  const remainder = raw.slice(lastIndex);
+
+  // Check for an unclosed visualizer fence with partial content (live preview)
+  const unclosedMatch = remainder.match(UNCLOSED_VISUALIZER_RE);
+  if (unclosedMatch) {
+    const before = remainder.slice(0, unclosedMatch.index);
+    if (before) segments.push({ type: 'md', content: before });
+    if (unclosedMatch[1]) segments.push({ type: 'visualizer', content: unclosedMatch[1] });
+  } else if (OPENING_VISUALIZER_RE.test(remainder)) {
+    // Just the opening fence, no content yet — strip it from markdown
+    const before = remainder.replace(OPENING_VISUALIZER_RE, '');
+    if (before) segments.push({ type: 'md', content: before });
+  } else {
+    if (remainder) segments.push({ type: 'md', content: remainder });
+  }
+
+  return segments;
+}
+
 function MarkDownInner({ content, className = '' }: { content: string; className?: string }) {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [remarkMathPlugin, setRemarkMathPlugin] = useState<unknown>(null);
   const [rehypeKatexPlugin, setRehypeKatexPlugin] = useState<unknown>(null);
+
+  const segments = useMemo(() => splitVisualizerBlocks(content), [content]);
 
   const needsMath = useMemo(() => MATH_PATTERN.test(content), [content]);
 
@@ -329,6 +378,16 @@ function MarkDownInner({ content, className = '' }: { content: string; className
     [copiedCode, handleCopyCode],
   );
 
+  const remarkPlugins = useMemo(
+    () => [remarkGfm, ...(remarkMathPlugin ? [remarkMathPlugin as never] : [])],
+    [remarkMathPlugin],
+  );
+  const rehypePlugins = useMemo(
+    () => (rehypeKatexPlugin ? ([rehypeKatexPlugin] as never[]) : []),
+    [rehypeKatexPlugin],
+  );
+  const mdClassName = `text-sm text-text-secondary dark:text-text-dark-secondary ${className}`;
+
   const mathPluginsLoading = needsMath && (!remarkMathPlugin || !rehypeKatexPlugin);
 
   if (mathPluginsLoading) {
@@ -341,15 +400,49 @@ function MarkDownInner({ content, className = '' }: { content: string; className
     );
   }
 
+  const hasSingleMdSegment = segments.length === 1 && segments[0].type === 'md';
+
+  if (hasSingleMdSegment) {
+    return (
+      <ReactMarkdown
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={rehypePlugins}
+        className={mdClassName}
+        components={components}
+      >
+        {segments[0].content}
+      </ReactMarkdown>
+    );
+  }
+
   return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm, ...(remarkMathPlugin ? [remarkMathPlugin as never] : [])]}
-      rehypePlugins={rehypeKatexPlugin ? ([rehypeKatexPlugin] as never[]) : []}
-      className={`text-sm text-text-secondary dark:text-text-dark-secondary ${className}`}
-      components={components}
-    >
-      {content}
-    </ReactMarkdown>
+    <div className={mdClassName}>
+      {segments.map((seg, i) =>
+        seg.type === 'visualizer' ? (
+          <Suspense
+            key={`viz-${i}`}
+            fallback={
+              <div className="my-4 flex h-[200px] items-center justify-center rounded-lg border border-border/50 bg-surface-secondary dark:border-border-dark/50 dark:bg-surface-dark-secondary">
+                <span className="text-xs text-text-tertiary dark:text-text-dark-tertiary">
+                  Loading visualization...
+                </span>
+              </div>
+            }
+          >
+            <VisualWidget code={seg.content} />
+          </Suspense>
+        ) : (
+          <ReactMarkdown
+            key={`md-${i}`}
+            remarkPlugins={remarkPlugins}
+            rehypePlugins={rehypePlugins}
+            components={components}
+          >
+            {seg.content}
+          </ReactMarkdown>
+        ),
+      )}
+    </div>
   );
 }
 
