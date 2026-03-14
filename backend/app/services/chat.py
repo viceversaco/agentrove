@@ -232,6 +232,17 @@ class ChatService(BaseDbService[Chat]):
 
             return chat
 
+    async def get_model_context_window(
+        self, chat_id: UUID, user_id: UUID
+    ) -> int | None:
+        last_msg = await self.message_service.get_latest_assistant_message(chat_id)
+        if not last_msg or not last_msg.model_id:
+            return None
+        user_settings = await self._user_service.get_user_settings(user_id)
+        return self._provider_service.get_model_context_window(
+            user_settings, last_msg.model_id
+        )
+
     async def delete_chat(self, chat_id: UUID, user: User) -> None:
         # Soft-delete a chat and its messages, terminate the active session,
         # and destroy the workspace container if no other chats reference it.

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useContextUsageQuery } from '@/hooks/queries/useChatQueries';
 import type { Chat, ContextUsage } from '@/types/chat.types';
 import { CONTEXT_WINDOW_TOKENS } from '@/config/constants';
@@ -10,18 +10,16 @@ interface ContextUsageState {
 
 interface UseContextUsageStateResult {
   contextUsage: ContextUsageState;
-  refetchContextUsage: () => Promise<unknown> | void;
   updateContextUsage: (data: ContextUsage, chatId?: string) => void;
 }
 
 export function useContextUsageState(
   chatId: string | undefined,
   currentChat: Chat | undefined,
+  modelContextWindow: number | null | undefined,
 ): UseContextUsageStateResult {
-  const [contextUsage, setContextUsage] = useState<ContextUsageState>({
-    tokensUsed: 0,
-    contextWindow: CONTEXT_WINDOW_TOKENS,
-  });
+  const effectiveContextWindow = modelContextWindow ?? CONTEXT_WINDOW_TOKENS;
+  const [tokensUsed, setTokensUsed] = useState(0);
   const prevChatIdRef = useRef<string | undefined>(chatId);
   const currentChatIdRef = useRef<string | undefined>(chatId);
 
@@ -31,7 +29,7 @@ export function useContextUsageState(
     currentChatIdRef.current = chatId;
 
     if (!chatId) {
-      setContextUsage({ tokensUsed: 0, contextWindow: CONTEXT_WINDOW_TOKENS });
+      setTokensUsed(0);
       return;
     }
 
@@ -39,41 +37,32 @@ export function useContextUsageState(
       currentChat?.id === chatId && currentChat.context_token_usage !== undefined;
 
     if (chatIdChanged && !hasMatchingChatUsage) {
-      setContextUsage({ tokensUsed: 0, contextWindow: CONTEXT_WINDOW_TOKENS });
+      setTokensUsed(0);
     }
 
     if (hasMatchingChatUsage) {
-      setContextUsage({
-        tokensUsed: currentChat.context_token_usage,
-        contextWindow: CONTEXT_WINDOW_TOKENS,
-      });
+      setTokensUsed(currentChat.context_token_usage);
     }
   }, [chatId, currentChat?.context_token_usage, currentChat?.id]);
 
-  const { data: contextUsageData, refetch: refetchContextUsage } = useContextUsageQuery(
-    chatId || '',
-    { enabled: !!chatId },
-  );
+  const { data: contextUsageData } = useContextUsageQuery(chatId || '', { enabled: !!chatId });
 
   useEffect(() => {
     if (!chatId || !contextUsageData) return;
-
-    setContextUsage({
-      tokensUsed: contextUsageData.tokens_used ?? 0,
-      contextWindow: contextUsageData.context_window ?? CONTEXT_WINDOW_TOKENS,
-    });
+    setTokensUsed(contextUsageData.tokens_used ?? 0);
   }, [chatId, contextUsageData]);
 
   const updateContextUsage = useCallback((data: ContextUsage, incomingChatId?: string) => {
     if (incomingChatId && incomingChatId !== currentChatIdRef.current) {
       return;
     }
-
-    setContextUsage({
-      tokensUsed: data.tokens_used ?? 0,
-      contextWindow: data.context_window ?? CONTEXT_WINDOW_TOKENS,
-    });
+    setTokensUsed(data.tokens_used ?? 0);
   }, []);
 
-  return { contextUsage, refetchContextUsage, updateContextUsage };
+  const contextUsage = useMemo<ContextUsageState>(
+    () => ({ tokensUsed, contextWindow: effectiveContextWindow }),
+    [tokensUsed, effectiveContextWindow],
+  );
+
+  return { contextUsage, updateContextUsage };
 }

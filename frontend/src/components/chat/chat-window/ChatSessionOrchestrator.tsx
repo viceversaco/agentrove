@@ -60,7 +60,7 @@ export function ChatSessionOrchestrator({
     return undefined;
   }, [fetchedMessages, messagesQuery.isLoading]);
 
-  const { selectedModelId, selectModel } = useModelSelection({
+  const { selectedModelId, selectedModel, selectModel } = useModelSelection({
     chatId,
     initialModelId: lastAssistantModelId,
   });
@@ -73,7 +73,11 @@ export function ChatSessionOrchestrator({
     initialPromptFromRoute,
   } = useInitialPrompt();
 
-  const { contextUsage, updateContextUsage } = useContextUsageState(chatId, currentChat);
+  const { contextUsage, updateContextUsage } = useContextUsageState(
+    chatId,
+    currentChat,
+    selectedModel?.context_window,
+  );
 
   const {
     pendingRequest,
