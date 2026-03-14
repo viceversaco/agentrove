@@ -35,6 +35,7 @@ from app.services.claude_agent import (
 )
 from app.services.claude_session_registry import session_registry
 from app.services.db import SessionFactoryType
+from app.services.provider import ProviderService
 from app.services.exceptions import ClaudeAgentException
 from app.services.message import MessageService
 from app.services.queue import QueueService
@@ -142,6 +143,7 @@ class ChatStreamRuntime:
         self.session_container: dict[str, Any] = {"session_id": request.session_id}
         self.assistant_message_id = request.assistant_message_id
         self.model_id = request.model_id
+        self.context_window = request.context_window
         self.prompt = request.prompt
         self._is_new_chat = request.session_id is None
         self.custom_instructions = request.custom_instructions
@@ -658,7 +660,7 @@ class ChatStreamRuntime:
         if token_usage <= 0:
             return
 
-        context_window = settings.CONTEXT_WINDOW_TOKENS
+        context_window = self.context_window or settings.CONTEXT_WINDOW_TOKENS
         percentage = (
             min((token_usage / context_window) * 100, 100.0)
             if context_window > 0
@@ -835,6 +837,9 @@ class ChatStreamRuntime:
         system_prompt = build_system_prompt_for_chat(
             user_settings,
         )
+        context_window = ProviderService().get_model_context_window(
+            user_settings, queued_msg["model_id"]
+        )
         return ChatStreamRequest(
             prompt=queued_msg["content"],
             system_prompt=system_prompt,
@@ -851,6 +856,7 @@ class ChatStreamRuntime:
             },
             permission_mode=queued_msg.get("permission_mode", "auto"),
             model_id=queued_msg["model_id"],
+            context_window=context_window,
             session_id=chat.session_id,
             assistant_message_id=assistant_message_id,
             thinking_mode=queued_msg.get("thinking_mode"),

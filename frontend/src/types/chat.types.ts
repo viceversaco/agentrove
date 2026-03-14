@@ -90,6 +90,7 @@ export interface Model {
   provider_id: string;
   provider_name: string;
   provider_type: ProviderType;
+  context_window: number | null;
 }
 
 export interface ContextUsage {

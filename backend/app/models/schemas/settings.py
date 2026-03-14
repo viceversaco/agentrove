@@ -19,6 +19,7 @@ class CustomProviderModel(BaseModel):
     model_id: str
     name: str
     enabled: bool = True
+    context_window: int | None = None
 
 
 class CustomProvider(BaseModel):

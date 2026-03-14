@@ -9,3 +9,4 @@ class AIModelResponse(BaseModel):
     provider_id: str
     provider_name: str
     provider_type: ProviderType
+    context_window: int | None = None

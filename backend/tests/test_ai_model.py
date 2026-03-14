@@ -25,6 +25,7 @@ class TestListModels:
             assert "provider_id" in model
             assert "provider_name" in model
             assert "provider_type" in model
+            assert "context_window" in model
             assert ":" in model["model_id"]
 
     async def test_list_models_unauthorized(

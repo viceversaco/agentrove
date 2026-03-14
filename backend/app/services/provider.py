@@ -35,6 +35,7 @@ class ProviderService:
                         "provider_id": provider_id,
                         "provider_name": provider_name,
                         "provider_type": provider_type,
+                        "context_window": model.get("context_window"),
                     }
                 )
         return result
@@ -66,3 +67,14 @@ class ProviderService:
                     return provider, model_id
 
         return None, model_id
+
+    def get_model_context_window(
+        self, user_settings: "UserSettings", model_id: str
+    ) -> int | None:
+        provider, actual_model_id = self.get_provider_for_model(user_settings, model_id)
+        if not provider:
+            return None
+        for model in provider.get("models", []):
+            if model.get("model_id") == actual_model_id:
+                return model.get("context_window")
+        return None

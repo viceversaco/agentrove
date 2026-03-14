@@ -38,6 +38,7 @@ from app.models.schemas.scheduler import (
 from app.prompts.system_prompt import build_system_prompt_for_chat
 from app.services.db import BaseDbService, SessionFactoryType
 from app.services.exceptions import SchedulerException
+from app.services.provider import ProviderService
 from app.services.sandbox import SandboxService
 from app.services.sandbox_providers.factory import SandboxProviderFactory
 from app.services.streaming.runtime import ChatStreamRuntime
@@ -729,12 +730,16 @@ class SchedulerService(BaseDbService[ScheduledTask]):
 
             system_prompt = build_system_prompt_for_chat(user_settings)
 
+            context_window = ProviderService().get_model_context_window(
+                user_settings, model_id
+            )
             stream_request = ChatStreamRequest(
                 prompt=prompt_message,
                 system_prompt=system_prompt,
                 custom_instructions=user_settings.custom_instructions,
                 chat_data=chat_data,
                 model_id=model_id,
+                context_window=context_window,
                 permission_mode="auto",
                 session_id=None,
                 assistant_message_id=str(assistant_message_id),

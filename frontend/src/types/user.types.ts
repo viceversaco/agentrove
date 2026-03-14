@@ -72,6 +72,7 @@ export interface CustomProviderModel {
   model_id: string;
   name: string;
   enabled: boolean;
+  context_window: number | null;
 }
 
 export interface CustomProvider {

@@ -720,6 +720,10 @@ class ChatService(BaseDbService[Chat]):
             user_settings.custom_instructions if user_settings else None
         )
 
+        context_window = self._provider_service.get_model_context_window(
+            user_settings, request.model_id
+        )
+
         try:
             await self._enqueue_chat_task(
                 prompt=user_prompt,
@@ -732,6 +736,7 @@ class ChatService(BaseDbService[Chat]):
                 assistant_message_id=str(assistant_message.id),
                 thinking_mode=request.thinking_mode,
                 attachments=attachments,
+                context_window=context_window,
                 is_custom_prompt=is_custom_prompt,
             )
         except Exception as e:
@@ -761,6 +766,7 @@ class ChatService(BaseDbService[Chat]):
         assistant_message_id: str,
         thinking_mode: str | None,
         attachments: list[MessageAttachmentDict] | None,
+        context_window: int | None = None,
         is_custom_prompt: bool = False,
     ) -> None:
         stream_attachments = (
@@ -783,6 +789,7 @@ class ChatService(BaseDbService[Chat]):
             },
             permission_mode=permission_mode,
             model_id=model_id,
+            context_window=context_window,
             session_id=session_id,
             assistant_message_id=assistant_message_id,
             thinking_mode=thinking_mode,

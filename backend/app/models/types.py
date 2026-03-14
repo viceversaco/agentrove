@@ -139,6 +139,7 @@ class CustomProviderModelDict(TypedDict, total=False):
     model_id: str
     name: str
     enabled: bool
+    context_window: int | None
 
 
 class CustomProviderDict(TypedDict, total=False):
