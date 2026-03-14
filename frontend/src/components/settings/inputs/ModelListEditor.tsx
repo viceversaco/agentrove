@@ -111,7 +111,10 @@ export const ModelListEditor: React.FC<ModelListEditorProps> = ({ models, onChan
         {!isAdding && (
           <Button
             type="button"
-            onClick={() => { setIsAdding(true); setEditingModelId(null); }}
+            onClick={() => {
+              setIsAdding(true);
+              setEditingModelId(null);
+            }}
             variant="ghost"
             size="sm"
             className="h-6 gap-1 px-1.5 text-2xs text-text-quaternary hover:text-text-secondary dark:text-text-dark-quaternary dark:hover:text-text-dark-secondary"
@@ -130,7 +133,10 @@ export const ModelListEditor: React.FC<ModelListEditorProps> = ({ models, onChan
             </p>
             <Button
               type="button"
-              onClick={() => { setIsAdding(true); setEditingModelId(null); }}
+              onClick={() => {
+                setIsAdding(true);
+                setEditingModelId(null);
+              }}
               variant="ghost"
               size="sm"
               className="mt-2 h-6 gap-1 px-2 text-2xs text-text-tertiary hover:text-text-primary dark:text-text-dark-tertiary dark:hover:text-text-dark-primary"
@@ -148,7 +154,9 @@ export const ModelListEditor: React.FC<ModelListEditorProps> = ({ models, onChan
                 <div className="mb-2 grid grid-cols-2 gap-2">
                   <Input
                     value={editModel.model_id}
-                    onChange={(e) => setEditModel((prev) => ({ ...prev, model_id: e.target.value }))}
+                    onChange={(e) =>
+                      setEditModel((prev) => ({ ...prev, model_id: e.target.value }))
+                    }
                     aria-label="Model ID"
                     className="font-mono text-2xs"
                   />

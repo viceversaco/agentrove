@@ -76,5 +76,6 @@ class ProviderService:
             return None
         for model in provider.get("models", []):
             if model.get("model_id") == actual_model_id:
-                return model.get("context_window")
+                ctx: int | None = model.get("context_window")
+                return ctx
         return None
