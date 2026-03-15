@@ -393,7 +393,9 @@ export function useStreamCallbacks({
                 ...oldData,
                 pages: oldData.pages.map((page) => ({
                   ...page,
-                  items: page.items.map((chat) => (chat.id === chatId ? patchChat(chat) : chat)),
+                  items: page.items.map((chat) =>
+                    chat.id === chatId ? patchChat(chat) : chat,
+                  ),
                 })),
               };
             },
