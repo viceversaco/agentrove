@@ -5,6 +5,7 @@ import { StreamingContentAccumulator, type ContentRenderSnapshot } from '@/utils
 import { notifyStreamComplete } from '@/utils/notifications';
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import { useSettingsQuery } from '@/hooks/queries/useSettingsQueries';
+import type { InfiniteData } from '@tanstack/react-query';
 import type {
   AssistantStreamEvent,
   Chat,
@@ -12,6 +13,7 @@ import type {
   Message,
   PermissionRequest,
 } from '@/types/chat.types';
+import type { PaginatedChats } from '@/types/api.types';
 import type { ToolEventPayload } from '@/types/tools.types';
 import type { QueueProcessingData, StreamEnvelope, StreamState } from '@/types/stream.types';
 import { useMessageCache } from '@/hooks/useMessageCache';
@@ -377,10 +379,24 @@ export function useStreamCallbacks({
         const worktreeCwd =
           typeof nestedData?.worktree_cwd === 'string' ? nestedData.worktree_cwd : undefined;
         if (worktreeCwd && chatId) {
+          const patchChat = (chat: Chat) =>
+            chat.worktree_cwd !== worktreeCwd ? { ...chat, worktree_cwd: worktreeCwd } : chat;
+
           queryClient.setQueryData<Chat>(queryKeys.chat(chatId), (prev) =>
-            prev && prev.worktree_cwd !== worktreeCwd
-              ? { ...prev, worktree_cwd: worktreeCwd }
-              : prev,
+            prev ? patchChat(prev) : prev,
+          );
+          queryClient.setQueriesData<InfiniteData<PaginatedChats>>(
+            { queryKey: [queryKeys.chats, 'infinite'] },
+            (oldData) => {
+              if (!oldData) return oldData;
+              return {
+                ...oldData,
+                pages: oldData.pages.map((page) => ({
+                  ...page,
+                  items: page.items.map((chat) => (chat.id === chatId ? patchChat(chat) : chat)),
+                })),
+              };
+            },
           );
         }
 
