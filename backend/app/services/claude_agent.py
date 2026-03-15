@@ -61,9 +61,7 @@ ALLOWED_SLASH_COMMANDS = [
     "/loop",
     "/batch",
 ]
-SDK_PERMISSION_MODE_MAP: dict[
-    str, Literal["default", "acceptEdits", "plan"]
-] = {
+SDK_PERMISSION_MODE_MAP: dict[str, Literal["default", "acceptEdits", "plan"]] = {
     "plan": "plan",
     "ask": "default",
     "auto": "acceptEdits",
