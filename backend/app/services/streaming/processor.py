@@ -93,11 +93,22 @@ class StreamProcessor:
         if isinstance(message, ResultMessage):
             if message.total_cost_usd is not None:
                 self.total_cost_usd = message.total_cost_usd
-            # Only use ResultMessage usage if we have no per-turn usage from
-            # AssistantMessage. ResultMessage.usage contains cumulative totals
-            # across all API calls, not the current context window size.
-            if message.usage is not None and self.usage is None:
-                self.usage = message.usage
+            # Use ResultMessage usage when we have no per-turn usage from
+            # AssistantMessage, or when AssistantMessage reported zero input
+            # tokens (bridge providers like OpenAI/OpenRouter only include
+            # real usage at stream end, not in per-turn messages).
+            if message.usage is not None:
+                existing_input = (
+                    (
+                        self.usage.get("input_tokens", 0)
+                        + self.usage.get("cache_creation_input_tokens", 0)
+                        + self.usage.get("cache_read_input_tokens", 0)
+                    )
+                    if self.usage
+                    else 0
+                )
+                if existing_input == 0:
+                    self.usage = message.usage
 
     @staticmethod
     def _extract_command_stdout(content: str | list[Any]) -> str | None:
