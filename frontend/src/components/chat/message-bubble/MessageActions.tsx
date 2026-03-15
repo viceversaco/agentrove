@@ -7,18 +7,20 @@ import { useChatSessionState, useChatSessionActions } from '@/hooks/useChatSessi
 interface MessageActionsProps {
   messageId: string;
   contentText: string;
+  copyLabel?: string;
 }
 
 export const MessageActions = memo(function MessageActions({
   messageId,
   contentText,
+  copyLabel = 'Copy',
 }: MessageActionsProps) {
   const { copiedMessageId } = useChatSessionState();
   const { onCopy } = useChatSessionActions();
 
   return (
     <div className="flex items-center gap-0.5">
-      <Tooltip content={copiedMessageId === messageId ? 'Copied!' : 'Copy'} position="bottom">
+      <Tooltip content={copiedMessageId === messageId ? 'Copied!' : copyLabel} position="bottom">
         <Button
           onClick={() => onCopy(contentText, messageId)}
           variant="unstyled"

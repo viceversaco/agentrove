@@ -345,6 +345,8 @@ export const Chat = memo(function Chat() {
             />
           ) : (
             <UserMessage
+              id={msg.id}
+              contentText={msg.content_text}
               contentRender={msg.content_render}
               attachments={msg.attachments}
               uploadingAttachmentIds={uploadingAttachmentIds}

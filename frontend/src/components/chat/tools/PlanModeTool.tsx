@@ -3,6 +3,7 @@ import { Map, CheckCircle, XCircle, AlertCircle, Terminal } from 'lucide-react';
 import { Button } from '@/components/ui/primitives/Button';
 import { LazyMarkDown } from '@/components/ui/LazyMarkDown';
 import type { ToolAggregate } from '@/types/tools.types';
+import { MessageActions } from '../message-bubble/MessageActions';
 import { ToolCard } from './common/ToolCard';
 import { useExitPlanMode } from '@/hooks/useExitPlanMode';
 
@@ -42,6 +43,7 @@ const ExitPlanModeInner: React.FC<PlanModeToolProps> = ({ tool, chatId }) => {
   const [alternativeInstruction, setAlternativeInstruction] = useState('');
 
   const planContent = tool.input?.plan as string | undefined;
+  const copyId = `plan-${tool.id}`;
   const allowedPrompts = (tool.input?.allowedPrompts ?? []) as AllowedPrompt[];
 
   const handleRejectClick = useCallback(() => {
@@ -72,6 +74,9 @@ const ExitPlanModeInner: React.FC<PlanModeToolProps> = ({ tool, chatId }) => {
               Plan Approval
             </span>
           </div>
+          {planContent && (
+            <MessageActions messageId={copyId} contentText={planContent} copyLabel="Copy plan" />
+          )}
         </div>
 
         <div className="max-h-[50vh] overflow-y-auto p-3">

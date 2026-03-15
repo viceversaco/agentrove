@@ -17,10 +17,14 @@ interface SharedContentProps {
 }
 
 export interface UserMessageProps extends SharedContentProps {
+  id: string;
+  contentText: string;
   uploadingAttachmentIds?: string[];
 }
 
 export const UserMessage = memo(function UserMessage({
+  id,
+  contentText,
   contentRender,
   attachments,
   uploadingAttachmentIds,
@@ -43,6 +47,12 @@ export const UserMessage = memo(function UserMessage({
               />
             </div>
           </div>
+
+          {contentText.trim() && !isStreaming && (
+            <div className="mt-1">
+              <MessageActions messageId={id} contentText={contentText} />
+            </div>
+          )}
         </div>
       </div>
     </div>
