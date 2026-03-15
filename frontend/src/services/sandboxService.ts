@@ -229,7 +229,11 @@ async function getGitDiff(
   validateRequired(sandboxId, 'Sandbox ID');
 
   return serviceCall(async () => {
-    const qs = buildQueryString({ mode, full_context: fullContext || undefined, cwd: cwd || undefined });
+    const qs = buildQueryString({
+      mode,
+      full_context: fullContext || undefined,
+      cwd: cwd || undefined,
+    });
     const response = await apiClient.get<GitDiffData>(`/sandbox/${sandboxId}/git/diff${qs}`);
     return response ?? { diff: '', has_changes: false, is_git_repo: false };
   });

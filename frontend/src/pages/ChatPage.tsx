@@ -78,8 +78,8 @@ export function ChatPage() {
     chatId,
   );
 
-  const worktreeEnabled = useChatSettingsStore(
-    (state) => (chatId ? state.worktreeByChat[chatId] ?? DEFAULT_WORKTREE : false),
+  const worktreeEnabled = useChatSettingsStore((state) =>
+    chatId ? (state.worktreeByChat[chatId] ?? DEFAULT_WORKTREE) : false,
   );
   const { data: worktreesData } = useGitWorktreesQuery(
     currentChat?.sandbox_id ?? '',
