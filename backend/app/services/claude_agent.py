@@ -61,12 +61,10 @@ ALLOWED_SLASH_COMMANDS = [
     "/loop",
     "/batch",
 ]
-SDK_PERMISSION_MODE_MAP: dict[
-    str, Literal["default", "acceptEdits", "plan", "bypassPermissions"]
-] = {
+SDK_PERMISSION_MODE_MAP: dict[str, Literal["default", "acceptEdits", "plan"]] = {
     "plan": "plan",
     "ask": "default",
-    "auto": "bypassPermissions",
+    "auto": "acceptEdits",
 }
 PLAN_MODE_TRANSITIONS: dict[tuple[str, str], str] = {
     ("tool_completed", "ExitPlanMode"): "auto",
@@ -210,9 +208,7 @@ class ClaudeAgentService:
                         tool_name = event.get("tool", {}).get("name", "")
                         mode = PLAN_MODE_TRANSITIONS.get((event_type, tool_name))
                         if mode:
-                            sdk_mode = SDK_PERMISSION_MODE_MAP.get(
-                                mode, "bypassPermissions"
-                            )
+                            sdk_mode = SDK_PERMISSION_MODE_MAP.get(mode, "acceptEdits")
                             await client.set_permission_mode(sdk_mode)
                 if processor.usage is not prev_usage:
                     result.usage = processor.usage
@@ -478,7 +474,7 @@ class ClaudeAgentService:
             disallowed_tools.append("WebSearch")
 
         sdk_permission_mode = SDK_PERMISSION_MODE_MAP.get(
-            permission_mode, "bypassPermissions"
+            permission_mode, "acceptEdits"
         )
 
         # Custom prompts are sent as-is; otherwise use the SDK's built-in

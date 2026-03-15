@@ -491,7 +491,7 @@ class ChatStreamRuntime:
                 queued_permission = queued_msg.get("permission_mode")
                 if queued_permission:
                     sdk_permission = SDK_PERMISSION_MODE_MAP.get(
-                        queued_permission, "bypassPermissions"
+                        queued_permission, "acceptEdits"
                     )
                     await self.client.set_permission_mode(sdk_permission)
 

@@ -75,7 +75,12 @@ const ExitPlanModeInner: React.FC<PlanModeToolProps> = ({ tool, chatId }) => {
             </span>
           </div>
           {planContent && (
-            <MessageActions messageId={copyId} contentText={planContent} copyLabel="Copy plan" />
+            <MessageActions
+              messageId={copyId}
+              contentText={planContent}
+              copyLabel="Copy plan"
+              showTooltip={false}
+            />
           )}
         </div>
 
