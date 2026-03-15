@@ -5,7 +5,11 @@ import { ChatSessionProvider } from '@/contexts/ChatSessionContext';
 import { ChatInputMessageProvider } from '@/contexts/ChatInputMessageContext';
 import type { ChatSessionState, ChatSessionActions } from '@/contexts/ChatSessionContextDefinition';
 import { useChatStore } from '@/store/chatStore';
-import { useUIStore } from '@/store/uiStore';
+import {
+  useChatSettingsStore,
+  DEFAULT_PERMISSION_MODE,
+  DEFAULT_THINKING_MODE,
+} from '@/store/chatSettingsStore';
 import { useChatStreaming } from '@/hooks/useChatStreaming';
 import { usePermissionRequest } from '@/hooks/usePermissionRequest';
 import { useInitialPrompt } from '@/hooks/useInitialPrompt';
@@ -43,11 +47,11 @@ export function ChatSessionOrchestrator({
     })),
   );
 
-  const { permissionMode, thinkingMode } = useUIStore(
-    useShallow((state) => ({
-      permissionMode: state.permissionMode,
-      thinkingMode: state.thinkingMode,
-    })),
+  const permissionMode = useChatSettingsStore(
+    (state) => state.permissionModeByChat[chatId] ?? DEFAULT_PERMISSION_MODE,
+  );
+  const thinkingMode = useChatSettingsStore(
+    (state) => state.thinkingModeByChat[chatId] ?? DEFAULT_THINKING_MODE,
   );
 
   const lastAssistantModelId = useMemo((): string | null | undefined => {

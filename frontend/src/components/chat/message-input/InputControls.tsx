@@ -21,11 +21,16 @@ export function InputControls() {
       />
 
       <PermissionModeSelector
+        chatId={state.chatId}
         dropdownPosition={state.dropdownPosition}
         disabled={state.isLoading}
       />
 
-      <ThinkingModeSelector dropdownPosition={state.dropdownPosition} disabled={state.isLoading} />
+      <ThinkingModeSelector
+        chatId={state.chatId}
+        dropdownPosition={state.dropdownPosition}
+        disabled={state.isLoading}
+      />
 
       <ModelSelector
         selectedModelId={state.selectedModelId}

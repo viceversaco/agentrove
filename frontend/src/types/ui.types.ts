@@ -26,16 +26,6 @@ export interface ModelSelectionState {
   selectModel: (chatId: string, modelId: string) => void;
 }
 
-export interface PermissionModeState {
-  permissionMode: 'plan' | 'ask' | 'auto';
-  setPermissionMode: (mode: 'plan' | 'ask' | 'auto') => void;
-}
-
-export interface ThinkingModeState {
-  thinkingMode: string | null;
-  setThinkingMode: (mode: string | null) => void;
-}
-
 export type ViewType =
   | 'agent'
   | 'browser'

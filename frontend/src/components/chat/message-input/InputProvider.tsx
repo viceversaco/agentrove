@@ -6,7 +6,11 @@ import { useSlashCommandSuggestions } from '@/hooks/useSlashCommandSuggestions';
 import { useEnhancePromptMutation } from '@/hooks/queries/useChatQueries';
 import { useMentionSuggestions } from '@/hooks/useMentionSuggestions';
 import { useMessageQueueStore } from '@/store/messageQueueStore';
-import { useUIStore } from '@/store/uiStore';
+import {
+  useChatSettingsStore,
+  DEFAULT_PERMISSION_MODE,
+  DEFAULT_THINKING_MODE,
+} from '@/store/chatSettingsStore';
 import { useChatContext } from '@/hooks/useChatContext';
 import {
   InputContext,
@@ -195,7 +199,9 @@ export function InputProvider({
     if (disabled) return;
 
     if (isStreaming && hasMessage && chatId) {
-      const { permissionMode, thinkingMode } = useUIStore.getState();
+      const settings = useChatSettingsStore.getState();
+      const permissionMode = settings.permissionModeByChat[chatId] ?? DEFAULT_PERMISSION_MODE;
+      const thinkingMode = settings.thinkingModeByChat[chatId] ?? DEFAULT_THINKING_MODE;
       const fullMessage = messageRef.current.trim();
       void useMessageQueueStore
         .getState()

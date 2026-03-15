@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { permissionService } from '@/services/permissionService';
 import { usePermissionStore } from '@/store/permissionStore';
-import { useUIStore } from '@/store/uiStore';
+import { useChatSettingsStore } from '@/store/chatSettingsStore';
 import { addResolvedRequestId } from '@/utils/permissionStorage';
 
 type ApiError = Error & { status?: number };
@@ -30,7 +30,7 @@ export function useExitPlanMode(chatId: string | undefined) {
       await permissionService.respondToPermission(chatId, pendingRequest.request_id, true);
       addResolvedRequestId(pendingRequest.request_id);
       usePermissionStore.getState().clearPermissionRequest(chatId);
-      useUIStore.getState().setPermissionMode('auto');
+      useChatSettingsStore.getState().setPermissionMode(chatId, 'auto');
     } catch (err) {
       if (isExpiredRequestError(err)) {
         addResolvedRequestId(pendingRequest.request_id);

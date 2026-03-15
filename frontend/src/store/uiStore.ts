@@ -2,8 +2,6 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type {
   ThemeState,
-  PermissionModeState,
-  ThinkingModeState,
   UIState,
   UIActions,
   SplitViewState,
@@ -12,8 +10,6 @@ import type {
 import { MOBILE_BREAKPOINT } from '@/config/constants';
 
 type UIStoreState = ThemeState &
-  PermissionModeState &
-  ThinkingModeState &
   Pick<UIState, 'sidebarOpen'> &
   Pick<UIActions, 'setSidebarOpen'> &
   SplitViewState &
@@ -40,10 +36,6 @@ export const useUIStore = create<UIStoreState>()(
           return { theme: next };
         }),
       setTheme: (theme) => set({ theme }),
-      permissionMode: 'auto',
-      setPermissionMode: (mode) => set({ permissionMode: mode }),
-      thinkingMode: null,
-      setThinkingMode: (mode) => set({ thinkingMode: mode }),
       sidebarOpen: getInitialSidebarState(),
       setSidebarOpen: (isOpen) => set({ sidebarOpen: isOpen }),
 
@@ -103,11 +95,9 @@ export const useUIStore = create<UIStoreState>()(
     }),
     {
       name: 'ui-storage',
-      version: 2,
+      version: 3,
       partialize: (state) => ({
         theme: state.theme,
-        permissionMode: state.permissionMode,
-        thinkingMode: state.thinkingMode,
         currentView: state.currentView,
         splitDirection: state.splitDirection,
         sidebarOpen: state.sidebarOpen,
@@ -116,6 +106,8 @@ export const useUIStore = create<UIStoreState>()(
         const state = persisted as Record<string, unknown>;
         delete state.isSplitMode;
         delete state.secondaryView;
+        delete state.permissionMode;
+        delete state.thinkingMode;
         return state;
       },
       merge: (persisted, current) => ({

@@ -17,7 +17,7 @@ import type { QueueProcessingData, StreamEnvelope, StreamState } from '@/types/s
 import { useMessageCache } from '@/hooks/useMessageCache';
 import { streamService } from '@/services/streamService';
 import type { StreamOptions } from '@/services/streamService';
-import { useUIStore } from '@/store/uiStore';
+import { useChatSettingsStore } from '@/store/chatSettingsStore';
 import type { PaginatedMessages } from '@/types/api.types';
 
 const STREAM_FLUSH_INTERVAL_MS = 130;
@@ -379,10 +379,10 @@ export function useStreamCallbacks({
 
       if (envelope.kind === 'tool_completed') {
         const tool = (envelope.payload as { tool?: ToolEventPayload })?.tool;
-        if (tool?.name === 'EnterPlanMode') {
-          useUIStore.getState().setPermissionMode('plan');
-        } else if (tool?.name === 'ExitPlanMode') {
-          useUIStore.getState().setPermissionMode('auto');
+        if (tool?.name === 'EnterPlanMode' && chatId) {
+          useChatSettingsStore.getState().setPermissionMode(chatId, 'plan');
+        } else if (tool?.name === 'ExitPlanMode' && chatId) {
+          useChatSettingsStore.getState().setPermissionMode(chatId, 'auto');
         }
       }
 
