@@ -345,12 +345,12 @@ export const AskUserQuestion: React.FC<AskUserQuestionProps> = ({ tool, chatId }
       }}
       loadingContent="Waiting for response\u2026"
       error={errorMessage}
-      expandable={questionCount > 0 && toolStatus === 'completed' && !!answers}
+      expandable={questionCount > 0 && (toolStatus === 'completed' || toolStatus === 'failed')}
     >
-      {questionCount > 0 && toolStatus === 'completed' && answers && (
+      {questionCount > 0 && (toolStatus === 'completed' || toolStatus === 'failed') && (
         <div className="space-y-2">
           {questions.map((q, index) => {
-            const answer = answers[`question_${index}`];
+            const answer = answers?.[`question_${index}`];
             return (
               <div key={index} className="space-y-0.5">
                 <p className="text-2xs text-text-tertiary dark:text-text-dark-tertiary">

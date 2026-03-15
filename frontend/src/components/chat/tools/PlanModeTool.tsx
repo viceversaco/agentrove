@@ -182,6 +182,8 @@ const ExitPlanModeInner: React.FC<PlanModeToolProps> = ({ tool, chatId }) => {
     );
   }
 
+  const hasContent = !!planContent || allowedPrompts.length > 0;
+
   return (
     <ToolCard
       icon={<Map className="h-3.5 w-3.5 text-text-secondary dark:text-text-dark-tertiary" />}
@@ -198,7 +200,40 @@ const ExitPlanModeInner: React.FC<PlanModeToolProps> = ({ tool, chatId }) => {
       }}
       loadingContent="Waiting for plan approval\u2026"
       error={tool.error}
-    />
+      expandable={hasContent}
+    >
+      {hasContent && (
+        <div className="space-y-2">
+          {planContent && (
+            <div className="overflow-auto rounded-md bg-black/5 px-2 py-1.5 text-xs dark:bg-white/5">
+              <div className="prose prose-sm dark:prose-invert max-w-none text-text-primary dark:text-text-dark-primary">
+                <LazyMarkDown content={planContent} />
+              </div>
+            </div>
+          )}
+          {allowedPrompts.length > 0 && (
+            <div>
+              <p className="text-2xs font-medium uppercase tracking-wide text-text-tertiary dark:text-text-dark-tertiary">
+                Requested Permissions
+              </p>
+              <div className="mt-1.5 space-y-1">
+                {allowedPrompts.map((item, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 rounded-md bg-black/5 px-2 py-1.5 dark:bg-white/5"
+                  >
+                    <Terminal className="h-3 w-3 flex-shrink-0 text-text-tertiary dark:text-text-dark-tertiary" />
+                    <span className="text-xs text-text-secondary dark:text-text-dark-secondary">
+                      {item.prompt}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </ToolCard>
   );
 };
 
