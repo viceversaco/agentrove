@@ -5,6 +5,7 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import { Button } from '@/components/ui/primitives/Button';
 import { SelectItem } from '@/components/ui/primitives/SelectItem';
 import { fuzzySearch } from '@/utils/fuzzySearch';
+import { cn } from '@/utils/cn';
 
 export type DropdownItemType<T> = { type: 'item'; data: T } | { type: 'header'; label: string };
 
@@ -147,7 +148,7 @@ function DropdownInner<T>({
       >
         {LeftIcon && (
           <LeftIcon
-            className={`h-3 w-3 text-text-tertiary dark:text-text-dark-tertiary${forceCompact ? '' : 'sm:hidden'}`}
+            className={cn('h-3 w-3 text-text-tertiary dark:text-text-dark-tertiary', !forceCompact && 'sm:hidden')}
           />
         )}
         <span className={labelClasses}>

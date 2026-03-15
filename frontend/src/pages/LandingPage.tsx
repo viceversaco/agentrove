@@ -6,6 +6,7 @@ import { useLayoutSidebar } from '@/components/layout/layoutState';
 import { Input as ChatInput } from '@/components/chat/message-input/Input';
 import { WorkspaceSelector } from '@/components/chat/WorkspaceSelector';
 import { useChatStore } from '@/store/chatStore';
+import { useUIStore } from '@/store/uiStore';
 import { useModelStore } from '@/store/modelStore';
 import { useChatSettingsStore } from '@/store/chatSettingsStore';
 import { useAuthStore } from '@/store/authStore';
@@ -98,6 +99,7 @@ export function LandingPage() {
 
   useEffect(() => {
     useChatStore.getState().setCurrentChat(null);
+    useUIStore.getState().exitSplitMode();
   }, []);
 
   const handleFileAttach = useCallback((files: File[]) => {
