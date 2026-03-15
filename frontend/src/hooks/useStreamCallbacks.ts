@@ -374,6 +374,16 @@ export function useStreamCallbacks({
           }
         }
 
+        const worktreeCwd =
+          typeof nestedData?.worktree_cwd === 'string' ? nestedData.worktree_cwd : undefined;
+        if (worktreeCwd && chatId) {
+          queryClient.setQueryData<Chat>(queryKeys.chat(chatId), (prev) =>
+            prev && prev.worktree_cwd !== worktreeCwd
+              ? { ...prev, worktree_cwd: worktreeCwd }
+              : prev,
+          );
+        }
+
         return;
       }
 

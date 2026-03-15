@@ -45,7 +45,7 @@ class StreamProcessor:
         # so we skip only those specific kinds from the complete AssistantMessage.
         self._streamed_kinds: set[str] = set()
 
-    def _process_session_init(self, message: SystemMessage) -> None:
+    def _process_session_init(self, message: SystemMessage) -> Iterable[StreamEvent]:
         if message.subtype != "init" or not self._session_handler:
             return
 
@@ -53,6 +53,8 @@ class StreamProcessor:
         if session_id:
             cwd = message.data.get("cwd")
             self._session_handler(session_id, cwd)
+            if cwd:
+                yield StreamEvent(type="system", data={"worktree_cwd": cwd})
 
     def emit_events_for_message(
         self,
@@ -69,7 +71,7 @@ class StreamProcessor:
             return
 
         if isinstance(message, SystemMessage):
-            self._process_session_init(message)
+            yield from self._process_session_init(message)
             return
 
         if isinstance(message, AssistantMessage):
