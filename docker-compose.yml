@@ -2,7 +2,7 @@ name: agentrove-web
 
 services:
   postgres:
-    image: postgres:13-alpine
+    image: postgres:17-alpine
     container_name: agentrove-postgres-web
     restart: always
     command: -c max_connections=600
