@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { Brain } from 'lucide-react';
 import { Dropdown } from '@/components/ui/primitives/Dropdown';
+import { useChatSettingsStore, DEFAULT_CHAT_SETTINGS_KEY, DEFAULT_THINKING_MODE } from '@/store/chatSettingsStore';
 import { useUIStore } from '@/store/uiStore';
 
 export interface ThinkingModeOption {
@@ -18,15 +19,20 @@ const THINKING_MODES: ThinkingModeOption[] = [
 ];
 
 export interface ThinkingModeSelectorProps {
+  chatId?: string;
   dropdownPosition?: 'top' | 'bottom';
   disabled?: boolean;
 }
 
 export const ThinkingModeSelector = memo(function ThinkingModeSelector({
+  chatId,
   dropdownPosition = 'bottom',
   disabled = false,
 }: ThinkingModeSelectorProps) {
-  const thinkingMode = useUIStore((state) => state.thinkingMode);
+  const key = chatId ?? DEFAULT_CHAT_SETTINGS_KEY;
+  const thinkingMode = useChatSettingsStore(
+    (state) => state.thinkingModeByChat[key] ?? DEFAULT_THINKING_MODE,
+  );
   const isSplitMode = useUIStore((state) => state.isSplitMode);
 
   const selectedMode = THINKING_MODES.find((m) => m.value === thinkingMode) || THINKING_MODES[0];
@@ -37,7 +43,7 @@ export const ThinkingModeSelector = memo(function ThinkingModeSelector({
       items={THINKING_MODES}
       getItemKey={(mode) => mode.value || 'off'}
       getItemLabel={(mode) => mode.label}
-      onSelect={(mode) => useUIStore.getState().setThinkingMode(mode.value)}
+      onSelect={(mode) => useChatSettingsStore.getState().setThinkingMode(key, mode.value)}
       leftIcon={Brain}
       width="w-32"
       dropdownPosition={dropdownPosition}

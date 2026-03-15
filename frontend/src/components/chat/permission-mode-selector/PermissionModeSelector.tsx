@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { Shield } from 'lucide-react';
 import { Dropdown } from '@/components/ui/primitives/Dropdown';
+import { useChatSettingsStore, DEFAULT_CHAT_SETTINGS_KEY, DEFAULT_PERMISSION_MODE } from '@/store/chatSettingsStore';
 import { useUIStore } from '@/store/uiStore';
 
 export interface PermissionModeOption {
@@ -16,15 +17,20 @@ const PERMISSION_MODES: PermissionModeOption[] = [
 ];
 
 export interface PermissionModeSelectorProps {
+  chatId?: string;
   dropdownPosition?: 'top' | 'bottom';
   disabled?: boolean;
 }
 
 export const PermissionModeSelector = memo(function PermissionModeSelector({
+  chatId,
   dropdownPosition = 'bottom',
   disabled = false,
 }: PermissionModeSelectorProps) {
-  const permissionMode = useUIStore((state) => state.permissionMode);
+  const key = chatId ?? DEFAULT_CHAT_SETTINGS_KEY;
+  const permissionMode = useChatSettingsStore(
+    (state) => state.permissionModeByChat[key] ?? DEFAULT_PERMISSION_MODE,
+  );
   const isSplitMode = useUIStore((state) => state.isSplitMode);
 
   const selectedMode =
@@ -36,7 +42,7 @@ export const PermissionModeSelector = memo(function PermissionModeSelector({
       items={PERMISSION_MODES}
       getItemKey={(mode) => mode.value}
       getItemLabel={(mode) => mode.label}
-      onSelect={(mode) => useUIStore.getState().setPermissionMode(mode.value)}
+      onSelect={(mode) => useChatSettingsStore.getState().setPermissionMode(key, mode.value)}
       leftIcon={Shield}
       width="w-48"
       itemClassName="flex flex-col gap-0.5"
