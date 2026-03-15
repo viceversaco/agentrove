@@ -476,7 +476,7 @@ export function WorkspaceSelector({
 
   return (
     <>
-      <div className="relative z-30 mb-2 px-4 sm:px-6">
+      <div className="relative">
         <button
           type="button"
           onClick={() => setIsModalOpen(true)}
