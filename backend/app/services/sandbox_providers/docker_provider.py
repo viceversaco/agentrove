@@ -160,7 +160,7 @@ class LocalDockerProvider(SandboxProvider):
             host_config["Runtime"] = self.config.runtime
         else:
             host_config["Privileged"] = True
-            host_config["SecurityOpt"] = ["no-new-privileges=false"]
+            host_config["SecurityOpt"] = ["no-new-privileges=true"]
 
         if self.config.mem_limit:
             host_config["Memory"] = self._parse_mem_limit(self.config.mem_limit)
