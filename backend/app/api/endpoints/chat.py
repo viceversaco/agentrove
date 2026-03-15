@@ -151,6 +151,7 @@ async def send_message(
     model_id: str = Form(...),
     permission_mode: Literal["plan", "ask", "auto"] = Form("auto"),
     thinking_mode: str | None = Form(None),
+    worktree: bool = Form(False),
     selected_prompt_name: str | None = Form(None),
     attached_files: list[UploadFile] | None = File(None),
     chat_service: ChatService = Depends(get_chat_service),
@@ -166,6 +167,7 @@ async def send_message(
                 attached_files=files,
                 permission_mode=permission_mode,
                 thinking_mode=thinking_mode,
+                worktree=worktree,
                 selected_prompt_name=selected_prompt_name,
             ),
             current_user,
@@ -457,6 +459,7 @@ async def queue_message(
     model_id: str = Form(...),
     permission_mode: Literal["plan", "ask", "auto"] = Form("auto"),
     thinking_mode: str | None = Form(None),
+    worktree: bool = Form(False),
     attached_files: list[UploadFile] | None = File(None),
     current_user: User = Depends(get_current_user),
     chat_service: ChatService = Depends(get_chat_service),
@@ -489,6 +492,7 @@ async def queue_message(
             model_id,
             permission_mode=permission_mode,
             thinking_mode=thinking_mode,
+            worktree=worktree,
             attachments=queue_attachments,
         )
 

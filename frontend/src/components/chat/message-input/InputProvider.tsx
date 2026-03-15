@@ -10,6 +10,7 @@ import {
   useChatSettingsStore,
   DEFAULT_PERMISSION_MODE,
   DEFAULT_THINKING_MODE,
+  DEFAULT_WORKTREE,
 } from '@/store/chatSettingsStore';
 import { useChatContext } from '@/hooks/useChatContext';
 import {
@@ -202,6 +203,7 @@ export function InputProvider({
       const settings = useChatSettingsStore.getState();
       const permissionMode = settings.permissionModeByChat[chatId] ?? DEFAULT_PERMISSION_MODE;
       const thinkingMode = settings.thinkingModeByChat[chatId] ?? DEFAULT_THINKING_MODE;
+      const worktree = settings.worktreeByChat[chatId] ?? DEFAULT_WORKTREE;
       const fullMessage = messageRef.current.trim();
       void useMessageQueueStore
         .getState()
@@ -211,6 +213,7 @@ export function InputProvider({
           selectedModelId,
           permissionMode,
           thinkingMode,
+          worktree,
           attachedFiles ?? undefined,
         );
       setMessage('');

@@ -45,6 +45,7 @@ class ChatStreamRequest:
     session_id: str | None
     assistant_message_id: str | None
     thinking_mode: str | None
+    worktree: bool = False
     attachments: list[dict[str, Any]] | None
     context_window: int | None = None
     is_custom_prompt: bool = False

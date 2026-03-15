@@ -307,6 +307,12 @@ class BaseSandboxTransport(Transport, ABC):
 
         cmd.extend(["--setting-sources", ",".join(self._options.setting_sources or [])])
 
+        if self._options.worktree:
+            if isinstance(self._options.worktree, str):
+                cmd.extend(["--worktree", self._options.worktree])
+            else:
+                cmd.append("--worktree")
+
         for flag, value in self._options.extra_args.items():
             if value is None:
                 cmd.append(f"--{flag}")

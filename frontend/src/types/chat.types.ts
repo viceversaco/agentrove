@@ -68,6 +68,7 @@ export interface ChatRequest {
   attached_files?: File[];
   permission_mode: 'plan' | 'ask' | 'auto';
   thinking_mode?: string;
+  worktree?: boolean;
   selected_prompt_name?: string;
 }
 

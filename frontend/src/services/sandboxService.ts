@@ -9,6 +9,7 @@ import type {
   GitBranchesData,
   GitCheckoutData,
   GitDiffData,
+  GitWorktreesData,
   PortInfo,
   Secret,
   UpdateFileResult,
@@ -223,13 +224,23 @@ async function getGitDiff(
   sandboxId: string,
   mode: DiffMode = 'all',
   fullContext: boolean = false,
+  cwd?: string,
 ): Promise<GitDiffData> {
   validateRequired(sandboxId, 'Sandbox ID');
 
   return serviceCall(async () => {
-    const qs = buildQueryString({ mode, full_context: fullContext || undefined });
+    const qs = buildQueryString({ mode, full_context: fullContext || undefined, cwd: cwd || undefined });
     const response = await apiClient.get<GitDiffData>(`/sandbox/${sandboxId}/git/diff${qs}`);
     return response ?? { diff: '', has_changes: false, is_git_repo: false };
+  });
+}
+
+async function getGitWorktrees(sandboxId: string): Promise<GitWorktreesData> {
+  validateRequired(sandboxId, 'Sandbox ID');
+
+  return serviceCall(async () => {
+    const response = await apiClient.get<GitWorktreesData>(`/sandbox/${sandboxId}/git/worktrees`);
+    return response ?? { worktrees: [] };
   });
 }
 
@@ -272,5 +283,6 @@ export const sandboxService = {
   getBrowserStatus,
   getGitDiff,
   getGitBranches,
+  getGitWorktrees,
   checkoutGitBranch,
 };

@@ -39,6 +39,7 @@ class QueueService:
         model_id: str,
         permission_mode: str = "auto",
         thinking_mode: str | None = None,
+        worktree: bool = False,
         attachments: list[dict[str, Any]] | None = None,
     ) -> QueueAddResponse:
         key = self._queue_key(chat_id)
@@ -52,6 +53,7 @@ class QueueService:
             "model_id": model_id,
             "permission_mode": permission_mode,
             "thinking_mode": thinking_mode,
+            "worktree": worktree,
             "queued_at": queued_at.isoformat(),
             "attachments": attachments,
         }
@@ -69,6 +71,7 @@ class QueueService:
             model_id=item["model_id"],
             permission_mode=item.get("permission_mode", "auto"),
             thinking_mode=item.get("thinking_mode"),
+            worktree=item.get("worktree", False),
             queued_at=datetime.fromisoformat(item["queued_at"]),
             attachments=item.get("attachments"),
         )

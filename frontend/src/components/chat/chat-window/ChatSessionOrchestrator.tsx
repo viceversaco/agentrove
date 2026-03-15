@@ -9,6 +9,7 @@ import {
   useChatSettingsStore,
   DEFAULT_PERMISSION_MODE,
   DEFAULT_THINKING_MODE,
+  DEFAULT_WORKTREE,
 } from '@/store/chatSettingsStore';
 import { useChatStreaming } from '@/hooks/useChatStreaming';
 import { usePermissionRequest } from '@/hooks/usePermissionRequest';
@@ -52,6 +53,9 @@ export function ChatSessionOrchestrator({
   );
   const thinkingMode = useChatSettingsStore(
     (state) => state.thinkingModeByChat[chatId] ?? DEFAULT_THINKING_MODE,
+  );
+  const worktree = useChatSettingsStore(
+    (state) => state.worktreeByChat[chatId] ?? DEFAULT_WORKTREE,
   );
 
   const lastAssistantModelId = useMemo((): string | null | undefined => {
@@ -104,6 +108,7 @@ export function ChatSessionOrchestrator({
     selectedModelId,
     permissionMode,
     thinkingMode,
+    worktree,
     onPermissionRequest: handlePermissionRequest,
   });
 

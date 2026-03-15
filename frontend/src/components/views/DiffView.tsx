@@ -154,9 +154,10 @@ function FileStatusBadge({ type }: { type?: string }) {
 
 interface DiffViewProps {
   sandboxId?: string;
+  cwd?: string;
 }
 
-export const DiffView = memo(function DiffView({ sandboxId }: DiffViewProps) {
+export const DiffView = memo(function DiffView({ sandboxId, cwd }: DiffViewProps) {
   const theme = useResolvedTheme();
   const [expandedFiles, setExpandedFiles] = useState<Set<number>>(new Set());
   const [parsedFiles, setParsedFiles] = useState<FileDiffMeta[]>([]);
@@ -170,7 +171,7 @@ export const DiffView = memo(function DiffView({ sandboxId }: DiffViewProps) {
     isFetching,
     isError,
     refetch,
-  } = useGitDiffQuery(sandboxId || '', mode, expandUnchanged, { enabled: !!sandboxId });
+  } = useGitDiffQuery(sandboxId || '', mode, expandUnchanged, cwd, { enabled: !!sandboxId });
 
   const diffContent = diffData?.diff ?? '';
   const prevFileNamesRef = useRef<string>('');

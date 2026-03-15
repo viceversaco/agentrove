@@ -10,6 +10,7 @@ class QueuedMessageBase(BaseModel):
     model_id: str = Field(..., min_length=1, max_length=255)
     permission_mode: Literal["plan", "ask", "auto"] = "auto"
     thinking_mode: str | None = None
+    worktree: bool = False
 
 
 class QueueMessageUpdate(BaseModel):

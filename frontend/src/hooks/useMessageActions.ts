@@ -14,6 +14,7 @@ interface UseMessageActionsParams {
   selectedModelId: string | null | undefined;
   permissionMode: 'plan' | 'ask' | 'auto';
   thinkingMode: string | null | undefined;
+  worktree: boolean;
   setStreamState: (state: StreamState) => void;
   setCurrentMessageId: (id: string | null) => void;
   setError: (error: Error | null) => void;
@@ -37,6 +38,7 @@ export function useMessageActions({
   selectedModelId,
   permissionMode,
   thinkingMode,
+  worktree,
   setStreamState,
   setCurrentMessageId,
   setError,
@@ -83,6 +85,7 @@ export function useMessageActions({
           attached_files: filesToSend && filesToSend.length > 0 ? filesToSend : undefined,
           permission_mode: permissionMode,
           thinking_mode: thinkingMode || undefined,
+          worktree: worktree ? true : undefined,
           ...(promptName && { selected_prompt_name: promptName }),
         };
 
@@ -132,6 +135,7 @@ export function useMessageActions({
       selectedModelId,
       startStream,
       thinkingMode,
+      worktree,
       setStreamState,
       setCurrentMessageId,
       setError,
