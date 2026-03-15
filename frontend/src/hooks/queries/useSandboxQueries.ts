@@ -6,7 +6,6 @@ import type {
   FileContent,
   FileMetadata,
   GitDiffData,
-  GitWorktreesData,
   PortInfo,
   Secret,
   UpdateFileResult,

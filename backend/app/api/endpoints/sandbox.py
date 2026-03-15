@@ -329,9 +329,7 @@ async def get_git_diff(
                 f"{untracked_diff}"
             )
 
-        result = await sandbox_service.execute_command(
-            sandbox_id, f"{cd_prefix}{cmd}"
-        )
+        result = await sandbox_service.execute_command(sandbox_id, f"{cd_prefix}{cmd}")
         if mode == "branch" and result.exit_code == 2:
             return GitDiffResponse(
                 diff="",
@@ -375,11 +373,13 @@ async def get_git_worktrees(
             elif line.startswith("branch "):
                 branch = line[7:].removeprefix("refs/heads/")
             elif line == "" and path:
-                worktrees.append(GitWorktree(
-                    path=path,
-                    branch=branch,
-                    is_main=path == SANDBOX_WORKSPACE_DIR,
-                ))
+                worktrees.append(
+                    GitWorktree(
+                        path=path,
+                        branch=branch,
+                        is_main=path == SANDBOX_WORKSPACE_DIR,
+                    )
+                )
                 path = None
                 branch = None
 
