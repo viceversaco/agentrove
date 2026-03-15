@@ -37,6 +37,9 @@ async function createCompletion(
       if (request.thinking_mode) {
         formData.append('thinking_mode', request.thinking_mode);
       }
+      if (request.worktree) {
+        formData.append('worktree', 'true');
+      }
       if (request.selected_prompt_name) {
         formData.append('selected_prompt_name', request.selected_prompt_name);
       }

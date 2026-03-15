@@ -9,6 +9,7 @@ async function queueMessage(
   modelId: string,
   permissionMode: string = 'auto',
   thinkingMode: string | null = null,
+  worktree: boolean = false,
   files?: File[],
 ): Promise<QueueAddResponse> {
   validateId(chatId, 'Chat ID');
@@ -22,6 +23,9 @@ async function queueMessage(
     formData.append('permission_mode', permissionMode);
     if (thinkingMode) {
       formData.append('thinking_mode', thinkingMode);
+    }
+    if (worktree) {
+      formData.append('worktree', 'true');
     }
 
     if (files) {

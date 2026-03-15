@@ -746,6 +746,7 @@ class ChatService(BaseDbService[Chat]):
                 session_id=session_id,
                 assistant_message_id=str(assistant_message.id),
                 thinking_mode=request.thinking_mode,
+                worktree=request.worktree,
                 attachments=attachments,
                 context_window=context_window,
                 is_custom_prompt=is_custom_prompt,
@@ -776,6 +777,7 @@ class ChatService(BaseDbService[Chat]):
         session_id: str | None,
         assistant_message_id: str,
         thinking_mode: str | None,
+        worktree: bool = False,
         attachments: list[MessageAttachmentDict] | None,
         context_window: int | None = None,
         is_custom_prompt: bool = False,
@@ -804,6 +806,7 @@ class ChatService(BaseDbService[Chat]):
             session_id=session_id,
             assistant_message_id=assistant_message_id,
             thinking_mode=thinking_mode,
+            worktree=worktree,
             attachments=stream_attachments,
             is_custom_prompt=is_custom_prompt,
         )

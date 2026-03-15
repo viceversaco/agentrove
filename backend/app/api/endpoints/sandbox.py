@@ -16,6 +16,8 @@ from app.models.schemas.sandbox import (
     GitCheckoutRequest,
     GitCheckoutResponse,
     GitDiffResponse,
+    GitWorktree,
+    GitWorktreesResponse,
     IDEUrlResponse,
     SandboxFilesMetadataResponse,
     StartBrowserRequest,
@@ -38,6 +40,13 @@ router = APIRouter()
 
 GIT_CD_PREFIX = f"cd {SANDBOX_WORKSPACE_DIR} 2>/dev/null || cd {SANDBOX_HOME_DIR}; "
 BRANCH_NAME_RE = re.compile(r"^[\w./-]+$")
+CWD_PATH_RE = re.compile(r"^/[a-zA-Z0-9/_.\- ]+$")
+
+
+def _git_cd_prefix(cwd: str | None = None) -> str:
+    if cwd and CWD_PATH_RE.match(cwd):
+        return f"cd '{cwd}'; "
+    return GIT_CD_PREFIX
 
 
 @router.get("/{sandbox_id}/preview-links", response_model=PreviewLinksResponse)
@@ -275,13 +284,16 @@ async def get_git_diff(
     sandbox_service: SandboxService = Depends(get_sandbox_service),
     mode: Literal["all", "staged", "unstaged", "branch"] = Query("all"),
     full_context: bool = Query(False),
+    cwd: str | None = Query(None),
 ) -> GitDiffResponse:
     # Workspace is mounted at /home/user/workspace in Docker containers;
     # cd there first, falling back to /home/user for non-Docker sandboxes.
+    # When cwd is provided (e.g. a worktree path), cd there instead.
+    cd_prefix = _git_cd_prefix(cwd)
     try:
         check = await sandbox_service.execute_command(
             sandbox_id,
-            f"{GIT_CD_PREFIX}git rev-parse --is-inside-work-tree 2>/dev/null",
+            f"{cd_prefix}git rev-parse --is-inside-work-tree 2>/dev/null",
         )
         if check.exit_code != 0:
             return GitDiffResponse(diff="", has_changes=False, is_git_repo=False)
@@ -317,9 +329,7 @@ async def get_git_diff(
                 f"{untracked_diff}"
             )
 
-        result = await sandbox_service.execute_command(
-            sandbox_id, f"{GIT_CD_PREFIX}{cmd}"
-        )
+        result = await sandbox_service.execute_command(sandbox_id, f"{cd_prefix}{cmd}")
         if mode == "branch" and result.exit_code == 2:
             return GitDiffResponse(
                 diff="",
@@ -333,6 +343,47 @@ async def get_git_diff(
             has_changes=bool(diff_output.strip()),
             is_git_repo=True,
         )
+    except SandboxException as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+
+
+@router.get("/{sandbox_id}/git/worktrees", response_model=GitWorktreesResponse)
+async def get_git_worktrees(
+    sandbox_id: str = Depends(validate_sandbox_ownership),
+    sandbox_service: SandboxService = Depends(get_sandbox_service),
+) -> GitWorktreesResponse:
+    try:
+        result = await sandbox_service.execute_command(
+            sandbox_id,
+            f"{GIT_CD_PREFIX}git worktree list --porcelain 2>/dev/null",
+        )
+        if result.exit_code != 0:
+            return GitWorktreesResponse(worktrees=[])
+
+        worktrees: list[GitWorktree] = []
+        path: str | None = None
+        branch: str | None = None
+
+        for line in [*result.stdout.splitlines(), ""]:
+            if line.startswith("worktree "):
+                path = line[9:]
+            elif line.startswith("branch "):
+                branch = line[7:].removeprefix("refs/heads/")
+            elif line == "" and path:
+                worktrees.append(
+                    GitWorktree(
+                        path=path,
+                        branch=branch,
+                        is_main=path == SANDBOX_WORKSPACE_DIR,
+                    )
+                )
+                path = None
+                branch = None
+
+        return GitWorktreesResponse(worktrees=worktrees)
     except SandboxException as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

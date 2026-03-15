@@ -860,6 +860,7 @@ class ChatStreamRuntime:
             session_id=chat.session_id,
             assistant_message_id=assistant_message_id,
             thinking_mode=queued_msg.get("thinking_mode"),
+            worktree=queued_msg.get("worktree", False),
             attachments=queued_msg.get("attachments"),
             is_custom_prompt=False,
         )
@@ -1066,6 +1067,7 @@ class ChatStreamRuntime:
                 permission_mode=request.permission_mode,
                 session_id=request.session_id,
                 thinking_mode=request.thinking_mode,
+                worktree=request.worktree,
                 is_custom_prompt=request.is_custom_prompt,
             )
 

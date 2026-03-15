@@ -14,6 +14,7 @@ interface MessageQueueState {
     modelId: string,
     permissionMode?: string,
     thinkingMode?: string | null,
+    worktree?: boolean,
     files?: File[],
   ) => Promise<string>;
   updateQueuedMessage: (chatId: string, messageId: string, content: string) => Promise<void>;
@@ -38,6 +39,7 @@ export const useMessageQueueStore = create<MessageQueueState>((set, get) => ({
     modelId: string,
     permissionMode: string = 'auto',
     thinkingMode: string | null = null,
+    worktree: boolean = false,
     files?: File[],
   ): Promise<string> => {
     const currentQueue = get().queues.get(chatId) || [];
@@ -65,6 +67,7 @@ export const useMessageQueueStore = create<MessageQueueState>((set, get) => ({
         modelId,
         permissionMode,
         thinkingMode,
+        worktree,
         files,
       );
 
@@ -307,6 +310,7 @@ export const useMessageQueueStore = create<MessageQueueState>((set, get) => ({
             msg.model_id,
             'auto',
             null,
+            false,
             msg.files,
           );
 

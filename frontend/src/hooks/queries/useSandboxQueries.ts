@@ -183,15 +183,25 @@ export const useGitDiffQuery = (
   sandboxId: string,
   mode: DiffMode = 'all',
   fullContext: boolean = false,
+  cwd?: string,
   options?: Partial<UseQueryOptions<GitDiffData>>,
 ) => {
   return useQuery({
-    queryKey: queryKeys.sandbox.gitDiff(sandboxId, mode, fullContext),
-    queryFn: () => sandboxService.getGitDiff(sandboxId, mode, fullContext),
+    queryKey: queryKeys.sandbox.gitDiff(sandboxId, mode, fullContext, cwd),
+    queryFn: () => sandboxService.getGitDiff(sandboxId, mode, fullContext, cwd),
     enabled: !!sandboxId,
     staleTime: 30_000,
     placeholderData: keepPreviousData,
     ...options,
+  });
+};
+
+export const useGitWorktreesQuery = (sandboxId: string, enabled: boolean = true) => {
+  return useQuery({
+    queryKey: queryKeys.sandbox.gitWorktrees(sandboxId),
+    queryFn: () => sandboxService.getGitWorktrees(sandboxId),
+    enabled: !!sandboxId && enabled,
+    staleTime: 30_000,
   });
 };
 

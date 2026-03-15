@@ -6,12 +6,15 @@ type PermissionMode = 'plan' | 'ask' | 'auto';
 const DEFAULT_KEY = '__default__';
 export const DEFAULT_PERMISSION_MODE: PermissionMode = 'auto';
 export const DEFAULT_THINKING_MODE: string | null = null;
+export const DEFAULT_WORKTREE = false;
 
 interface ChatSettingsState {
   permissionModeByChat: Record<string, PermissionMode>;
   thinkingModeByChat: Record<string, string | null>;
+  worktreeByChat: Record<string, boolean>;
   setPermissionMode: (chatId: string, mode: PermissionMode) => void;
   setThinkingMode: (chatId: string, mode: string | null) => void;
+  setWorktree: (chatId: string, enabled: boolean) => void;
   initChatFromDefaults: (chatId: string) => void;
 }
 
@@ -20,6 +23,7 @@ export const useChatSettingsStore = create<ChatSettingsState>()(
     (set, get) => ({
       permissionModeByChat: {},
       thinkingModeByChat: {},
+      worktreeByChat: {},
       setPermissionMode: (chatId, mode) =>
         set((state) => ({
           permissionModeByChat: { ...state.permissionModeByChat, [chatId]: mode },
@@ -28,18 +32,26 @@ export const useChatSettingsStore = create<ChatSettingsState>()(
         set((state) => ({
           thinkingModeByChat: { ...state.thinkingModeByChat, [chatId]: mode },
         })),
+      setWorktree: (chatId, enabled) =>
+        set((state) => ({
+          worktreeByChat: { ...state.worktreeByChat, [chatId]: enabled },
+        })),
       initChatFromDefaults: (chatId) => {
         const state = get();
         const permission = state.permissionModeByChat[DEFAULT_KEY];
         const thinking = state.thinkingModeByChat[DEFAULT_KEY];
+        const worktree = state.worktreeByChat[DEFAULT_KEY];
         const updates: Partial<
-          Pick<ChatSettingsState, 'permissionModeByChat' | 'thinkingModeByChat'>
+          Pick<ChatSettingsState, 'permissionModeByChat' | 'thinkingModeByChat' | 'worktreeByChat'>
         > = {};
         if (permission !== undefined) {
           updates.permissionModeByChat = { ...state.permissionModeByChat, [chatId]: permission };
         }
         if (thinking !== undefined) {
           updates.thinkingModeByChat = { ...state.thinkingModeByChat, [chatId]: thinking };
+        }
+        if (worktree !== undefined) {
+          updates.worktreeByChat = { ...state.worktreeByChat, [chatId]: worktree };
         }
         if (Object.keys(updates).length > 0) set(updates);
       },

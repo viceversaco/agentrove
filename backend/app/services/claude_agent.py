@@ -125,6 +125,7 @@ class ClaudeAgentService:
         permission_mode: str,
         session_id: str | None,
         thinking_mode: str | None,
+        worktree: bool = False,
         is_custom_prompt: bool,
     ) -> SessionParams:
         # Resolve chat + user settings into everything needed to launch a Claude
@@ -148,6 +149,7 @@ class ClaudeAgentService:
             model_id=model_id,
             session_id=session_id,
             thinking_mode=thinking_mode,
+            worktree=worktree,
             chat_id=chat_id,
             is_custom_prompt=is_custom_prompt,
             cwd=claude_cwd,
@@ -442,6 +444,7 @@ class ClaudeAgentService:
         model_id: str,
         session_id: str | None,
         thinking_mode: str | None,
+        worktree: bool = False,
         chat_id: str,
         is_custom_prompt: bool = False,
         cwd: str = SANDBOX_HOME_DIR,
@@ -514,6 +517,9 @@ class ClaudeAgentService:
 
         if thinking_mode in THINKING_MODE_TOKENS:
             options.max_thinking_tokens = THINKING_MODE_TOKENS[thinking_mode]
+
+        if worktree:
+            options.worktree = True
 
         return options
 
