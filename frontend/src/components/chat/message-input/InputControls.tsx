@@ -2,14 +2,12 @@ import { EnhanceButton } from './EnhanceButton';
 import { PermissionModeSelector } from '@/components/chat/permission-mode-selector/PermissionModeSelector';
 import { ModelSelector } from '@/components/chat/model-selector/ModelSelector';
 import { ThinkingModeSelector } from '@/components/chat/thinking-mode-selector/ThinkingModeSelector';
-import { WorktreeSelector } from '@/components/chat/worktree-selector/WorktreeSelector';
 import { BranchSelector } from '@/components/chat/branch-selector/BranchSelector';
 import { useInputState, useInputActions } from '@/hooks/useInputContext';
 
 export function InputControls() {
   const state = useInputState();
   const actions = useInputActions();
-  const isLandingPage = !state.chatId;
 
   return (
     <div
@@ -40,8 +38,6 @@ export function InputControls() {
         dropdownPosition={state.dropdownPosition}
         disabled={state.isLoading}
       />
-
-      {isLandingPage && <WorktreeSelector disabled={state.isLoading} />}
 
       <BranchSelector dropdownPosition={state.dropdownPosition} disabled={state.isLoading} />
     </div>

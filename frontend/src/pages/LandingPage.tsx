@@ -5,6 +5,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { useLayoutSidebar } from '@/components/layout/layoutState';
 import { Input as ChatInput } from '@/components/chat/message-input/Input';
 import { WorkspaceSelector } from '@/components/chat/WorkspaceSelector';
+import { WorktreeToggle } from '@/components/chat/worktree-selector/WorktreeToggle';
 import { useChatStore } from '@/store/chatStore';
 import { useUIStore } from '@/store/uiStore';
 import { useModelStore } from '@/store/modelStore';
@@ -194,12 +195,15 @@ export function LandingPage() {
       <div className="relative flex flex-1">
         <div className="flex flex-1 items-center justify-center px-4 pb-10">
           <div className="w-full max-w-2xl">
-            <WorkspaceSelector
-              selectedWorkspaceId={selectedWorkspaceId}
-              onWorkspaceChange={setSelectedWorkspaceId}
-              enabled={isAuthenticated}
-              chatCountByWorkspace={chatCountByWorkspace}
-            />
+            <div className="relative z-30 mb-2 flex items-center gap-1 px-4 sm:px-6">
+              <WorkspaceSelector
+                selectedWorkspaceId={selectedWorkspaceId}
+                onWorkspaceChange={setSelectedWorkspaceId}
+                enabled={isAuthenticated}
+                chatCountByWorkspace={chatCountByWorkspace}
+              />
+              <WorktreeToggle disabled={isLoading} />
+            </div>
 
             <ChatProvider
               customAgents={allAgents}
