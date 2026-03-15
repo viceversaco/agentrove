@@ -10,6 +10,11 @@ Self-hosted Claude Code workspace with multi-provider routing, sandboxed executi
 
 > **Note:** Agentrove is under active development. Expect breaking changes between releases.
 
+## Screenshots
+
+![Chat Interface](screenshots/chat-interface.png)
+![Agent Workflow](screenshots/agent-workflow.png)
+
 ## Community
 
 Join the [Discord server](https://discord.gg/HvkJU8dcBA).
@@ -233,11 +238,6 @@ This is the main value of using Claude Code as the harness while changing infere
 
 - VPS/Coolify guide: [docs/coolify-installation-guide.md](docs/coolify-installation-guide.md)
 - Production setup uses frontend at `/` and API under `/api/*`
-
-## Screenshots
-
-![Chat Interface](screenshots/chat-interface.png)
-![Agent Workflow](screenshots/agent-workflow.png)
 
 ## Tech Stack
 
