@@ -99,10 +99,14 @@ class StreamProcessor:
             # real usage at stream end, not in per-turn messages).
             if message.usage is not None:
                 existing_input = (
-                    self.usage.get("input_tokens", 0)
-                    + self.usage.get("cache_creation_input_tokens", 0)
-                    + self.usage.get("cache_read_input_tokens", 0)
-                ) if self.usage else 0
+                    (
+                        self.usage.get("input_tokens", 0)
+                        + self.usage.get("cache_creation_input_tokens", 0)
+                        + self.usage.get("cache_read_input_tokens", 0)
+                    )
+                    if self.usage
+                    else 0
+                )
                 if existing_input == 0:
                     self.usage = message.usage
 
