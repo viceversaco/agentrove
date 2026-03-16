@@ -20,7 +20,7 @@ annotated-doc==0.0.4
     # via fastapi
 annotated-types==0.7.0
     # via pydantic
-anthropic-bridge==0.1.39
+anthropic-bridge==0.1.40
     # via -r requirements.txt
 anyio==4.12.1
     # via
