@@ -191,8 +191,8 @@ class SessionRegistry:
         try:
             await client.connect()
         except Exception:
-            await client.disconnect()
             await transport.close()
+            await client.disconnect()
             raise
 
         return ChatSession(
@@ -204,9 +204,10 @@ class SessionRegistry:
 
     @staticmethod
     async def _close_session(session: ChatSession) -> None:
-        # Gracefully tear down: cancel any in-flight generation, disconnect
-        # the SDK client, then close the transport. Each step is guarded
-        # independently so a failure in one doesn't skip the others.
+        # Gracefully tear down: cancel any in-flight generation, close the
+        # transport, then disconnect the SDK client. Transport closes first
+        # so the SDK's internal reader task finishes naturally before
+        # disconnect tears down the task group.
         task = session.active_generation_task
         if task is not None and not task.done():
             task.cancel()
@@ -216,16 +217,16 @@ class SessionRegistry:
                 pass
 
         try:
-            await session.client.disconnect()
-        except Exception as exc:
-            logger.debug("Error disconnecting chat %s: %s", session.chat_id, exc)
-
-        try:
             await session.transport.close()
         except Exception as exc:
             logger.debug(
                 "Error closing transport for chat %s: %s", session.chat_id, exc
             )
+
+        try:
+            await session.client.disconnect()
+        except Exception as exc:
+            logger.debug("Error disconnecting chat %s: %s", session.chat_id, exc)
 
 
 session_registry = SessionRegistry()
