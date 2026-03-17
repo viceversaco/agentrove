@@ -196,6 +196,9 @@ class Settings(BaseSettings):
     # URL the permission server in host mode uses to reach the API
     HOST_PERMISSION_API_URL: str = "http://localhost:8080"
 
+    # Filesystem browse — comma-separated extra allowed root paths
+    BROWSE_ROOTS: str = ""
+
     @field_validator("HOST_SANDBOX_BASE_DIR", mode="before")
     @classmethod
     def set_host_sandbox_base_dir(
