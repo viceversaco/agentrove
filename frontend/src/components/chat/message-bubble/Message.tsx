@@ -36,7 +36,7 @@ export const UserMessage = memo(function UserMessage({
     <div className="group px-4 py-1.5 sm:px-6 sm:py-2">
       <div className="flex items-start">
         <div className="min-w-0 flex-1">
-          <div className="inline-block max-w-full rounded-xl bg-surface-hover/60 px-3 py-1.5 dark:bg-surface-dark-tertiary/80">
+          <div className="inline-block max-w-full overflow-hidden rounded-xl bg-surface-hover/60 px-3 py-1.5 dark:bg-surface-dark-tertiary/80">
             <div className="max-w-none break-words text-sm text-text-primary dark:text-text-dark-primary">
               <UserMessageContent
                 contentRender={contentRender}
