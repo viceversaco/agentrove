@@ -3,7 +3,7 @@ import { BaseModal } from '@/components/ui/shared/BaseModal';
 import { Button } from '@/components/ui/primitives/Button';
 import { Spinner } from '@/components/ui/primitives/Spinner';
 import { LazyMarkDown } from '@/components/ui/LazyMarkDown';
-import { Bot, Terminal, Zap, Plug, ExternalLink, X, AlertCircle } from 'lucide-react';
+import { Bot, Terminal, Zap, Plug, FileCode, ExternalLink, X, AlertCircle } from 'lucide-react';
 import {
   usePluginDetailsQuery,
   useInstallComponentsMutation,
@@ -24,6 +24,7 @@ const COMPONENT_ICONS = {
   command: Terminal,
   skill: Zap,
   mcp: Plug,
+  lsp: FileCode,
 } as const;
 
 type ComponentType = keyof typeof COMPONENT_ICONS;
@@ -225,6 +226,7 @@ export const PluginDetailModal: React.FC<PluginDetailModalProps> = ({
         ...details.components.commands.map((name) => ({ type: 'command' as const, name })),
         ...details.components.skills.map((name) => ({ type: 'skill' as const, name })),
         ...details.components.mcp_servers.map((name) => ({ type: 'mcp' as const, name })),
+        ...details.components.lsp_servers.map((name) => ({ type: 'lsp' as const, name })),
       ]
     : [];
 
@@ -411,6 +413,20 @@ export const PluginDetailModal: React.FC<PluginDetailModalProps> = ({
                 </div>
               )}
             </>
+          ) : details?.is_external ? (
+            <div className="rounded-lg border border-border/50 p-6 text-center dark:border-border-dark/50">
+              <Plug className="mx-auto mb-3 h-5 w-5 text-text-quaternary dark:text-text-dark-quaternary" />
+              <p className="mb-2 text-sm text-text-secondary dark:text-text-dark-secondary">
+                Could not load components
+              </p>
+              <p className="mb-3 text-xs text-text-tertiary dark:text-text-dark-tertiary">
+                This external plugin&apos;s repository could not be fetched. You can install it via
+                the Claude Code CLI instead.
+              </p>
+              <code className="block rounded bg-surface-tertiary px-3 py-2 font-mono text-2xs text-text-secondary dark:bg-surface-dark-tertiary dark:text-text-dark-secondary">
+                claude plugin install {plugin.name}
+              </code>
+            </div>
           ) : (
             <p className="py-4 text-center text-sm text-text-tertiary dark:text-text-dark-tertiary">
               No components available

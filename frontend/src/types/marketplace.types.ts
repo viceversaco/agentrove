@@ -20,11 +20,13 @@ export interface PluginComponents {
   commands: string[];
   skills: string[];
   mcp_servers: string[];
+  lsp_servers: string[];
 }
 
 export interface PluginDetails extends MarketplacePlugin {
   readme?: string;
   components: PluginComponents;
+  is_external: boolean;
 }
 
 export interface InstalledPlugin {

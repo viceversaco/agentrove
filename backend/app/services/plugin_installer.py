@@ -1,3 +1,4 @@
+import asyncio
 import io
 import logging
 import re
@@ -23,6 +24,7 @@ from app.services.skill import SkillService
 logger = logging.getLogger(__name__)
 
 SUPPORTED_MCP_COMMANDS: set[str] = {"npx", "bunx", "uvx"}
+CLAUDE_PLUGIN_TIMEOUT_SECONDS = 30
 
 
 @dataclass
@@ -105,6 +107,12 @@ class PluginInstallerService:
                                 error="MCP server uses unsupported command type",
                             )
                         )
+                elif comp_type == "lsp":
+                    # LSP plugins always have exactly one server per plugin, so installing
+                    # the plugin by name is equivalent to installing the selected server
+                    plugin_name = details.get("name", comp_name)
+                    await self._install_lsp(plugin_name, marketplace)
+                    installed.append(component)
                 else:
                     failed.append(
                         InstallComponentResult(
@@ -145,6 +153,9 @@ class PluginInstallerService:
         elif comp_type == "mcp":
             if comp_name not in available.get("mcp_servers", []):
                 return f"MCP server '{comp_name}' not found in plugin"
+        elif comp_type == "lsp":
+            if comp_name not in available.get("lsp_servers", []):
+                return f"LSP server '{comp_name}' not found in plugin"
         else:
             return f"Unknown component type: {comp_type}"
         return None
@@ -270,6 +281,45 @@ class PluginInstallerService:
             "args": None,
             "enabled": True,
         }
+
+    async def _run_claude_plugin_command(self, action: str, plugin_ref: str) -> None:
+        proc = await asyncio.create_subprocess_exec(
+            "claude",
+            "plugin",
+            action,
+            plugin_ref,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(), timeout=CLAUDE_PLUGIN_TIMEOUT_SECONDS
+            )
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
+            raise ServiceException(
+                f"Timed out waiting for 'claude plugin {action} {plugin_ref}'"
+            )
+        if proc.returncode != 0:
+            error_msg = (
+                stderr.decode(errors="replace").strip()
+                or stdout.decode(errors="replace").strip()
+            )
+            raise ServiceException(
+                f"Failed to {action} plugin '{plugin_ref}': {error_msg}"
+            )
+
+    async def _install_lsp(
+        self,
+        plugin_name: str,
+        marketplace: str = "",
+    ) -> None:
+        plugin_ref = f"{plugin_name}@{marketplace}" if marketplace else plugin_name
+        await self._run_claude_plugin_command("install", plugin_ref)
+
+    async def uninstall_lsp(self, plugin_ref: str) -> None:
+        await self._run_claude_plugin_command("uninstall", plugin_ref)
 
     def _create_upload_file(self, filename: str, content: bytes) -> UploadFile:
         file_obj = io.BytesIO(content)

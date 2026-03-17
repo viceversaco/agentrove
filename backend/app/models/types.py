@@ -96,6 +96,14 @@ class MarketplaceAuthorDict(TypedDict, total=False):
     url: str | None
 
 
+class PluginComponentsDict(TypedDict, total=False):
+    agents: list[str]
+    commands: list[str]
+    skills: list[str]
+    mcp_servers: list[str]
+    lsp_servers: list[str]
+
+
 class MarketplacePluginDict(TypedDict, total=False):
     name: str
     description: str
@@ -105,14 +113,7 @@ class MarketplacePluginDict(TypedDict, total=False):
     version: str | None
     author: MarketplaceAuthorDict | None
     homepage: str | None
-    has_lsp_only: bool
-
-
-class PluginComponentsDict(TypedDict, total=False):
-    agents: list[str]
-    commands: list[str]
-    skills: list[str]
-    mcp_servers: list[str]
+    components: PluginComponentsDict
 
 
 class PluginDetailsDict(TypedDict, total=False):
@@ -126,6 +127,7 @@ class PluginDetailsDict(TypedDict, total=False):
     homepage: str | None
     readme: str | None
     components: PluginComponentsDict
+    is_external: bool
 
 
 class InstalledPluginDict(TypedDict, total=False):
