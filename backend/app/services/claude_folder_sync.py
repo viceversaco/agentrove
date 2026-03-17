@@ -56,17 +56,20 @@ class ClaudeFolderSync:
         return paths
 
     @staticmethod
+    def _plugin_name_from_key(key: str) -> str:
+        return key.split("@", 1)[0] if "@" in key else key
+
+    @staticmethod
     def get_cli_installed_plugins() -> list[InstalledPluginDict]:
         data = ClaudeFolderSync.read_installed_plugins()
         if not data:
             return []
         results: list[InstalledPluginDict] = []
         for key, entries in data.get("plugins", {}).items():
-            plugin_name = key.split("@", 1)[0] if "@" in key else key
             entry = entries[0] if entries else {}
             results.append(
                 {
-                    "name": plugin_name,
+                    "name": ClaudeFolderSync._plugin_name_from_key(key),
                     "version": entry.get("version"),
                     "installed_at": entry.get("installedAt", ""),
                     "components": [],
@@ -91,3 +94,13 @@ class ClaudeFolderSync:
                 if ip.startswith(host_prefix):
                     entry["installPath"] = container_cache_dir + ip[len(host_prefix) :]
         return json.dumps(data, indent=2)
+
+    @staticmethod
+    def find_installed_plugin_key(plugin_name: str) -> str | None:
+        data = ClaudeFolderSync.read_installed_plugins()
+        if not data:
+            return None
+        for key in data.get("plugins", {}):
+            if ClaudeFolderSync._plugin_name_from_key(str(key)) == plugin_name:
+                return str(key)
+        return None

@@ -162,11 +162,14 @@ async def uninstall_plugin_components(
     agent_service: AgentService = Depends(get_agent_service),
     command_service: CommandService = Depends(get_command_service),
     skill_service: SkillService = Depends(get_skill_service),
+    installer_service: PluginInstallerService = Depends(get_plugin_installer_service),
 ) -> UninstallResponse:
     user_settings = await load_user_settings_or_404(user_service, current_user.id, db)
 
     uninstalled: list[str] = []
     failed: list[InstallComponentResult] = []
+    lsp_plugin_key = ClaudeFolderSync.find_installed_plugin_key(request.plugin_name)
+    lsp_plugin_uninstalled = False
 
     installed_plugins: list[InstalledPluginDict] = list(
         user_settings.installed_plugins or []
@@ -192,7 +195,6 @@ async def uninstall_plugin_components(
         comp_type, comp_name = component_id.split(":", 1)
 
         if comp_type == "mcp":
-            # MCPs are still DB-managed
             items = list(user_settings.custom_mcps or [])
             idx = find_named_item_index(items, comp_name)
             if idx is None:
@@ -208,6 +210,24 @@ async def uninstall_plugin_components(
             user_settings.custom_mcps = items if items else None
             flag_modified(user_settings, "custom_mcps")
             uninstalled.append(component_id)
+            continue
+
+        if comp_type == "lsp":
+            if lsp_plugin_key:
+                if not lsp_plugin_uninstalled:
+                    try:
+                        await installer_service.uninstall_lsp(lsp_plugin_key)
+                        lsp_plugin_uninstalled = True
+                    except (ServiceException, OSError) as e:
+                        failed.append(
+                            InstallComponentResult(
+                                component=component_id, success=False, error=str(e)
+                            )
+                        )
+                        continue
+                uninstalled.append(component_id)
+            else:
+                uninstalled.append(component_id)
             continue
 
         service = service_dispatch.get(comp_type)

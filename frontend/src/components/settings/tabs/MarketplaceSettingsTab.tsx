@@ -17,13 +17,18 @@ const PluginDetailModal = lazy(() =>
 
 const CATEGORIES = [
   'all',
-  'development',
-  'productivity',
-  'testing',
+  'automation',
   'database',
   'deployment',
-  'security',
   'design',
+  'development',
+  'learning',
+  'location',
+  'migration',
+  'monitoring',
+  'productivity',
+  'security',
+  'testing',
   'other',
 ] as const;
 

@@ -206,7 +206,7 @@ function MarkDownInner({ content, className = '' }: { content: string; className
 
         return (
           <p
-            className="mb-3 whitespace-pre-wrap [overflow-wrap:anywhere] leading-5 text-text-secondary last:mb-0 dark:text-text-dark-secondary"
+            className="mb-3 whitespace-pre-wrap leading-5 text-text-secondary [overflow-wrap:anywhere] last:mb-0 dark:text-text-dark-secondary"
             {...props}
           >
             {children}

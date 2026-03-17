@@ -1,7 +1,10 @@
+import asyncio
+import hashlib
 import io
 import json
 import logging
 import re
+import shutil
 import zipfile
 from pathlib import Path
 from typing import Any, cast
@@ -19,8 +22,21 @@ logger = logging.getLogger(__name__)
 
 CLAUDE_PLUGINS_DIR = CLAUDE_DIR / "plugins"
 KNOWN_MARKETPLACES_JSON = CLAUDE_PLUGINS_DIR / "known_marketplaces.json"
+EXTERNAL_PLUGINS_CACHE_DIR = CLAUDE_PLUGINS_DIR / "external_cache"
+EXTERNAL_SOURCE_PREFIX = "external:"
 MAX_SKILL_FILES = 50
+CLONE_TIMEOUT_SECONDS = 30
 SAFE_PATH_SEGMENT = re.compile(r"^[a-zA-Z0-9_\-\.]+$")
+
+
+def _empty_components() -> PluginComponentsDict:
+    return {
+        "agents": [],
+        "commands": [],
+        "skills": [],
+        "mcp_servers": [],
+        "lsp_servers": [],
+    }
 
 
 class MarketplaceService:
@@ -56,6 +72,8 @@ class MarketplaceService:
         return name
 
     def _resolve_local_plugin_dir(self, source: str, marketplace: str) -> Path | None:
+        if source.startswith(EXTERNAL_SOURCE_PREFIX):
+            return self._resolve_external_cache_dir(source)
         known = self._read_known_marketplaces()
         marketplace_info = known.get(marketplace)
         if not marketplace_info:
@@ -69,6 +87,87 @@ class MarketplaceService:
             return local_dir
         return None
 
+    @staticmethod
+    def _parse_external_source(source: str) -> tuple[str, str]:
+        raw = source.removeprefix(EXTERNAL_SOURCE_PREFIX)
+        if "#" in raw:
+            url, subpath = raw.split("#", 1)
+            return url, subpath
+        return raw, ""
+
+    @staticmethod
+    def _external_clone_dir(url: str) -> Path:
+        url_hash = hashlib.sha256(url.encode()).hexdigest()[:16]
+        return EXTERNAL_PLUGINS_CACHE_DIR / url_hash
+
+    @staticmethod
+    def _resolve_subpath(clone_dir: Path, subpath: str) -> Path | None:
+        plugin_dir = (clone_dir / subpath).resolve() if subpath else clone_dir
+        if not plugin_dir.is_relative_to(clone_dir):
+            return None
+        return plugin_dir if plugin_dir.is_dir() else None
+
+    @staticmethod
+    def _resolve_external_cache_dir(source: str) -> Path | None:
+        url, subpath = MarketplaceService._parse_external_source(source)
+        if not url:
+            return None
+        clone_dir = MarketplaceService._external_clone_dir(url)
+        if not clone_dir.is_dir():
+            return None
+        return MarketplaceService._resolve_subpath(clone_dir, subpath)
+
+    async def _ensure_external_clone(self, source: str) -> Path | None:
+        url, subpath = self._parse_external_source(source)
+        if not url:
+            return None
+        clone_dir = self._external_clone_dir(url)
+        if clone_dir.is_dir():
+            return self._resolve_subpath(clone_dir, subpath)
+        EXTERNAL_PLUGINS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "git",
+                "clone",
+                "--depth",
+                "1",
+                "--single-branch",
+                url,
+                str(clone_dir),
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await asyncio.wait_for(
+                proc.communicate(), timeout=CLONE_TIMEOUT_SECONDS
+            )
+            if proc.returncode != 0:
+                logger.error(
+                    "git clone failed for %s: %s", url, stderr.decode(errors="replace")
+                )
+                await asyncio.to_thread(shutil.rmtree, clone_dir, True)
+                return None
+        except asyncio.TimeoutError:
+            logger.error("git clone timed out for %s", url)
+            proc.kill()
+            await proc.wait()
+            await asyncio.to_thread(shutil.rmtree, clone_dir, True)
+            return None
+        except FileNotFoundError:
+            logger.error("git not found on PATH")
+            return None
+        result = self._resolve_subpath(clone_dir, subpath)
+        if result is None and subpath:
+            logger.error("Cloned %s but subpath '%s' not found", url, subpath)
+        return result
+
+    @staticmethod
+    def _extract_names(items: list[Any]) -> list[str]:
+        return [
+            name
+            for x in items
+            if (name := x if isinstance(x, str) else x.get("name", ""))
+        ]
+
     def _normalize_plugin(self, raw: dict[str, Any]) -> MarketplacePluginDict:
         author_raw = raw.get("author") or raw.get("owner")
         author: MarketplaceAuthorDict | None = None
@@ -79,17 +178,23 @@ class MarketplaceService:
 
         source_raw = raw.get("source", "")
         if isinstance(source_raw, dict):
-            source = f"external:{source_raw.get('url', '')}"
+            url = source_raw.get("url", "")
+            subpath = source_raw.get("path", "")
+            source = (
+                f"{EXTERNAL_SOURCE_PREFIX}{url}#{subpath}"
+                if subpath
+                else f"{EXTERNAL_SOURCE_PREFIX}{url}"
+            )
         else:
             source = source_raw
 
-        has_lsp_only = bool(raw.get("lspServers")) and not any(
-            [
-                raw.get("agents"),
-                raw.get("commands"),
-                raw.get("skills"),
-                raw.get("mcpServers"),
-            ]
+        mcp_servers_raw = raw.get("mcpServers")
+        mcp_servers = (
+            list(mcp_servers_raw.keys()) if isinstance(mcp_servers_raw, dict) else []
+        )
+        lsp_servers_raw = raw.get("lspServers")
+        lsp_servers = (
+            list(lsp_servers_raw.keys()) if isinstance(lsp_servers_raw, dict) else []
         )
 
         return {
@@ -101,7 +206,13 @@ class MarketplaceService:
             "version": raw.get("version"),
             "author": author,
             "homepage": raw.get("homepage"),
-            "has_lsp_only": has_lsp_only,
+            "components": {
+                "agents": self._extract_names(raw.get("agents") or []),
+                "commands": self._extract_names(raw.get("commands") or []),
+                "skills": self._extract_names(raw.get("skills") or []),
+                "mcp_servers": mcp_servers,
+                "lsp_servers": lsp_servers,
+            },
         }
 
     async def fetch_catalog(self) -> list[MarketplacePluginDict]:
@@ -126,12 +237,20 @@ class MarketplaceService:
                 normalized = self._normalize_plugin(plugin)
                 normalized["marketplace"] = marketplace_name
                 all_plugins.append(normalized)
-        return [
-            p
-            for p in all_plugins
-            if not p["source"].startswith("external:")
-            and not p.get("has_lsp_only", False)
-        ]
+        deduplicated: dict[str, MarketplacePluginDict] = {}
+        for plugin in all_plugins:
+            name = plugin["name"]
+            if name not in deduplicated:
+                deduplicated[name] = plugin
+            else:
+                existing_source = deduplicated[name].get("source", "")
+                new_source = plugin.get("source", "")
+                if existing_source.startswith(
+                    EXTERNAL_SOURCE_PREFIX
+                ) and not new_source.startswith(EXTERNAL_SOURCE_PREFIX):
+                    deduplicated[name] = plugin
+
+        return list(deduplicated.values())
 
     async def get_plugin_details(self, plugin_name: str) -> PluginDetailsDict:
         catalog = await self.fetch_catalog()
@@ -147,18 +266,22 @@ class MarketplaceService:
         source = plugin.get("source", "")
         marketplace = plugin.get("marketplace", "")
 
+        is_external = source.startswith(EXTERNAL_SOURCE_PREFIX)
         readme: str | None = None
-        components: PluginComponentsDict = {
-            "agents": [],
-            "commands": [],
-            "skills": [],
-            "mcp_servers": [],
-        }
-        if not source.startswith("external:"):
+        catalog_components = plugin.get("components")
+        components: PluginComponentsDict = _empty_components()
+        if catalog_components:
+            components.update(catalog_components)
+        if is_external:
+            local_dir = await self._ensure_external_clone(source)
+        else:
             local_dir = self._resolve_local_plugin_dir(source, marketplace)
-            if local_dir:
-                readme = self._read_local_readme(local_dir)
-                components = self._discover_components_local(local_dir)
+        if local_dir:
+            readme = self._read_local_readme(local_dir)
+            discovered = self._discover_components_local(local_dir)
+            for k in ("agents", "commands", "skills", "mcp_servers", "lsp_servers"):
+                if discovered.get(k):
+                    components[k] = discovered[k]
 
         return {
             "name": plugin["name"],
@@ -171,6 +294,7 @@ class MarketplaceService:
             "homepage": plugin.get("homepage"),
             "readme": readme,
             "components": components,
+            "is_external": is_external,
         }
 
     async def download_agent(
@@ -224,22 +348,27 @@ class MarketplaceService:
         zip_buffer.seek(0)
         return zip_buffer.read()
 
-    async def download_mcp_config(
-        self, source: str, marketplace: str = ""
+    def _download_config_file(
+        self, source: str, filename: str, marketplace: str = ""
     ) -> dict[str, Any] | None:
         local_dir = self._resolve_local_plugin_dir(source, marketplace)
         if not local_dir:
             return None
-        mcp_path = local_dir / ".mcp.json"
-        if not mcp_path.is_file():
+        config_path = local_dir / filename
+        if not config_path.is_file():
             return None
         try:
             return cast(
                 dict[str, Any],
-                json.loads(mcp_path.read_text(encoding="utf-8")),
+                json.loads(config_path.read_text(encoding="utf-8")),
             )
         except (json.JSONDecodeError, OSError):
             return None
+
+    async def download_mcp_config(
+        self, source: str, marketplace: str = ""
+    ) -> dict[str, Any] | None:
+        return self._download_config_file(source, ".mcp.json", marketplace)
 
     def _read_local_file(self, source: str, marketplace: str, rel_path: str) -> bytes:
         local_dir = self._resolve_local_plugin_dir(source, marketplace)
@@ -274,12 +403,7 @@ class MarketplaceService:
 
     @staticmethod
     def _discover_components_local(plugin_dir: Path) -> PluginComponentsDict:
-        components: PluginComponentsDict = {
-            "agents": [],
-            "commands": [],
-            "skills": [],
-            "mcp_servers": [],
-        }
+        components: PluginComponentsDict = _empty_components()
 
         agents_dir = plugin_dir / "agents"
         if agents_dir.is_dir():
@@ -299,18 +423,30 @@ class MarketplaceService:
                 and MarketplaceService._validate_path_segment(d.name)
             ]
 
-        mcp_path = plugin_dir / ".mcp.json"
-        if mcp_path.is_file():
-            try:
-                data = json.loads(mcp_path.read_text(encoding="utf-8"))
-                servers = data.get("mcpServers") or data
-                components["mcp_servers"] = [
-                    k
-                    for k in servers.keys()
-                    if MarketplaceService._validate_path_segment(k)
-                    and isinstance(servers[k], dict)
-                ]
-            except (json.JSONDecodeError, OSError):
-                pass
+        components["mcp_servers"] = MarketplaceService._discover_servers_from_config(
+            plugin_dir, ".mcp.json", "mcpServers"
+        )
+        components["lsp_servers"] = MarketplaceService._discover_servers_from_config(
+            plugin_dir, ".lsp.json"
+        )
 
         return components
+
+    @staticmethod
+    def _discover_servers_from_config(
+        plugin_dir: Path, config_filename: str, servers_key: str | None = None
+    ) -> list[str]:
+        config_path = plugin_dir / config_filename
+        if not config_path.is_file():
+            return []
+        try:
+            data = json.loads(config_path.read_text(encoding="utf-8"))
+            servers = data.get(servers_key, data) if servers_key else data
+            return [
+                k
+                for k in servers.keys()
+                if MarketplaceService._validate_path_segment(k)
+                and isinstance(servers[k], dict)
+            ]
+        except (json.JSONDecodeError, OSError):
+            return []

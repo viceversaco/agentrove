@@ -23,11 +23,13 @@ class PluginComponents(BaseModel):
     commands: list[str] = Field(default_factory=list)
     skills: list[str] = Field(default_factory=list)
     mcp_servers: list[str] = Field(default_factory=list)
+    lsp_servers: list[str] = Field(default_factory=list)
 
 
 class PluginDetails(MarketplacePlugin):
     readme: str | None = None
     components: PluginComponents = Field(default_factory=PluginComponents)
+    is_external: bool = False
 
 
 class InstallComponentRequest(BaseModel):
