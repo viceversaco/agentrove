@@ -26,6 +26,7 @@ class FileMetadata(BaseModel):
     size: int
     modified: float
     is_binary: bool | None = None
+    has_children: bool | None = None
 
 
 class SandboxFilesMetadataResponse(BaseModel):

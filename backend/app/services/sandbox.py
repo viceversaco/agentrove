@@ -234,6 +234,22 @@ class SandboxService:
             for m in metadata
         ]
 
+    async def list_children_metadata(
+        self, sandbox_id: str, path: str
+    ) -> list[dict[str, Any]]:
+        metadata = await self.provider.list_children(sandbox_id, path)
+        return [
+            {
+                "path": m.path,
+                "type": m.type,
+                "size": m.size,
+                "modified": m.modified,
+                "is_binary": m.is_binary,
+                "has_children": m.has_children,
+            }
+            for m in metadata
+        ]
+
     async def get_file_content(self, sandbox_id: str, file_path: str) -> dict[str, Any]:
         try:
             content = await self.provider.read_file(sandbox_id, file_path)

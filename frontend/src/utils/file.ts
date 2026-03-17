@@ -64,6 +64,59 @@ export function sortFiles(files: FileStructure[]): FileStructure[] {
   );
 }
 
+export function buildChildrenFileStructure(
+  metadata: Array<{
+    path: string;
+    type: string;
+    is_binary?: boolean;
+    size?: number;
+    modified?: number;
+    has_children?: boolean;
+  }>,
+): FileStructure[] {
+  const items: FileStructure[] = metadata.map((m) => {
+    const normalizedPath = m.path.replace(LEADING_SLASH_RE, '');
+    if (m.type === 'directory') {
+      return {
+        path: normalizedPath,
+        content: '',
+        type: 'folder' as const,
+        size: m.size,
+        modified: m.modified,
+        isLoaded: false,
+        has_children: m.has_children ?? true,
+        children: [],
+      };
+    }
+    return {
+      path: normalizedPath,
+      content: '',
+      type: 'file' as const,
+      is_binary: m.is_binary,
+      size: m.size,
+      modified: m.modified,
+      isLoaded: false,
+    };
+  });
+  return sortFiles(items);
+}
+
+export function mergeChildrenIntoTree(
+  tree: FileStructure[],
+  parentPath: string,
+  children: FileStructure[],
+): FileStructure[] {
+  return tree.map((node) => {
+    if (node.path === parentPath && node.type === 'folder') {
+      return { ...node, children, isLoaded: true };
+    }
+    if (node.type === 'folder' && node.children && parentPath.startsWith(node.path + '/')) {
+      return { ...node, children: mergeChildrenIntoTree(node.children, parentPath, children) };
+    }
+    return node;
+  });
+}
+
 export function getFileName(path: string): string {
   const parts = path.split('/');
   return parts[parts.length - 1];

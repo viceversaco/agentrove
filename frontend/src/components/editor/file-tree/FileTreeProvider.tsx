@@ -13,10 +13,18 @@ export function FileTreeProvider({
   onFileSelect,
   onToggleFolder,
   modifiedPaths,
+  loadingPaths,
 }: FileTreeProviderProps) {
   const value = useMemo(
-    () => ({ selectedFile, expandedFolders, onFileSelect, onToggleFolder, modifiedPaths }),
-    [selectedFile, expandedFolders, onFileSelect, onToggleFolder, modifiedPaths],
+    () => ({
+      selectedFile,
+      expandedFolders,
+      onFileSelect,
+      onToggleFolder,
+      modifiedPaths,
+      loadingPaths,
+    }),
+    [selectedFile, expandedFolders, onFileSelect, onToggleFolder, modifiedPaths, loadingPaths],
   );
 
   return <FileTreeContext.Provider value={value}>{children}</FileTreeContext.Provider>;

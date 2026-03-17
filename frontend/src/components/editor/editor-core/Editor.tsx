@@ -5,6 +5,7 @@ import type { FileStructure } from '@/types/file-system.types';
 import type { Chat } from '@/types/chat.types';
 import { useResolvedTheme } from '@/hooks/useResolvedTheme';
 import { sandboxService } from '@/services/sandboxService';
+import { findFileInStructure } from '@/utils/file';
 
 const collectFolderPaths = (items: FileStructure[], validPaths: Set<string>) => {
   items.forEach((item) => {
@@ -27,6 +28,8 @@ export interface EditorProps {
   isSandboxSyncing?: boolean;
   onRefresh?: () => void;
   isRefreshing?: boolean;
+  loadChildren?: (folderPath: string) => Promise<void>;
+  loadingPaths?: Record<string, boolean>;
 }
 
 export const Editor = memo(function Editor({
@@ -37,6 +40,8 @@ export const Editor = memo(function Editor({
   isSandboxSyncing = false,
   onRefresh,
   isRefreshing = false,
+  loadChildren,
+  loadingPaths,
 }: EditorProps) {
   const theme = useResolvedTheme();
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
@@ -53,21 +58,29 @@ export const Editor = memo(function Editor({
     const newState: Record<string, boolean> = {};
 
     validFolderPaths.forEach((path) => {
-      newState[path] = path in expandedFolders ? expandedFolders[path] : true;
+      newState[path] = path in expandedFolders ? expandedFolders[path] : false;
     });
 
     return newState;
   }, [expandedFolders, validFolderPaths]);
 
-  const toggleFolder = useCallback((path: string) => {
-    setExpandedFolders((prev) => {
-      const currentValue = path in prev ? prev[path] : true;
-      return {
-        ...prev,
-        [path]: !currentValue,
-      };
-    });
-  }, []);
+  const toggleFolder = useCallback(
+    (path: string) => {
+      setExpandedFolders((prev) => {
+        const currentValue = path in prev ? prev[path] : false;
+        return {
+          ...prev,
+          [path]: !currentValue,
+        };
+      });
+
+      const folder = findFileInStructure(files, path);
+      if (folder && !folder.isLoaded && loadChildren) {
+        void loadChildren(path);
+      }
+    },
+    [files, loadChildren],
+  );
 
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -117,6 +130,7 @@ export const Editor = memo(function Editor({
         isSandboxSyncing={isSandboxSyncing}
         onRefresh={onRefresh}
         isRefreshing={isRefreshing}
+        loadingPaths={loadingPaths}
       />
     </div>
   );

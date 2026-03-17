@@ -71,10 +71,8 @@ export function ChatPage() {
   const { chats, currentChat, fetchedMessages, hasFetchedMessages, chatsQueryMeta, messagesQuery } =
     useChatData(chatId);
 
-  const { fileStructure, isFileMetadataLoading, refetchFilesMetadata } = useSandboxFiles(
-    currentChat,
-    chatId,
-  );
+  const { fileStructure, isFileMetadataLoading, refetchFilesMetadata, loadChildren, loadingPaths } =
+    useSandboxFiles(currentChat, chatId);
 
   const worktreeCwd = currentChat?.worktree_cwd ?? undefined;
 
@@ -216,6 +214,8 @@ export function ChatPage() {
                 isSandboxSyncing={isFileMetadataLoading}
                 onRefresh={handleRefresh}
                 isRefreshing={isRefreshing}
+                loadChildren={loadChildren}
+                loadingPaths={loadingPaths}
               />
             </Suspense>
           );
@@ -268,6 +268,8 @@ export function ChatPage() {
       isFileMetadataLoading,
       handleRefresh,
       isRefreshing,
+      loadChildren,
+      loadingPaths,
       worktreeCwd,
     ],
   );

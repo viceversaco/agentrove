@@ -6,5 +6,6 @@ export interface FileStructure {
   size?: number;
   modified?: number;
   isLoaded?: boolean;
+  has_children?: boolean;
   children?: FileStructure[];
 }

@@ -21,6 +21,7 @@ export interface CodeViewProps {
   isSandboxSyncing?: boolean;
   onRefresh?: () => void;
   isRefreshing?: boolean;
+  loadingPaths?: Record<string, boolean>;
 }
 
 export const CodeView = memo(function CodeView({
@@ -37,6 +38,7 @@ export const CodeView = memo(function CodeView({
   isSandboxSyncing = false,
   onRefresh,
   isRefreshing = false,
+  loadingPaths,
 }: CodeViewProps) {
   const backgroundClass = theme === 'light' ? 'bg-surface-secondary' : 'bg-surface-dark-secondary';
   const isMobile = useIsMobile();
@@ -96,6 +98,7 @@ export const CodeView = memo(function CodeView({
                 onRefresh={onRefresh}
                 isRefreshing={isRefreshing}
                 onClose={() => setShowMobileTree(false)}
+                loadingPaths={loadingPaths}
               />
             </div>
           </>
@@ -142,6 +145,7 @@ export const CodeView = memo(function CodeView({
               onRefresh={onRefresh}
               isRefreshing={isRefreshing}
               onClose={handleToggleFileTree}
+              loadingPaths={loadingPaths}
             />
           </div>
         </Panel>

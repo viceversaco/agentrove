@@ -21,6 +21,7 @@ export interface TreeProps {
   isRefreshing?: boolean;
   onClose?: () => void;
   modifiedPaths?: Set<string>;
+  loadingPaths?: Record<string, boolean>;
 }
 
 export const Tree = memo(function Tree({
@@ -36,6 +37,7 @@ export const Tree = memo(function Tree({
   isRefreshing = false,
   onClose,
   modifiedPaths,
+  loadingPaths,
 }: TreeProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -63,6 +65,7 @@ export const Tree = memo(function Tree({
       onFileSelect={onFileSelect}
       onToggleFolder={onToggleFolder}
       modifiedPaths={modifiedPaths}
+      loadingPaths={loadingPaths}
     >
       <div className="flex h-full select-none flex-col bg-surface-secondary dark:bg-surface-dark-secondary">
         <Header
