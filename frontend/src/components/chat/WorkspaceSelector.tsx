@@ -29,10 +29,11 @@ import { formatRelativeTime } from '@/utils/date';
 import { cn } from '@/utils/cn';
 import { isTauri } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
+import { FolderBrowser } from '@/components/chat/FolderBrowser';
 
 const VISIBLE_LIMIT = 5;
 
-type CreationMode = 'none' | 'menu' | 'empty' | 'git';
+type CreationMode = 'none' | 'menu' | 'empty' | 'git' | 'local';
 
 function ProviderToggle({
   value,
@@ -355,11 +356,13 @@ export function WorkspaceSelector({
   const [searchQuery, setSearchQuery] = useState('');
   const [creationMode, setCreationMode] = useState<CreationMode>('none');
   const [emptyName, setEmptyName] = useState('');
+  const [localPath, setLocalPath] = useState('');
   const [gitUrl, setGitUrl] = useState('');
   const [sandboxProvider, setSandboxProvider] = useState<'docker' | 'host'>(defaultProvider);
   const [repoSearchQuery, setRepoSearchQuery] = useState('');
   const [debouncedRepoQuery, setDebouncedRepoQuery] = useState('');
   const [showUrlInput, setShowUrlInput] = useState(false);
+  const [showBrowser, setShowBrowser] = useState(false);
   useEffect(() => {
     setSandboxProvider(defaultProvider);
   }, [defaultProvider]);
@@ -389,11 +392,13 @@ export function WorkspaceSelector({
     setSearchQuery('');
     setCreationMode('none');
     setEmptyName('');
+    setLocalPath('');
     setGitUrl('');
     setSandboxProvider(defaultProvider);
     setRepoSearchQuery('');
     setDebouncedRepoQuery('');
     setShowUrlInput(false);
+    setShowBrowser(false);
   }, [defaultProvider]);
 
   const selectWorkspace = useCallback(
@@ -421,18 +426,44 @@ export function WorkspaceSelector({
   }, [createWorkspace, emptyName, sandboxProvider, onWorkspaceChange, closeModal]);
 
   const handleChooseLocal = useCallback(async () => {
-    const selected = await open({
-      directory: true,
-      multiple: false,
-      title: 'Select Workspace Folder',
-    });
-    if (!selected || Array.isArray(selected)) return;
+    if (isDesktop) {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: 'Select Workspace Folder',
+      });
+      if (!selected || Array.isArray(selected)) return;
+      try {
+        const name = selected.split(/[\\/]/).filter(Boolean).pop() || 'Local';
+        const workspace = await createWorkspace.mutateAsync({
+          name,
+          source_type: 'local',
+          workspace_path: selected,
+          sandbox_provider: sandboxProvider,
+        });
+        onWorkspaceChange(workspace.id);
+        closeModal();
+        toast.success('Workspace created');
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to create workspace');
+      }
+    } else {
+      setCreationMode('local');
+    }
+  }, [isDesktop, createWorkspace, sandboxProvider, onWorkspaceChange, closeModal]);
+
+  const handleCreateLocal = useCallback(async () => {
+    const trimmed = localPath.trim();
+    if (!trimmed) {
+      toast.error('Enter a folder path');
+      return;
+    }
     try {
-      const name = selected.split(/[\\/]/).filter(Boolean).pop() || 'Local';
+      const name = trimmed.split(/[\\/]/).filter(Boolean).pop() || 'Local';
       const workspace = await createWorkspace.mutateAsync({
         name,
         source_type: 'local',
-        workspace_path: selected,
+        workspace_path: trimmed,
         sandbox_provider: sandboxProvider,
       });
       onWorkspaceChange(workspace.id);
@@ -441,7 +472,7 @@ export function WorkspaceSelector({
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to create workspace');
     }
-  }, [createWorkspace, sandboxProvider, onWorkspaceChange, closeModal]);
+  }, [createWorkspace, localPath, sandboxProvider, onWorkspaceChange, closeModal]);
 
   const cloneRepo = useCallback(
     async (url: string, name: string) => {
@@ -583,6 +614,66 @@ export function WorkspaceSelector({
                   </Button>
                 </div>
               </div>
+            ) : creationMode === 'local' ? (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs text-text-secondary dark:text-text-dark-secondary">
+                    <HardDrive className="h-3.5 w-3.5 text-text-quaternary dark:text-text-dark-quaternary" />
+                    Local folder
+                  </div>
+                  {!isDesktop && (
+                    <button
+                      type="button"
+                      onClick={() => setShowBrowser(!showBrowser)}
+                      className="text-2xs text-text-quaternary transition-colors duration-200 hover:text-text-secondary dark:text-text-dark-quaternary dark:hover:text-text-dark-secondary"
+                    >
+                      {showBrowser ? 'Type path' : 'Browse'}
+                    </button>
+                  )}
+                </div>
+                {showBrowser ? (
+                  <FolderBrowser onSelect={setLocalPath} />
+                ) : (
+                  <input
+                    value={localPath}
+                    onChange={(e) => setLocalPath(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') void handleCreateLocal();
+                    }}
+                    placeholder="/home/user/projects/my-project"
+                    autoFocus
+                    className="bg-surface-primary dark:bg-surface-dark-primary h-8 w-full rounded-lg border border-border/50 px-3 font-mono text-xs text-text-primary outline-none placeholder:text-text-quaternary focus-visible:border-border-hover dark:border-border-dark/50 dark:text-text-dark-primary dark:placeholder:text-text-dark-quaternary dark:focus-visible:border-border-dark-hover"
+                  />
+                )}
+                {localPath && showBrowser && (
+                  <div className="truncate font-mono text-2xs text-text-secondary dark:text-text-dark-secondary">
+                    {localPath}
+                  </div>
+                )}
+                <ProviderToggle value={sandboxProvider} onChange={setSandboxProvider} />
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setCreationMode('menu');
+                      setLocalPath('');
+                      setShowBrowser(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void handleCreateLocal()}
+                    isLoading={createWorkspace.isPending}
+                  >
+                    Create
+                  </Button>
+                </div>
+              </div>
             ) : creationMode === 'git' ? (
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
@@ -706,17 +797,15 @@ export function WorkspaceSelector({
                   <Box className="h-3.5 w-3.5 text-text-quaternary dark:text-text-dark-quaternary" />
                   Empty workspace
                 </button>
-                {isDesktop && (
-                  <button
-                    type="button"
-                    onClick={() => void handleChooseLocal()}
-                    disabled={createWorkspace.isPending}
-                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-text-secondary transition-colors duration-200 hover:bg-surface-hover hover:text-text-primary disabled:opacity-50 dark:text-text-dark-secondary dark:hover:bg-surface-dark-hover dark:hover:text-text-dark-primary"
-                  >
-                    <HardDrive className="h-3.5 w-3.5 text-text-quaternary dark:text-text-dark-quaternary" />
-                    Local folder
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => void handleChooseLocal()}
+                  disabled={createWorkspace.isPending}
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-text-secondary transition-colors duration-200 hover:bg-surface-hover hover:text-text-primary disabled:opacity-50 dark:text-text-dark-secondary dark:hover:bg-surface-dark-hover dark:hover:text-text-dark-primary"
+                >
+                  <HardDrive className="h-3.5 w-3.5 text-text-quaternary dark:text-text-dark-quaternary" />
+                  Local folder
+                </button>
                 <button
                   type="button"
                   onClick={() => setCreationMode('git')}
