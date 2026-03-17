@@ -126,6 +126,19 @@ async def get_files_metadata(
     return SandboxFilesMetadataResponse(files=[FileMetadata(**f) for f in files])
 
 
+@router.get(
+    "/{sandbox_id}/files/children",
+    response_model=SandboxFilesMetadataResponse,
+)
+async def get_files_children(
+    sandbox_id: str = Depends(validate_sandbox_ownership),
+    sandbox_service: SandboxService = Depends(get_sandbox_service),
+    path: str = Query(SANDBOX_HOME_DIR),
+) -> SandboxFilesMetadataResponse:
+    files = await sandbox_service.list_children_metadata(sandbox_id, path)
+    return SandboxFilesMetadataResponse(files=[FileMetadata(**f) for f in files])
+
+
 def _normalize_file_path(file_path: str) -> str:
     if file_path.startswith("/") and not file_path.startswith(SANDBOX_HOME_DIR):
         return file_path.lstrip("/")

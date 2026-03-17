@@ -54,6 +54,18 @@ async function getSandboxFilesMetadata(sandboxId: string): Promise<FileMetadata[
   });
 }
 
+async function getFilesChildren(sandboxId: string, path?: string): Promise<FileMetadata[]> {
+  validateRequired(sandboxId, 'Sandbox ID');
+
+  return serviceCall(async () => {
+    const qs = buildQueryString(path ? { path } : {});
+    const response = await apiClient.get<{ files: FileMetadata[] }>(
+      `/sandbox/${sandboxId}/files/children${qs}`,
+    );
+    return response?.files ?? [];
+  });
+}
+
 async function getFileContent(sandboxId: string, filePath: string): Promise<FileContent> {
   validateRequired(sandboxId, 'Sandbox ID');
   validateRequired(filePath, 'File path');
@@ -262,6 +274,7 @@ async function checkoutGitBranch(sandboxId: string, branch: string): Promise<Git
 export const sandboxService = {
   getPreviewLinks,
   getSandboxFilesMetadata,
+  getFilesChildren,
   getFileContent,
   updateFile,
   getSecrets,

@@ -491,6 +491,80 @@ class LocalHostProvider(SandboxProvider):
         )
 
     @staticmethod
+    def _scandir_children(
+        target_dir: Path,
+        caller_patterns: list[str],
+        gitignore_patterns: list[str],
+        exceptions: list[str],
+        base_dir: Path,
+    ) -> list[FileMetadata]:
+        items: list[FileMetadata] = []
+        try:
+            entries = sorted(os.scandir(target_dir), key=lambda e: e.name.lower())
+        except PermissionError:
+            return items
+
+        for entry in entries:
+            if entry.name.startswith("."):
+                continue
+            rel = str(Path(entry.path).relative_to(base_dir))
+            if LocalHostProvider._is_excluded_path(
+                rel, entry.name, caller_patterns, gitignore_patterns, exceptions
+            ):
+                continue
+            try:
+                stat = entry.stat()
+            except OSError:
+                continue
+
+            if entry.is_dir(follow_symlinks=True):
+                items.append(
+                    FileMetadata(
+                        path=rel,
+                        type="directory",
+                        size=0,
+                        modified=stat.st_mtime,
+                        has_children=True,
+                    )
+                )
+            elif entry.is_file(follow_symlinks=True):
+                ext = Path(entry.name).suffix.lstrip(".").lower()
+                items.append(
+                    FileMetadata(
+                        path=rel,
+                        type="file",
+                        is_binary=ext in SANDBOX_BINARY_EXTENSIONS,
+                        size=stat.st_size,
+                        modified=stat.st_mtime,
+                    )
+                )
+        return items
+
+    async def list_children(
+        self,
+        sandbox_id: str,
+        path: str = SANDBOX_HOME_DIR,
+    ) -> list[FileMetadata]:
+        workspace_dir = self._resolve_workspace_dir(sandbox_id)
+        if path == SANDBOX_HOME_DIR:
+            target_dir = workspace_dir
+        elif not Path(path).is_absolute():
+            target_dir = workspace_dir / path
+        else:
+            target_dir = self._resolve_path(sandbox_id, path)
+        gitignore_patterns, exceptions = await self._get_gitignore_patterns(
+            sandbox_id, str(target_dir)
+        )
+        return await asyncio.to_thread(
+            self._scandir_children,
+            target_dir,
+            [],
+            gitignore_patterns,
+            exceptions,
+            self._resolve_workspace_dir(sandbox_id),
+        )
+
+    @staticmethod
     def _resize_fd(fd: int, rows: int, cols: int) -> None:
         size = rows.to_bytes(2, "little") + cols.to_bytes(2, "little") + b"\x00" * 4
         fcntl.ioctl(fd, termios.TIOCSWINSZ, size)

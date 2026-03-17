@@ -14,6 +14,7 @@ from app.constants import (
     SANDBOX_BINARY_EXTENSIONS,
     SANDBOX_HOME_DIR,
     SANDBOX_SYSTEM_VARIABLES,
+    SANDBOX_WORKSPACE_DIR,
 )
 from app.services.sandbox_providers.types import (
     CommandResult,
@@ -371,6 +372,90 @@ class SandboxProvider(ABC):
                         type="directory",
                         size=0,
                         modified=modified,
+                    )
+                )
+
+        return metadata_items
+
+    async def list_children(
+        self,
+        sandbox_id: str,
+        path: str = SANDBOX_HOME_DIR,
+    ) -> list[FileMetadata]:
+        if path != SANDBOX_HOME_DIR and not path.startswith("/"):
+            path = f"{SANDBOX_WORKSPACE_DIR}/{path}"
+
+        gitignore_patterns, exceptions = await self._get_gitignore_patterns(
+            sandbox_id, path
+        )
+
+        prune_parts: list[str] = []
+        if gitignore_patterns:
+            gi_expr = " -o ".join(
+                self._find_prune_condition(p) for p in gitignore_patterns
+            )
+            exception_expr = ""
+            if exceptions:
+                exception_parts = [
+                    f"! -path {shlex.quote(f'{path}/{e}')}" for e in exceptions
+                ]
+                exception_expr = " " + " ".join(exception_parts)
+            prune_parts.append(f"\\( {gi_expr} \\){exception_expr}")
+
+        if prune_parts:
+            combined = " -o ".join(prune_parts)
+            find_command = (
+                f"find {shlex.quote(path)} -maxdepth 1 "
+                f"\\( {combined} \\) "
+                f"-prune -o -printf '%p\\t%y\\t%s\\t%T@\\n'"
+            )
+        else:
+            find_command = (
+                f"find {shlex.quote(path)} -maxdepth 1 -printf '%p\\t%y\\t%s\\t%T@\\n'"
+            )
+
+        result = await self.execute_command(sandbox_id, find_command, timeout=10)
+
+        metadata_items: list[FileMetadata] = []
+        home_dir_slash = f"{SANDBOX_HOME_DIR}/"
+        for line in result.stdout.strip().split("\n"):
+            if not line:
+                continue
+            parts = line.split("\t")
+            if len(parts) < 4:
+                continue
+
+            file_path, file_type, size, mtime = parts[:4]
+            if not file_path or file_path == path:
+                continue
+
+            if file_path.startswith(home_dir_slash):
+                file_path = file_path[len(home_dir_slash) :]
+
+            modified = float(mtime) if mtime.replace(".", "").isdigit() else 0
+
+            if file_type == "f":
+                is_binary = (
+                    Path(file_path).suffix.lstrip(".").lower()
+                    in SANDBOX_BINARY_EXTENSIONS
+                )
+                metadata_items.append(
+                    FileMetadata(
+                        path=file_path,
+                        type="file",
+                        is_binary=is_binary,
+                        size=int(size) if size.isdigit() else 0,
+                        modified=modified,
+                    )
+                )
+            elif file_type == "d":
+                metadata_items.append(
+                    FileMetadata(
+                        path=file_path,
+                        type="directory",
+                        size=0,
+                        modified=modified,
+                        has_children=True,
                     )
                 )
 

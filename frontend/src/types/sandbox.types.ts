@@ -24,6 +24,7 @@ export interface FileMetadata {
   is_binary?: boolean;
   size: number;
   modified: number;
+  has_children?: boolean;
 }
 
 export interface FileContent {

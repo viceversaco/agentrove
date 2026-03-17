@@ -24,6 +24,7 @@ class FileMetadata:
     size: int
     modified: float
     is_binary: bool = False
+    has_children: bool = False
 
 
 @dataclass
